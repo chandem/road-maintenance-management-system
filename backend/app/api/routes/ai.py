@@ -2,7 +2,7 @@ import json
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from openai import OpenAI
+from google import genai
 
 from app.api.dependencies import get_current_user
 from app.core.config import get_settings
@@ -145,10 +145,10 @@ def generate_ai_explanation(
     recommended_action: str,
 ) -> str | None:
     settings = get_settings()
-    if not settings.openai_api_key:
+    if not settings.gemini_api_key:
         return None
 
-    client = OpenAI(api_key=settings.openai_api_key)
+    client = genai.Client(api_key=settings.gemini_api_key)
     prompt = (
         f"Road section: {data.get('section_code') or 'not recorded'}\n"
         f"Priority score: {score}/100\n"
@@ -162,17 +162,12 @@ def generate_ai_explanation(
     )
 
     try:
-        response = client.responses.create(
-            model=settings.openai_model,
-            input=[
-                {
-                    "role": "system",
-                    "content": "You are an AI road-maintenance analyst.",
-                },
-                {"role": "user", "content": prompt},
-            ],
+        response = client.models.generate_content(
+            model=settings.gemini_model,
+            contents=prompt,
+            config={"system_instruction": "You are an AI road-maintenance analyst."},
         )
-        return response.output_text.strip() or None
+        return response.text.strip() if response.text else None
     except Exception:
         return None
 
@@ -181,7 +176,7 @@ def generate_ranking_ai_explanations(
     rankings: list[RoadRankingItem],
 ) -> dict[str, dict[str, str]]:
     settings = get_settings()
-    if not settings.openai_api_key or not rankings:
+    if not settings.gemini_api_key or not rankings:
         return {}
 
     payload = [
@@ -213,18 +208,13 @@ def generate_ranking_ai_explanations(
     )
 
     try:
-        client = OpenAI(api_key=settings.openai_api_key)
-        response = client.responses.create(
-            model=settings.openai_model,
-            input=[
-                {
-                    "role": "system",
-                    "content": "You are an AI road-maintenance planning assistant.",
-                },
-                {"role": "user", "content": prompt},
-            ],
+        client = genai.Client(api_key=settings.gemini_api_key)
+        response = client.models.generate_content(
+            model=settings.gemini_model,
+            contents=prompt,
+            config={"system_instruction": "You are an AI road-maintenance planning assistant."},
         )
-        raw = response.output_text.strip()
+        raw = response.text.strip() if response.text else ""
         parsed = json.loads(raw)
         if not isinstance(parsed, list):
             return {}
@@ -485,7 +475,7 @@ def office_assistant(
         f"Sections with recorded condition rating >= 4: {len(critical_sections)}.",
     ]
 
-    if not settings.openai_api_key:
+    if not settings.gemini_api_key:
         return OfficeAssistantResponse(
             answer="The AI provider is not configured yet. The verified office data was retrieved successfully, but no AI answer was generated.",
             evidence=evidence,
@@ -513,18 +503,13 @@ def office_assistant(
     )
 
     try:
-        client = OpenAI(api_key=settings.openai_api_key)
-        response = client.responses.create(
-            model=settings.openai_model,
-            input=[
-                {
-                    "role": "system",
-                    "content": "You are the AI-RMMS evidence-based office assistant.",
-                },
-                {"role": "user", "content": prompt},
-            ],
+        client = genai.Client(api_key=settings.gemini_api_key)
+        response = client.models.generate_content(
+            model=settings.gemini_model,
+            contents=prompt,
+            config={"system_instruction": "You are the AI-RMMS evidence-based office assistant."},
         )
-        answer = response.output_text.strip()
+        answer = response.text.strip() if response.text else ""
     except Exception:
         answer = "I could not generate the AI answer right now. Please review the verified office data or try again."
 
