@@ -330,18 +330,26 @@ def rank_road_sections(
             methodology="No road sections were available to analyze.",
         )
 
+    section_ids = [str(section["id"]) for section in sections]
+    work_orders = (
+        supabase.table("work_orders")
+        .select("id,road_section_id,priority,status")
+        .in_("road_section_id", section_ids)
+        .limit(10000)
+        .execute()
+        .data
+        or []
+    )
+    orders_by_section: dict[str, list[dict]] = {}
+    for work_order in work_orders:
+        section_id = str(work_order.get("road_section_id") or "")
+        if section_id:
+            orders_by_section.setdefault(section_id, []).append(work_order)
+
     rows = []
 
     for section in sections:
-        orders = (
-            supabase.table("work_orders")
-            .select("id,priority,status")
-            .eq("road_section_id", str(section["id"]))
-            .limit(100)
-            .execute()
-            .data
-            or []
-        )
+        orders = orders_by_section.get(str(section["id"]), [])
 
         score, level, confidence, _, _ = calculate_priority(section, orders)
 
