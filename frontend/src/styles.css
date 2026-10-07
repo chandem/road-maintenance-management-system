@@ -148,6 +148,39 @@ h2 { margin: 0; font-size: 23px; }
   cursor: pointer;
 }
 
+.assistant-chat form { display: grid; gap: 10px; }
+.assistant-chat textarea {
+  width: 100%;
+  resize: vertical;
+  min-height: 100px;
+  padding: 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  font: inherit;
+  color: #0f172a;
+}
+.assistant-chat textarea:focus { outline: 2px solid #bfdbfe; border-color: #2563eb; }
+.assistant-chat button {
+  justify-self: end;
+  border: 0;
+  border-radius: 9px;
+  padding: 10px 16px;
+  background: #2563eb;
+  color: white;
+  font-weight: 700;
+  cursor: pointer;
+}
+.assistant-chat button:disabled { opacity: .6; cursor: not-allowed; }
+.assistant-answer {
+  margin-top: 14px;
+  padding: 16px;
+  border: 1px solid #dbeafe;
+  border-radius: 12px;
+  background: #f8fbff;
+}
+.assistant-answer p { margin: 8px 0 14px; color: #334155; line-height: 1.65; }
+.evidence-list { display: grid; gap: 5px; color: #64748b; font-size: 12px; }
+
 @media (max-width: 760px) {
   .auth-panel { grid-template-columns: 1fr; }
 }
