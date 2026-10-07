@@ -50,7 +50,7 @@ function App() {
       if (sessionError) throw sessionError;
       const token = sessionData.session?.access_token;
       if (!token) throw new Error("Please sign in to access road intelligence.");
-      const response = await fetch(`${API_BASE_URL}/ai/road-ranking?limit=10`, { headers: { Authorization: `Bearer ${token}` } });
+      const response = await fetch(`${API_BASE_URL}/ai/road-ranking`, { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ limit: 10 }) });
       if (!response.ok) throw new Error(`Road ranking request failed (${response.status})`);
       setData((await response.json()) as RankingResponse);
     } catch (err) {
