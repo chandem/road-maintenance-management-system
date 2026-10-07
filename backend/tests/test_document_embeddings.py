@@ -38,18 +38,18 @@ def test_embedding_response_is_normalized(monkeypatch):
 
         models = Models()
 
-    class FakeGenAI:
-        Client = lambda **kwargs: FakeClient()
-
     class FakeTypes:
         class EmbedContentConfig:
             def __init__(self, **kwargs):
                 assert kwargs["output_dimensionality"] == 768
 
+    class FakeGenAI:
+        Client = lambda **kwargs: FakeClient()
+        types = FakeTypes
+
     import sys
 
     monkeypatch.setitem(sys.modules, "google.genai", FakeGenAI)
-    monkeypatch.setitem(sys.modules, "google.genai.types", FakeTypes)
     monkeypatch.setattr(
         "app.services.document_embeddings.get_settings",
         lambda: SimpleNamespace(gemini_api_key="test-key"),
@@ -70,18 +70,18 @@ def test_provider_failure_is_wrapped(monkeypatch):
 
         models = Models()
 
-    class FakeGenAI:
-        Client = lambda **kwargs: FakeClient()
-
     class FakeTypes:
         class EmbedContentConfig:
             def __init__(self, **kwargs):
                 pass
 
+    class FakeGenAI:
+        Client = lambda **kwargs: FakeClient()
+        types = FakeTypes
+
     import sys
 
     monkeypatch.setitem(sys.modules, "google.genai", FakeGenAI)
-    monkeypatch.setitem(sys.modules, "google.genai.types", FakeTypes)
     monkeypatch.setattr(
         "app.services.document_embeddings.get_settings",
         lambda: SimpleNamespace(gemini_api_key="test-key"),
