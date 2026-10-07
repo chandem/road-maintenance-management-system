@@ -32,3 +32,23 @@ class DocumentSearchResult(BaseModel):
 class DocumentSearchResponse(BaseModel):
     query: str
     results: list[DocumentSearchResult]
+
+
+class DocumentQuestionRequest(BaseModel):
+    question: str = Field(min_length=3, max_length=2_000)
+    document_type: str | None = Field(default=None, max_length=100)
+    limit: int = Field(default=5, ge=1, le=10)
+
+
+class DocumentEvidence(BaseModel):
+    document_id: str
+    title: str
+    document_type: str | None
+    snippet: str
+
+
+class DocumentQuestionResponse(BaseModel):
+    question: str
+    answer: str
+    evidence: list[DocumentEvidence]
+    ai_generated: bool
