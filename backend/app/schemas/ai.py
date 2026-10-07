@@ -34,9 +34,12 @@ class RoadRankingItem(BaseModel):
     active_work_orders: int
     urgent_work_orders: int
     confidence: Decimal = Field(ge=0, le=1)
+    explanation: str | None = None
+    recommended_action: str | None = None
 
 
 class RoadRankingResponse(BaseModel):
     total_sections_analyzed: int
     rankings: list[RoadRankingItem]
     methodology: str
+    ai_generated: bool = False
