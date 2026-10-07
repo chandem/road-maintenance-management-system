@@ -1,8 +1,7 @@
 from decimal import Decimal
-import json
-from urllib.request import Request, urlopen
 
 from fastapi import APIRouter, Depends, HTTPException
+from openai import OpenAI
 
 from app.api.dependencies import get_current_user
 from app.core.config import get_settings
@@ -10,22 +9,40 @@ from app.schemas.ai import RoadPriorityRecommendation, RoadPriorityRequest
 
 router = APIRouter(prefix="/ai", tags=["ai"])
 
+
 def clamp(value: Decimal) -> Decimal:
     return max(Decimal("0"), min(Decimal("100"), value))
+
 
 def generate_ai_explanation(data: dict, score: Decimal, level: str, evidence: list[str], recommended_action: str) -> str | None:
     settings = get_settings()
     if not settings.openai_api_key:
         return None
-    prompt = {"section": data.get("section_code"), "priority_score": float(score), "priority_level": level, "evidence": evidence, "baseline_action": recommended_action}
-    payload = {"model": settings.openai_model, "input": [{"role": "system", "content": "You are an AI road-maintenance analyst. Explain only the supplied evidence. Do not invent missing facts, costs, dates, measurements, or causes. Keep the explanation concise and suitable for an engineering office decision. State uncertainty when evidence is incomplete."}, {"role": "user", "content": json.dumps(prompt)}]}
-    request = Request("https://api.openai.com/v1/responses", data=json.dumps(payload).encode(), headers={"Authorization": f"Bearer {settings.openai_api_key}", "Content-Type": "application/json"}, method="POST")
+
+    client = OpenAI(api_key=settings.openai_api_key)
+    prompt = (
+        f"Road section: {data.get('section_code') or 'not recorded'}\n"
+        f"Priority score: {score.quantize(Decimal('0.01'))}/100\n"
+        f"Priority level: {level}\n"
+        f"Evidence:\n- " + "\n- ".join(evidence) +
+        f"\nBaseline action: {recommended_action}\n\n"
+        "Explain the maintenance priority using only these supplied facts. "
+        "Do not invent causes, costs, dates, measurements, traffic data, or site observations. "
+        "Do not change the score or priority level. Mention uncertainty if important. "
+        "Return one concise engineering-office explanation."
+    )
     try:
-        with urlopen(request, timeout=30) as response:
-            result = json.loads(response.read().decode())
-        return result.get("output_text")
+        response = client.responses.create(
+            model=settings.openai_model,
+            input=[
+                {"role": "system", "content": "You are an AI road-maintenance analyst."},
+                {"role": "user", "content": prompt},
+            ],
+        )
+        return response.output_text.strip() or None
     except Exception:
         return None
+
 
 @router.post("/road-priority", response_model=RoadPriorityRecommendation)
 def analyze_road_priority(request: RoadPriorityRequest, current_user=Depends(get_current_user)):
