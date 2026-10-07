@@ -35,6 +35,9 @@ function App() {
   const [error, setError] = useState<string | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [authReady, setAuthReady] = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [authLoading, setAuthLoading] = useState(false);
 
   const loadRanking = useCallback(async () => {
     setLoading(true);
@@ -93,6 +96,20 @@ function App() {
     if (authReady && user) void loadRanking();
   }, [authReady, user, loadRanking]);
 
+  const handleSignIn = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setAuthLoading(true);
+    setError(null);
+    const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+    if (signInError) setError(signInError.message);
+    setAuthLoading(false);
+  };
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    setData(null);
+  };
+
   const rankings = data?.rankings ?? [];
   const critical = rankings.filter((item) => item.priority_level === "Critical").length;
   const high = rankings.filter((item) => item.priority_level === "High").length;
@@ -129,7 +146,7 @@ function App() {
           </div>
         </section>
 
-        {!authReady && <div className="empty-state">Checking authentication…</div>}\n        {authReady && !user && (\n          <section className="panel">\n            <div className="empty-state">Sign in through Supabase to view protected road intelligence.</div>\n          </section>\n        )}\n\n        <section className="metrics">
+        {!authReady && <div className="empty-state">Checking authentication…</div>}\n        {authReady && !user && (\n          <section className="auth-panel">\n            <div>\n              <p className="eyebrow">SECURE ACCESS</p>\n              <h2>Sign in to AI-RMMS</h2>\n              <p className="auth-copy">Your access token is used only to authenticate requests to the protected maintenance API.</p>\n            </div>\n            <form className="auth-form" onSubmit={handleSignIn}>\n              <input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="Email" required />\n              <input type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Password" required />\n              <button type="submit" disabled={authLoading}>{authLoading ? "Signing in…" : "Sign in"}</button>\n            </form>\n          </section>\n        )}\n\n        <section className="metrics">
           <article><span>Road sections</span><strong>{data?.total_sections_analyzed ?? "—"}</strong><small>Analyzed by priority engine</small></article>
           <article><span>Critical</span><strong>{critical}</strong><small>Needs attention</small></article>
           <article><span>High priority</span><strong>{high}</strong><small>Review recommended</small></article>
