@@ -6,6 +6,9 @@ from app.api.dependencies import get_current_user
 from app.schemas.documents import (
     DocumentClassificationRequest,
     DocumentClassificationResponse,
+    DocumentSearchRequest,
+    DocumentSearchResponse,
+    DocumentSearchResult,
 )
 from app.services.document_extraction import extract_text
 from app.services.document_intelligence import classify_document
@@ -14,6 +17,31 @@ router = APIRouter(prefix="/documents", tags=["documents"])
 
 ALLOWED_EXTENSIONS = {".txt", ".csv", ".pdf", ".docx", ".xlsx", ".xlsm"}
 MAX_FILE_SIZE = 10 * 1024 * 1024
+
+
+def _document_snippet(text: str | None, query: str, max_length: int = 240) -> str:
+    """Return a compact evidence snippet around the first query match."""
+    if not text:
+        return ""
+
+    normalized_text = text.strip()
+    if not normalized_text:
+        return ""
+
+    position = normalized_text.lower().find(query.lower().strip())
+    if position < 0:
+        return normalized_text[:max_length].strip()
+
+    half = max_length // 2
+    start = max(0, position - half)
+    end = min(len(normalized_text), position + len(query) + half)
+    snippet = normalized_text[start:end].strip()
+
+    if start > 0:
+        snippet = "…" + snippet
+    if end < len(normalized_text):
+        snippet += "…"
+    return snippet
 
 
 @router.post("/classify", response_model=DocumentClassificationResponse)
@@ -28,6 +56,49 @@ def classify_document_text(
         confidence=result.confidence,
         reasons=result.reasons,
     )
+
+
+@router.post("/search", response_model=DocumentSearchResponse)
+def search_documents(
+    request: DocumentSearchRequest,
+    current_user=Depends(get_current_user),
+):
+    """Search the authenticated user's organization documents by title or extracted text."""
+    query = request.query.strip()
+    escaped_query = query.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+    pattern = f"%{escaped_query}%"
+
+    document_query = (
+        current_user["client"]
+        .table("documents")
+        .select(
+            "id,title,document_type,status,extraction_status,document_date,extracted_text"
+        )
+        .or_(f"title.ilike.{pattern},extracted_text.ilike.{pattern}")
+        .order("created_at", desc=True)
+        .limit(request.limit)
+    )
+
+    if request.document_type:
+        document_query = document_query.eq("document_type", request.document_type)
+
+    response = document_query.execute()
+    rows = response.data or []
+
+    results = [
+        DocumentSearchResult(
+            id=str(row["id"]),
+            title=row["title"],
+            document_type=row.get("document_type"),
+            status=row["status"],
+            extraction_status=row["extraction_status"],
+            document_date=str(row["document_date"]) if row.get("document_date") else None,
+            snippet=_document_snippet(row.get("extracted_text"), query),
+        )
+        for row in rows
+    ]
+
+    return DocumentSearchResponse(query=query, results=results)
 
 
 @router.post("/upload-and-classify", response_model=DocumentClassificationResponse)
