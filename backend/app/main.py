@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 
 from app.api.routes.ai import router as ai_router
+from app.api.routes.assets import router as assets_router
 from app.api.routes.documents import router as documents_router
 from app.api.routes.employees import router as employees_router
 from app.api.routes.finance import router as finance_router
@@ -25,6 +26,7 @@ app.include_router(maintenance_plans_router, prefix="/api/v1")
 app.include_router(machinery_router, prefix="/api/v1")
 app.include_router(employees_router, prefix="/api/v1")
 app.include_router(finance_router, prefix="/api/v1")
+app.include_router(assets_router, prefix="/api/v1")
 
 
 @app.get("/")
