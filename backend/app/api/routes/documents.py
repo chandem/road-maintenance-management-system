@@ -56,9 +56,45 @@ async def upload_and_classify_document(
         )
 
     result = classify_document(filename, text)
+
+    profile = (
+        current_user["client"]
+        .table("user_profiles")
+        .select("organization_id")
+        .eq("id", current_user["id"])
+        .maybe_single()
+        .execute()
+    )
+    organization_id = (profile.data or {}).get("organization_id")
+    if not organization_id:
+        raise HTTPException(status_code=409, detail="User is not assigned to an organization.")
+
+    document = (
+        current_user["client"]
+        .table("documents")
+        .insert(
+            {
+                "organization_id": organization_id,
+                "title": filename,
+                "document_type": result.document_type,
+                "mime_type": file.content_type,
+                "status": "processed",
+                "extraction_status": "completed",
+                "classification_confidence": result.confidence,
+                "extracted_text": text,
+                "file_size_bytes": len(content),
+                "uploaded_by": current_user["id"],
+            }
+        )
+        .execute()
+    )
+
+    if not document.data:
+        raise HTTPException(status_code=500, detail="Document could not be saved.")
+
     return DocumentClassificationResponse(
         filename=filename,
         document_type=result.document_type,
         confidence=result.confidence,
-        reasons=result.reasons + [f"Extracted {len(text)} characters from the uploaded document."],
+        reasons=result.reasons + [f"Stored {len(text)} extracted characters in the document record."],
     )
