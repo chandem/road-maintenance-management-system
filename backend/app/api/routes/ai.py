@@ -13,6 +13,7 @@ from app.schemas.ai import (
     RoadRankingRequest,
     RoadRankingResponse,
 )
+from app.schemas.office_assistant import OfficeAssistantRequest, OfficeAssistantResponse
 
 router = APIRouter(prefix="/ai", tags=["ai"])
 
@@ -424,3 +425,108 @@ def rank_road_sections(
         ),
         ai_generated=ai_generated,
     )
+
+
+@router.post("/office-assistant", response_model=OfficeAssistantResponse)
+def office_assistant(
+    request: OfficeAssistantRequest,
+    current_user=Depends(get_current_user),
+):
+    settings = get_settings()
+    supabase = current_user["client"]
+
+    roads = (
+        supabase.table("roads")
+        .select("id,road_code,name,total_length_km,status")
+        .limit(100)
+        .execute()
+        .data
+        or []
+    )
+    sections = (
+        supabase.table("road_sections")
+        .select("id,road_id,section_code,condition_rating,status")
+        .limit(500)
+        .execute()
+        .data
+        or []
+    )
+    plans = (
+        supabase.table("maintenance_plans")
+        .select("id,name,fiscal_year,plan_type,status,budget_amount,start_date,end_date")
+        .limit(100)
+        .execute()
+        .data
+        or []
+    )
+    work_orders = (
+        supabase.table("work_orders")
+        .select("id,road_section_id,work_order_no,title,maintenance_type,priority,status,planned_cost,actual_cost")
+        .limit(500)
+        .execute()
+        .data
+        or []
+    )
+
+    active_orders = [
+        item for item in work_orders
+        if (item.get("status") or "").lower() not in {"completed", "closed", "cancelled"}
+    ]
+    critical_sections = [
+        item for item in sections
+        if item.get("condition_rating") is not None
+        and float(item["condition_rating"]) >= 4
+    ]
+
+    evidence = [
+        f"Road records available to this organization: {len(roads)}.",
+        f"Road sections available to this organization: {len(sections)}.",
+        f"Maintenance plans available: {len(plans)}.",
+        f"Work orders available: {len(work_orders)}; active: {len(active_orders)}.",
+        f"Sections with recorded condition rating >= 4: {len(critical_sections)}.",
+    ]
+
+    if not settings.openai_api_key:
+        return OfficeAssistantResponse(
+            answer="The AI provider is not configured yet. The verified office data was retrieved successfully, but no AI answer was generated.",
+            evidence=evidence,
+        )
+
+    context = {
+        "roads": roads,
+        "road_sections": sections,
+        "maintenance_plans": plans,
+        "work_orders": work_orders,
+        "summary": evidence,
+    }
+
+    prompt = (
+        "Answer the maintenance-office user's question using ONLY the supplied "
+        "organization data. If the data does not contain the answer, say that it "
+        "is not available. Never invent costs, dates, causes, quantities, traffic "
+        "conditions, site observations, or project status. Distinguish recorded "
+        "facts from recommendations. Recommendations are advisory only and must "
+        "not approve spending, contracts, payments, budget changes, or official "
+        "work-order closure. Keep the answer concise and useful for an engineering "
+        "office.\n\n"
+        f"User question: {request.question}\n\n"
+        f"Verified data:\n{json.dumps(context, default=str)}"
+    )
+
+    try:
+        client = OpenAI(api_key=settings.openai_api_key)
+        response = client.responses.create(
+            model=settings.openai_model,
+            input=[
+                {
+                    "role": "system",
+                    "content": "You are the AI-RMMS evidence-based office assistant.",
+                },
+                {"role": "user", "content": prompt},
+            ],
+        )
+        answer = response.output_text.strip()
+    except Exception:
+        answer = "I could not generate the AI answer right now. Please review the verified office data or try again."
+
+    return OfficeAssistantResponse(answer=answer, evidence=evidence)
