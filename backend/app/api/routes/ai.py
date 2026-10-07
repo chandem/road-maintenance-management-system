@@ -2,7 +2,6 @@ import json
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from google import genai
 
 from app.api.dependencies import get_current_user
 from app.core.config import get_settings
@@ -13,6 +12,8 @@ from app.schemas.ai import (
     RoadRankingResponse,
 )
 from app.schemas.office_assistant import OfficeAssistantRequest, OfficeAssistantResponse
+from app.services.ai_audit import log_analysis_run, resolve_organization_id
+from app.services.ai_provider import generate_text
 
 router = APIRouter(prefix="/ai", tags=["ai"])
 
@@ -153,11 +154,6 @@ def generate_ai_explanation(
     evidence: list[str],
     recommended_action: str,
 ) -> str | None:
-    settings = get_settings()
-    if not settings.gemini_api_key:
-        return None
-
-    client = genai.Client(api_key=settings.gemini_api_key)
     prompt = (
         f"Road section: {data.get('section_code') or 'not recorded'}\n"
         f"Priority score: {score}/100\n"
@@ -169,23 +165,17 @@ def generate_ai_explanation(
         "measurements, traffic data, or site observations. Do not change the "
         "score or priority level. Return one concise engineering-office explanation."
     )
-
-    try:
-        response = client.models.generate_content(
-            model=settings.gemini_model,
-            contents=prompt,
-            config={"system_instruction": "You are an AI road-maintenance analyst."},
-        )
-        return response.text.strip() if response.text else None
-    except Exception:
-        return None
+    result = generate_text(
+        prompt,
+        system_instruction="You are an AI road-maintenance analyst.",
+    )
+    return result.text if result else None
 
 
 def generate_ranking_ai_explanations(
     rankings: list[RoadRankingItem],
 ) -> dict[str, dict[str, str]]:
-    settings = get_settings()
-    if not settings.gemini_api_key or not rankings:
+    if not rankings:
         return {}
 
     payload = [
@@ -216,19 +206,18 @@ def generate_ranking_ai_explanations(
         + json.dumps(payload, default=str)
     )
 
+    result = generate_text(
+        prompt,
+        system_instruction="You are an AI road-maintenance planning assistant.",
+    )
+    if not result:
+        return {}
+
     try:
-        client = genai.Client(api_key=settings.gemini_api_key)
-        response = client.models.generate_content(
-            model=settings.gemini_model,
-            contents=prompt,
-            config={"system_instruction": "You are an AI road-maintenance planning assistant."},
-        )
-        raw = response.text.strip() if response.text else ""
-        parsed = json.loads(raw)
+        parsed = json.loads(result.text)
         if not isinstance(parsed, list):
             return {}
-
-        result: dict[str, dict[str, str]] = {}
+        out: dict[str, dict[str, str]] = {}
         for item in parsed:
             if not isinstance(item, dict):
                 continue
@@ -236,11 +225,11 @@ def generate_ranking_ai_explanations(
             explanation = str(item.get("explanation", "")).strip()
             action = str(item.get("recommended_action", "")).strip()
             if section_id and explanation and action:
-                result[section_id] = {
+                out[section_id] = {
                     "explanation": explanation,
                     "recommended_action": action,
                 }
-        return result
+        return out
     except Exception:
         return {}
 
@@ -288,7 +277,7 @@ def analyze_road_priority(
         "based on the recorded evidence."
     )
 
-    return RoadPriorityRecommendation(
+    recommendation = RoadPriorityRecommendation(
         road_section_id=request.road_section_id,
         priority_score=score,
         priority_level=level,
@@ -298,6 +287,27 @@ def analyze_road_priority(
         explanation=explanation,
         recommended_action=action,
     )
+
+    org_id = resolve_organization_id(supabase, current_user["id"])
+    if org_id:
+        log_analysis_run(
+            supabase,
+            organization_id=org_id,
+            analysis_type="road_priority",
+            entity_type="road_section",
+            entity_id=str(request.road_section_id),
+            status="completed",
+            confidence=float(confidence),
+            result={
+                "priority_score": float(score),
+                "priority_level": level,
+                "recommended_action": action,
+            },
+            evidence={"reasons": reasons, "evidence": evidence},
+            created_by=current_user["id"],
+        )
+
+    return recommendation
 
 
 @router.get("/road-ranking", response_model=RoadRankingResponse)
@@ -346,7 +356,6 @@ def rank_road_sections(
 
     for section in sections:
         orders = orders_by_section.get(str(section["id"]), [])
-
         score, level, confidence, _, _ = calculate_priority(section, orders)
 
         active = [
@@ -420,7 +429,7 @@ def rank_road_sections(
                 )
             )
 
-    return RoadRankingResponse(
+    response = RoadRankingResponse(
         total_sections_analyzed=len(rows),
         rankings=enriched_rankings,
         methodology=(
@@ -432,13 +441,30 @@ def rank_road_sections(
         ai_generated=ai_generated,
     )
 
+    org_id = resolve_organization_id(supabase, current_user["id"])
+    if org_id:
+        log_analysis_run(
+            supabase,
+            organization_id=org_id,
+            analysis_type="road_ranking",
+            status="completed",
+            result={
+                "total_sections_analyzed": len(rows),
+                "returned": len(enriched_rankings),
+                "ai_generated": ai_generated,
+            },
+            evidence={"methodology": response.methodology},
+            created_by=current_user["id"],
+        )
+
+    return response
+
 
 @router.post("/office-assistant", response_model=OfficeAssistantResponse)
 def office_assistant(
     request: OfficeAssistantRequest,
     current_user=Depends(get_current_user),
 ):
-    settings = get_settings()
     supabase = current_user["client"]
 
     roads = (
@@ -556,6 +582,7 @@ def office_assistant(
         f"Asset records available: {len(assets)}; active: {len(active_assets)}.",
     ]
 
+    settings = get_settings()
     if not settings.gemini_api_key:
         return OfficeAssistantResponse(
             answer="The AI provider is not configured yet. The verified office data was retrieved successfully, but no AI answer was generated.",
@@ -588,15 +615,26 @@ def office_assistant(
         f"Verified data:\n{json.dumps(context, default=str)}"
     )
 
-    try:
-        client = genai.Client(api_key=settings.gemini_api_key)
-        response = client.models.generate_content(
-            model=settings.gemini_model,
-            contents=prompt,
-            config={"system_instruction": "You are the AI-RMMS evidence-based office assistant."},
-        )
-        answer = response.text.strip() if response.text else ""
-    except Exception:
+    ai_result = generate_text(
+        prompt,
+        system_instruction="You are the AI-RMMS evidence-based office assistant.",
+    )
+    if ai_result:
+        answer = ai_result.text
+    else:
         answer = "I could not generate the AI answer right now. Please review the verified office data or try again."
+
+    org_id = resolve_organization_id(supabase, current_user["id"])
+    if org_id:
+        log_analysis_run(
+            supabase,
+            organization_id=org_id,
+            analysis_type="office_assistant",
+            input_reference=request.question[:500],
+            status="completed" if ai_result else "failed",
+            result={"answer": answer[:2000]},
+            evidence={"summary": evidence},
+            created_by=current_user["id"],
+        )
 
     return OfficeAssistantResponse(answer=answer, evidence=evidence)
