@@ -485,6 +485,30 @@ def office_assistant(
         .data
         or []
     )
+    employees = (
+        supabase.table("employees")
+        .select("id,employee_code,full_name,job_title,status")
+        .limit(200)
+        .execute()
+        .data
+        or []
+    )
+    budgets = (
+        supabase.table("budgets")
+        .select("id,fiscal_year,budget_code,category,allocated_amount,spent_amount,committed_amount,status")
+        .limit(50)
+        .execute()
+        .data
+        or []
+    )
+    expenses = (
+        supabase.table("expenses")
+        .select("id,budget_id,work_order_id,expense_date,description,category,amount,status")
+        .limit(200)
+        .execute()
+        .data
+        or []
+    )
 
     active_orders = [
         item for item in work_orders
@@ -503,6 +527,13 @@ def office_assistant(
         item for item in machinery
         if (item.get("status") or "").lower() in {"down", "under_maintenance", "broken", "unavailable"}
     ]
+    active_employees = [
+        item for item in employees
+        if (item.get("status") or "").lower() == "active"
+    ]
+
+    total_allocated = sum(float(b.get("allocated_amount") or 0) for b in budgets)
+    total_spent = sum(float(b.get("spent_amount") or 0) for b in budgets)
 
     evidence = [
         f"Road records available to this organization: {len(roads)}.",
@@ -511,6 +542,9 @@ def office_assistant(
         f"Work orders available: {len(work_orders)}; active: {len(active_orders)}.",
         f"Sections with recorded condition rating >= 4: {len(critical_sections)}.",
         f"Machinery records available: {len(machinery)}; available/operational: {len(available_machinery)}; down/under maintenance: {len(down_machinery)}.",
+        f"Employee records available: {len(employees)}; active: {len(active_employees)}.",
+        f"Budget records available: {len(budgets)}; total allocated: {total_allocated:.2f}; total spent: {total_spent:.2f}.",
+        f"Expense records available: {len(expenses)}.",
     ]
 
     if not settings.gemini_api_key:
@@ -525,6 +559,9 @@ def office_assistant(
         "maintenance_plans": plans,
         "work_orders": work_orders,
         "machinery": machinery,
+        "employees": employees,
+        "budgets": budgets,
+        "expenses": expenses,
         "summary": evidence,
     }
 
