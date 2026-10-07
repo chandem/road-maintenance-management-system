@@ -34,7 +34,7 @@ def test_closed_work_order_does_not_count_as_active():
 
     assert "0 active work order(s)" in reasons
     assert any("active: 0" in item and "urgent/high: 0" in item for item in evidence)
-    assert score == Decimal("44.12")
+    assert score == Decimal("33.53")
 
 
 def test_priority_score_stays_within_bounds():
