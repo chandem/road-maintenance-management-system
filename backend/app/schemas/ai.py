@@ -3,10 +3,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
-
 class RoadPriorityRequest(BaseModel):
     road_section_id: UUID
-
 
 class RoadPriorityRecommendation(BaseModel):
     road_section_id: UUID
@@ -15,3 +13,5 @@ class RoadPriorityRecommendation(BaseModel):
     reasons: list[str]
     evidence: list[str]
     confidence: Decimal = Field(ge=0, le=1)
+    explanation: str
+    recommended_action: str
