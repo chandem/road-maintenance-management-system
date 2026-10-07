@@ -48,4 +48,7 @@ def analyze_road_priority(request: RoadPriorityRequest, current_user=Depends(get
     confidence = Decimal("0.90") if data_points == 3 else Decimal("0.70") if data_points == 2 else Decimal("0.45")
     evidence.append(f"Score components: condition={condition}, urgency={urgency}, planning={planning}, data_quality={data_quality}.")
 
-    return RoadPriorityRecommendation(road_section_id=request.road_section_id, priority_score=score.quantize(Decimal("0.01")), priority_level=level, reasons=reasons, evidence=evidence, confidence=confidence)
+    explanation = f"Section {data.get('section_code') or request.road_section_id} has a {level} maintenance priority with a score of {score.quantize(Decimal('0.01'))}/100. The assessment is based on recorded condition, active work orders, planning signals, and available data quality."
+    recommended_action = {"critical": "Prioritize field verification and maintenance action.", "high": "Schedule field verification and include in near-term maintenance planning.", "medium": "Monitor the section and address it through planned maintenance.", "low": "Continue routine monitoring and update condition data when available."}[level]
+
+    return RoadPriorityRecommendation(road_section_id=request.road_section_id, priority_score=score.quantize(Decimal("0.01")), priority_level=level, reasons=reasons, evidence=evidence, confidence=confidence, explanation=explanation, recommended_action=recommended_action)
