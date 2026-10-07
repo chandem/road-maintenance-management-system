@@ -5,7 +5,13 @@ from openai import OpenAI
 
 from app.api.dependencies import get_current_user
 from app.core.config import get_settings
-from app.schemas.ai import RoadPriorityRecommendation, RoadPriorityRequest
+from app.schemas.ai import (
+    RoadPriorityRecommendation,
+    RoadPriorityRequest,
+    RoadRankingItem,
+    RoadRankingRequest,
+    RoadRankingResponse,
+)
 
 router = APIRouter(prefix="/ai", tags=["ai"])
 
@@ -14,43 +20,7 @@ def clamp(value: Decimal) -> Decimal:
     return max(Decimal("0"), min(Decimal("100"), value))
 
 
-def generate_ai_explanation(data: dict, score: Decimal, level: str, evidence: list[str], recommended_action: str) -> str | None:
-    settings = get_settings()
-    if not settings.openai_api_key:
-        return None
-
-    client = OpenAI(api_key=settings.openai_api_key)
-    prompt = (
-        f"Road section: {data.get('section_code') or 'not recorded'}\n"
-        f"Priority score: {score.quantize(Decimal('0.01'))}/100\n"
-        f"Priority level: {level}\n"
-        f"Evidence:\n- " + "\n- ".join(evidence) +
-        f"\nBaseline action: {recommended_action}\n\n"
-        "Explain the maintenance priority using only these supplied facts. "
-        "Do not invent causes, costs, dates, measurements, traffic data, or site observations. "
-        "Do not change the score or priority level. Mention uncertainty if important. "
-        "Return one concise engineering-office explanation."
-    )
-    try:
-        response = client.responses.create(
-            model=settings.openai_model,
-            input=[
-                {"role": "system", "content": "You are an AI road-maintenance analyst."},
-                {"role": "user", "content": prompt},
-            ],
-        )
-        return response.output_text.strip() or None
-    except Exception:
-        return None
-
-
-@router.post("/road-priority", response_model=RoadPriorityRecommendation)
-def analyze_road_priority(request: RoadPriorityRequest, current_user=Depends(get_current_user)):
-    supabase = current_user["client"]
-    section = (supabase.table("road_sections").select("id,road_id,section_code,start_chainage_km,end_chainage_km,length_km,condition_rating,status").eq("id", str(request.road_section_id)).maybe_single().execute())
-    if not section.data:
-        raise HTTPException(status_code=404, detail="Road section not found")
-    data = section.data
+def calculate_priority(data: dict, work_orders: list[dict]) -> tuple[Decimal, str, Decimal, list[str], list[str]]:
     reasons: list[str] = []
     evidence: list[str] = []
     rating = data.get("condition_rating")
@@ -61,7 +31,6 @@ def analyze_road_priority(request: RoadPriorityRequest, current_user=Depends(get
         condition = clamp((Decimal("5") - Decimal(str(rating))) * Decimal("25"))
         reasons.append(f"Recorded condition rating is {rating}.")
     evidence.append(f"Road section status: {data.get('status') or 'not recorded'}.")
-    work_orders = (supabase.table("work_orders").select("id,work_order_no,title,priority,status,planned_cost,actual_cost").eq("road_section_id", str(request.road_section_id)).limit(100).execute().data or [])
     open_orders = [w for w in work_orders if (w.get("status") or "").lower() not in {"completed", "closed", "cancelled"}]
     urgent_orders = [w for w in open_orders if (w.get("priority") or "").lower() in {"critical", "high", "urgent"}]
     urgency = Decimal("100") if urgent_orders else Decimal("60") if open_orders else Decimal("0")
@@ -74,6 +43,49 @@ def analyze_road_priority(request: RoadPriorityRequest, current_user=Depends(get
     level = "critical" if score >= 80 else "high" if score >= 60 else "medium" if score >= 40 else "low"
     confidence = Decimal("0.90") if data_points == 3 else Decimal("0.70") if data_points == 2 else Decimal("0.45")
     evidence.append(f"Score components: condition={condition}, urgency={urgency}, planning={planning}, data_quality={data_quality}.")
+    return score.quantize(Decimal("0.01")), level, confidence, reasons, evidence
+
+
+def generate_ai_explanation(data: dict, score: Decimal, level: str, evidence: list[str], recommended_action: str) -> str | None:
+    settings = get_settings()
+    if not settings.openai_api_key:
+        return None
+    client = OpenAI(api_key=settings.openai_api_key)
+    prompt = (f"Road section: {data.get('section_code') or 'not recorded'}\\nPriority score: {score}/100\\nPriority level: {level}\\nEvidence:\\n- " + "\\n- ".join(evidence) + f"\\nBaseline action: {recommended_action}\\n\\nExplain using only these facts. Do not invent causes, costs, dates, measurements, traffic data, or site observations. Do not change the score or priority level. Return one concise engineering-office explanation.")
+    try:
+        response = client.responses.create(model=settings.openai_model, input=[{"role": "system", "content": "You are an AI road-maintenance analyst."}, {"role": "user", "content": prompt}])
+        return response.output_text.strip() or None
+    except Exception:
+        return None
+
+
+@router.post("/road-priority", response_model=RoadPriorityRecommendation)
+def analyze_road_priority(request: RoadPriorityRequest, current_user=Depends(get_current_user)):
+    supabase = current_user["client"]
+    section = supabase.table("road_sections").select("id,road_id,section_code,start_chainage_km,end_chainage_km,length_km,condition_rating,status").eq("id", str(request.road_section_id)).maybe_single().execute()
+    if not section.data:
+        raise HTTPException(status_code=404, detail="Road section not found")
+    data = section.data
+    work_orders = supabase.table("work_orders").select("id,work_order_no,title,priority,status,planned_cost,actual_cost").eq("road_section_id", str(request.road_section_id)).limit(100).execute().data or []
+    score, level, confidence, reasons, evidence = calculate_priority(data, work_orders)
     baseline = {"critical": "Prioritize field verification and maintenance action.", "high": "Schedule field verification and include in near-term maintenance planning.", "medium": "Monitor the section and address it through planned maintenance.", "low": "Continue routine monitoring and update condition data when available."}[level]
-    explanation = generate_ai_explanation(data, score, level, evidence, baseline) or f"Section {data.get('section_code') or request.road_section_id} has a {level} maintenance priority with a score of {score.quantize(Decimal('0.01'))}/100, based on the recorded evidence."
-    return RoadPriorityRecommendation(road_section_id=request.road_section_id, priority_score=score.quantize(Decimal("0.01")), priority_level=level, reasons=reasons, evidence=evidence, confidence=confidence, explanation=explanation, recommended_action=baseline)
+    explanation = generate_ai_explanation(data, score, level, evidence, baseline) or f"Section {data.get('section_code') or request.road_section_id} has a {level} maintenance priority with a score of {score}/100, based on the recorded evidence."
+    return RoadPriorityRecommendation(road_section_id=request.road_section_id, priority_score=score, priority_level=level, reasons=reasons, evidence=evidence, confidence=confidence, explanation=explanation, recommended_action=baseline)
+
+
+@router.post("/road-ranking", response_model=RoadRankingResponse)
+def rank_road_sections(request: RoadRankingRequest, current_user=Depends(get_current_user)):
+    supabase = current_user["client"]
+    sections = supabase.table("road_sections").select("id,road_id,section_code,start_chainage_km,end_chainage_km,length_km,condition_rating,status").limit(1000).execute().data or []
+    if not sections:
+        return RoadRankingResponse(total_sections_analyzed=0, rankings=[], methodology="No road sections were available to analyze.")
+    rows = []
+    for section in sections:
+        orders = supabase.table("work_orders").select("id,priority,status").eq("road_section_id", str(section["id"])).limit(100).execute().data or []
+        score, level, confidence, _, _ = calculate_priority(section, orders)
+        active = [w for w in orders if (w.get("status") or "").lower() not in {"completed", "closed", "cancelled"}]
+        urgent = [w for w in active if (w.get("priority") or "").lower() in {"critical", "high", "urgent"}]
+        rows.append(RoadRankingItem(rank=0, road_section_id=section["id"], section_code=section.get("section_code"), priority_score=score, priority_level=level, condition_rating=section.get("condition_rating"), status=section.get("status"), active_work_orders=len(active), urgent_work_orders=len(urgent), confidence=confidence))
+    rows.sort(key=lambda item: (-item.priority_score, -item.confidence, item.section_code or ""))
+    rankings = [item.model_copy(update={"rank": index}) for index, item in enumerate(rows[:request.limit], start=1)]
+    return RoadRankingResponse(total_sections_analyzed=len(rows), rankings=rankings, methodology="Sections are ranked using deterministic condition, work-order urgency, planning, and data-quality signals. AI explanations are generated separately from verified evidence.")
