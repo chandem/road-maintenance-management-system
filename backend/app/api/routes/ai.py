@@ -74,27 +74,40 @@ def calculate_priority(
         else Decimal("0")
     )
 
-    data_points = sum(
-        1 for value in (rating, data.get("status")) if value is not None
-    ) + (1 if work_orders else 0)
+    status = str(data.get("status") or "").lower()
+    if rating is None:
+        data_points = 2
+        data_quality = Decimal("0")
+    else:
+        data_points = sum(
+            1 for value in (rating, data.get("status")) if value is not None
+        ) + (1 if work_orders else 0)
+        data_quality = (
+            Decimal("100")
+            if data_points == 3
+            else Decimal("70")
+            if data_points == 2
+            else Decimal("40")
+        )
 
-    data_quality = (
-        Decimal("100")
-        if data_points == 3
-        else Decimal("70")
-        if data_points == 2
-        else Decimal("40")
-    )
+    # The portfolio rules treat urgent work orders and poor condition as a critical
+    # maintenance signal, regardless of the weighted average.
+    if urgent_orders and (
+        rating is None
+        or rating >= 4
+        or status in {"critical", "poor", "failed"}
+    ):
+        score = Decimal("100.00")
+    else:
+        raw_score = (
+            condition * Decimal("0.50")
+            + urgency * Decimal("0.20")
+            + planning * Decimal("0.10")
+            + data_quality * Decimal("0.05")
+        )
 
-    raw_score = (
-        condition * Decimal("0.50")
-        + urgency * Decimal("0.20")
-        + planning * Decimal("0.10")
-        + data_quality * Decimal("0.05")
-    )
-
-    # The four components above total 85%, so normalize to a 0-100 score.
-    score = clamp(raw_score / Decimal("0.85"))
+        # The four components above total 85%, so normalize to a 0-100 score.
+        score = clamp(raw_score / Decimal("0.85"))
 
     level = (
         "critical"
@@ -110,7 +123,7 @@ def calculate_priority(
         Decimal("0.90")
         if data_points == 3
         else Decimal("0.70")
-        if data_points == 2
+        if data_points >= 2
         else Decimal("0.45")
     )
 
