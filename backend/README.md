@@ -2,11 +2,16 @@
 
 FastAPI backend for the AI-Powered Road Maintenance Management System.
 
-## Local development
+Run locally with:
 
-cd backend
-python -m uvicorn app.main:app --reload
+```bash
+uvicorn app.main:app --reload
+```
 
-Health check: GET /health
+Health endpoint:
 
-The backend will later connect to Supabase/PostgreSQL and expose Road, Finance, Asset, Machinery, HR, Document, and AI APIs.
+```
+GET /api/v1/health
+```
+
+Keep Supabase credentials in environment variables and never commit real secrets.

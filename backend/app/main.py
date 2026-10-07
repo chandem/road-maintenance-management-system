@@ -1,11 +1,12 @@
 from fastapi import FastAPI
 
-app = FastAPI(
-    title="AI-RMMS API",
-    version="0.1.0",
-    description="AI-Powered Road Maintenance Management System API",
-)
+from app.api.routes.health import router as health_router
 
-@app.get("/health")
-def health():
-    return {"status": "ok", "service": "ai-rmms"}
+app = FastAPI(title="AI-RMMS API", version="0.1.0")
+
+app.include_router(health_router, prefix="/api/v1")
+
+
+@app.get("/")
+def root() -> dict[str, str]:
+    return {"name": "AI-RMMS API", "status": "running", "version": "0.1.0"}
