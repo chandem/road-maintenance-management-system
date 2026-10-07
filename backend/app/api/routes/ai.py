@@ -477,6 +477,14 @@ def office_assistant(
         .data
         or []
     )
+    machinery = (
+        supabase.table("machinery")
+        .select("id,asset_code,name,machinery_type,status,current_hours")
+        .limit(200)
+        .execute()
+        .data
+        or []
+    )
 
     active_orders = [
         item for item in work_orders
@@ -487,6 +495,14 @@ def office_assistant(
         if item.get("condition_rating") is not None
         and float(item["condition_rating"]) >= 4
     ]
+    available_machinery = [
+        item for item in machinery
+        if (item.get("status") or "").lower() in {"available", "ready", "operational"}
+    ]
+    down_machinery = [
+        item for item in machinery
+        if (item.get("status") or "").lower() in {"down", "under_maintenance", "broken", "unavailable"}
+    ]
 
     evidence = [
         f"Road records available to this organization: {len(roads)}.",
@@ -494,6 +510,7 @@ def office_assistant(
         f"Maintenance plans available: {len(plans)}.",
         f"Work orders available: {len(work_orders)}; active: {len(active_orders)}.",
         f"Sections with recorded condition rating >= 4: {len(critical_sections)}.",
+        f"Machinery records available: {len(machinery)}; available/operational: {len(available_machinery)}; down/under maintenance: {len(down_machinery)}.",
     ]
 
     if not settings.gemini_api_key:
@@ -507,6 +524,7 @@ def office_assistant(
         "road_sections": sections,
         "maintenance_plans": plans,
         "work_orders": work_orders,
+        "machinery": machinery,
         "summary": evidence,
     }
 
