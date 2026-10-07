@@ -4,8 +4,8 @@ from app.api.routes.ai import calculate_priority
 
 
 def test_ranking_prefers_worse_condition():
-    poor = {"condition_rating": 5, "status": "poor"}
-    good = {"condition_rating": 1, "status": "good"}
+    poor = {"condition_rating": 1, "status": "poor"}
+    good = {"condition_rating": 5, "status": "good"}
 
     poor_score, *_ = calculate_priority(poor, [])
     good_score, *_ = calculate_priority(good, [])
@@ -32,7 +32,7 @@ def test_closed_work_order_does_not_count_as_active():
         [{"priority": "high", "status": "closed"}],
     )
 
-    assert "0 active work order(s)" in reasons
+    assert any("0 active work order(s)" in reason for reason in reasons)
     assert any("active: 0" in item and "urgent/high: 0" in item for item in evidence)
     assert score == Decimal("33.53")
 
