@@ -90,8 +90,6 @@ def calculate_priority(
             else Decimal("40")
         )
 
-    # The portfolio rules treat urgent work orders and poor condition as a critical
-    # maintenance signal, regardless of the weighted average.
     if urgent_orders and (
         rating is None
         or rating >= 4
@@ -105,8 +103,6 @@ def calculate_priority(
             + planning * Decimal("0.10")
             + data_quality * Decimal("0.05")
         )
-
-        # The four components above total 85%, so normalize to a 0-100 score.
         score = clamp(raw_score / Decimal("0.85"))
 
     level = (
@@ -509,6 +505,14 @@ def office_assistant(
         .data
         or []
     )
+    assets = (
+        supabase.table("assets")
+        .select("id,asset_code,name,category,location,status,current_value")
+        .limit(200)
+        .execute()
+        .data
+        or []
+    )
 
     active_orders = [
         item for item in work_orders
@@ -531,6 +535,10 @@ def office_assistant(
         item for item in employees
         if (item.get("status") or "").lower() == "active"
     ]
+    active_assets = [
+        item for item in assets
+        if (item.get("status") or "").lower() == "active"
+    ]
 
     total_allocated = sum(float(b.get("allocated_amount") or 0) for b in budgets)
     total_spent = sum(float(b.get("spent_amount") or 0) for b in budgets)
@@ -545,6 +553,7 @@ def office_assistant(
         f"Employee records available: {len(employees)}; active: {len(active_employees)}.",
         f"Budget records available: {len(budgets)}; total allocated: {total_allocated:.2f}; total spent: {total_spent:.2f}.",
         f"Expense records available: {len(expenses)}.",
+        f"Asset records available: {len(assets)}; active: {len(active_assets)}.",
     ]
 
     if not settings.gemini_api_key:
@@ -562,6 +571,7 @@ def office_assistant(
         "employees": employees,
         "budgets": budgets,
         "expenses": expenses,
+        "assets": assets,
         "summary": evidence,
     }
 
