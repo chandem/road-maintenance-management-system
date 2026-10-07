@@ -39,6 +39,21 @@ function App() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [authLoading, setAuthLoading] = useState(false);
+  const [organizationId, setOrganizationId] = useState<string | null>(null);
+  const [organizationName, setOrganizationName] = useState<string | null>(null);
+  const [organizationLoading, setOrganizationLoading] = useState(false);
+  const [organizationNameInput, setOrganizationNameInput] = useState("");
+  const [organizationCodeInput, setOrganizationCodeInput] = useState("");
+
+  const loadOrganization = useCallback(async () => {
+    const { data, error } = await supabase.from("user_profiles").select("organization_id").maybeSingle();
+    if (error) throw error;
+    if (!data?.organization_id) { setOrganizationId(null); setOrganizationName(null); return; }
+    setOrganizationId(data.organization_id);
+    const { data: org, error: orgError } = await supabase.from("organizations").select("name").eq("id", data.organization_id).maybeSingle();
+    if (orgError) throw orgError;
+    setOrganizationName(org?.name ?? null);
+  }, []);
 
   const loadRanking = useCallback(async () => {
     setLoading(true);
@@ -83,7 +98,7 @@ function App() {
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
       setAuthReady(true);
-      if (session) void loadRanking();
+      if (session) void loadOrganization();
       else setData(null);
     });
 
@@ -91,11 +106,11 @@ function App() {
       active = false;
       listener.subscription.unsubscribe();
     };
-  }, [loadRanking]);
+  }, [loadOrganization, loadRanking]);
 
   useEffect(() => {
-    if (authReady && user) void loadRanking();
-  }, [authReady, user, loadRanking]);
+    if (authReady && user) void loadOrganization();
+  }, [authReady, user, loadOrganization]);
 
   const handleSignIn = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -103,12 +118,25 @@ function App() {
     setError(null);
     const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
     if (signInError) setError(signInError.message);
+    else await loadOrganization();
     setAuthLoading(false);
+  };
+
+  const handleCreateOrganization = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setOrganizationLoading(true);
+    setError(null);
+    const { data: newOrganizationId, error: organizationError } = await supabase.rpc("create_organization_for_current_user", { p_name: organizationNameInput, p_code: organizationCodeInput || null });
+    if (organizationError) setError(organizationError.message);
+    else { setOrganizationId(newOrganizationId); setOrganizationName(organizationNameInput.trim()); setOrganizationNameInput(""); setOrganizationCodeInput(""); await loadRanking(); }
+    setOrganizationLoading(false);
   };
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
     setData(null);
+    setOrganizationId(null);
+    setOrganizationName(null);
   };
 
   const rankings = data?.rankings ?? [];
@@ -147,63 +175,30 @@ function App() {
           </div>
         </section>
 
-        {!authReady && <div className="empty-state">Checking authentication…</div>}\n        {authReady && !user && (\n          <section className="auth-panel">\n            <div>\n              <p className="eyebrow">SECURE ACCESS</p>\n              <h2>Sign in to AI-RMMS</h2>\n              <p className="auth-copy">Your access token is used only to authenticate requests to the protected maintenance API.</p>\n            </div>\n            <form className="auth-form" onSubmit={handleSignIn}>\n              <input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="Email" required />\n              <input type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Password" required />\n              <button type="submit" disabled={authLoading}>{authLoading ? "Signing in…" : "Sign in"}</button>\n            </form>\n          </section>\n        )}\n\n        <section className="metrics">
-          <article><span>Road sections</span><strong>{data?.total_sections_analyzed ?? "—"}</strong><small>Analyzed by priority engine</small></article>
-          <article><span>Critical</span><strong>{critical}</strong><small>Needs attention</small></article>
-          <article><span>High priority</span><strong>{high}</strong><small>Review recommended</small></article>
-          <article><span>AI confidence</span><strong>{Math.round(topConfidence * 100)}%</strong><small>Top recommendation</small></article>
-        </section>
+        {!authReady && <div className="empty-state">Checking authentication…</div>}
 
-        <section className="panel">
-          <div className="panel-heading">
-            <div>
-              <p className="eyebrow">AI ROAD INTELLIGENCE</p>
-              <h2>Priority ranking</h2>
-            </div>
-            <button type="button" onClick={() => void loadRanking()} disabled={loading}>
-              {loading ? "Analyzing…" : "Refresh analysis"}
-            </button>
-          </div>
+        {authReady && !user && (
+          <section className="auth-panel">
+            <div><p className="eyebrow">SECURE ACCESS</p><h2>Sign in to AI-RMMS</h2><p className="auth-copy">Use your maintenance-office account to access protected road intelligence.</p></div>
+            <form className="auth-form" onSubmit={handleSignIn}>
+              <input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="Email" autoComplete="email" required />
+              <input type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Password" autoComplete="current-password" required />
+              <button type="submit" disabled={authLoading}>{authLoading ? "Signing in…" : "Sign in"}</button>
+            </form>
+          </section>
+        )}
 
-          {error && <div className="error-message">{error}</div>}
+        {authReady && user && !organizationId && (
+          <section className="auth-panel">
+            <div><p className="eyebrow">ORGANIZATION SETUP</p><h2>Create your maintenance office</h2><p className="auth-copy">Create your first AI-RMMS organization. You will become its owner.</p></div>
+            <form className="auth-form" onSubmit={handleCreateOrganization}>
+              <input type="text" value={organizationNameInput} onChange={(event) => setOrganizationNameInput(event.target.value)} placeholder="Organization name" required />
+              <input type="text" value={organizationCodeInput} onChange={(event) => setOrganizationCodeInput(event.target.value)} placeholder="Organization code (optional)" />
+              <button type="submit" disabled={organizationLoading}>{organizationLoading ? "Creating organization…" : "Create organization"}</button>
+            </form>
+          </section>
+        )}
 
-          <div className="table">
-            <div className="table-row table-head">
-              <span>Road section</span><span>Score</span><span>Priority</span><span>Condition</span><span>Recommended action</span>
-            </div>
-            {loading && <div className="empty-state">Loading road intelligence…</div>}
-            {!loading && !error && rankings.length === 0 && (
-              <div className="empty-state">No road sections are available for analysis.</div>
-            )}
-            {!loading && rankings.map((item) => (
-              <div className="table-row" key={item.road_section_id}>
-                <span className="road-name">{item.section_code ?? item.road_section_id}</span>
-                <span className="score">{Math.round(item.priority_score)}</span>
-                <span><span className={`badge ${item.priority_level.toLowerCase()}`}>{item.priority_level}</span></span>
-                <span>{item.condition_rating == null ? "Not recorded" : `Rating ${item.condition_rating}`}</span>
-                <span>{item.recommended_action ?? "Review recommended"}</span>
-              </div>
-            ))}
-          </div>
-
-          {data?.methodology && (
-            <div className="methodology">
-              <strong>Methodology:</strong> {data.methodology}
-            </div>
-          )}
-        </section>
-
-        <section className="assistant-panel">
-          <div>
-            <p className="eyebrow">AI OFFICE ASSISTANT</p>
-            <h2>Ask about your maintenance office</h2>
-            <p>Next, this area can become the evidence-based assistant for roads, plans, work orders and documents.</p>
-          </div>
-          <div className="question-box">AI Office Assistant — coming next</div>
-        </section>
-      </main>
-    </div>
-  );
-}
-
-export default App;
+        {authReady && user && organizationId && (
+          <div className="organization-bar"><span><strong>{organizationName ?? "Organization"}</strong> · {user.email}</span><button type="button" onClick={() => void handleSignOut()}>Sign out</button></div>
+        )}
