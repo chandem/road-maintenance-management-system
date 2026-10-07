@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
+import type { User } from "@supabase/supabase-js";
+import { supabase } from "./lib/supabase";
 
 type Priority = "Critical" | "High" | "Medium" | "Low";
 
@@ -31,14 +33,24 @@ function App() {
   const [data, setData] = useState<RankingResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [user, setUser] = useState<User | null>(null);
+  const [authReady, setAuthReady] = useState(false);
 
   const loadRanking = useCallback(async () => {
     setLoading(true);
     setError(null);
 
     try {
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError) throw sessionError;
+      const accessToken = sessionData.session?.access_token;
+      if (!accessToken) {
+        throw new Error("Please sign in to access road intelligence.");
+      }
+
       const response = await fetch(
         `${API_BASE_URL}/ai/road-ranking?limit=10`,
+        { headers: { Authorization: `Bearer ${accessToken}` } },
       );
 
       if (!response.ok) {
@@ -55,8 +67,31 @@ function App() {
   }, []);
 
   useEffect(() => {
-    void loadRanking();
+    let active = true;
+
+    supabase.auth.getUser().then(({ data, error: userError }) => {
+      if (!active) return;
+      if (userError) setError(userError.message);
+      setUser(data.user ?? null);
+      setAuthReady(true);
+    });
+
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+      setAuthReady(true);
+      if (session) void loadRanking();
+      else setData(null);
+    });
+
+    return () => {
+      active = false;
+      listener.subscription.unsubscribe();
+    };
   }, [loadRanking]);
+
+  useEffect(() => {
+    if (authReady && user) void loadRanking();
+  }, [authReady, user, loadRanking]);
 
   const rankings = data?.rankings ?? [];
   const critical = rankings.filter((item) => item.priority_level === "Critical").length;
@@ -94,7 +129,7 @@ function App() {
           </div>
         </section>
 
-        <section className="metrics">
+        {!authReady && <div className="empty-state">Checking authentication…</div>}\n        {authReady && !user && (\n          <section className="panel">\n            <div className="empty-state">Sign in through Supabase to view protected road intelligence.</div>\n          </section>\n        )}\n\n        <section className="metrics">
           <article><span>Road sections</span><strong>{data?.total_sections_analyzed ?? "—"}</strong><small>Analyzed by priority engine</small></article>
           <article><span>Critical</span><strong>{critical}</strong><small>Needs attention</small></article>
           <article><span>High priority</span><strong>{high}</strong><small>Review recommended</small></article>
