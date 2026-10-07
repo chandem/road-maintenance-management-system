@@ -1,7 +1,7 @@
 import json
 from decimal import Decimal
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from openai import OpenAI
 
 from app.api.dependencies import get_current_user
@@ -10,7 +10,6 @@ from app.schemas.ai import (
     RoadPriorityRecommendation,
     RoadPriorityRequest,
     RoadRankingItem,
-    RoadRankingRequest,
     RoadRankingResponse,
 )
 from app.schemas.office_assistant import OfficeAssistantRequest, OfficeAssistantResponse
@@ -302,9 +301,9 @@ def analyze_road_priority(
     )
 
 
-@router.post("/road-ranking", response_model=RoadRankingResponse)
+@router.get("/road-ranking", response_model=RoadRankingResponse)
 def rank_road_sections(
-    request: RoadRankingRequest,
+    limit: int = Query(default=10, ge=1, le=100),
     current_user=Depends(get_current_user),
 ):
     supabase = current_user["client"]
@@ -380,7 +379,7 @@ def rank_road_sections(
 
     rankings = [
         item.model_copy(update={"rank": index})
-        for index, item in enumerate(rows[: request.limit], start=1)
+        for index, item in enumerate(rows[:limit], start=1)
     ]
 
     ai_explanations = generate_ranking_ai_explanations(rankings)
