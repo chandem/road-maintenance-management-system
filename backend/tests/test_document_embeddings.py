@@ -32,24 +32,14 @@ def test_embedding_response_is_normalized(monkeypatch):
             def embed_content(self, **kwargs):
                 assert kwargs["model"] == "gemini-embedding-2"
                 assert kwargs["contents"] == "Road maintenance"
+                assert kwargs["config"].output_dimensionality == 768
                 return SimpleNamespace(
                     embeddings=[SimpleNamespace(values=[0.1, 0.2, 0.3])]
                 )
 
         models = Models()
 
-    class FakeTypes:
-        class EmbedContentConfig:
-            def __init__(self, **kwargs):
-                assert kwargs["output_dimensionality"] == 768
-
-    class FakeGenAI:
-        Client = lambda **kwargs: FakeClient()
-        types = FakeTypes
-
-    import sys
-
-    monkeypatch.setitem(sys.modules, "google.genai", FakeGenAI)
+    monkeypatch.setattr("google.genai.Client", lambda **kwargs: FakeClient())
     monkeypatch.setattr(
         "app.services.document_embeddings.get_settings",
         lambda: SimpleNamespace(gemini_api_key="test-key"),
@@ -70,18 +60,7 @@ def test_provider_failure_is_wrapped(monkeypatch):
 
         models = Models()
 
-    class FakeTypes:
-        class EmbedContentConfig:
-            def __init__(self, **kwargs):
-                pass
-
-    class FakeGenAI:
-        Client = lambda **kwargs: FakeClient()
-        types = FakeTypes
-
-    import sys
-
-    monkeypatch.setitem(sys.modules, "google.genai", FakeGenAI)
+    monkeypatch.setattr("google.genai.Client", lambda **kwargs: FakeClient())
     monkeypatch.setattr(
         "app.services.document_embeddings.get_settings",
         lambda: SimpleNamespace(gemini_api_key="test-key"),
