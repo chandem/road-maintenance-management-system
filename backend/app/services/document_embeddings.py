@@ -46,13 +46,12 @@ def generate_embedding(
 
     try:
         from google import genai
-        from google.genai import types
 
         client = genai.Client(api_key=settings.gemini_api_key)
         response = client.models.embed_content(
             model=model,
             contents=normalized,
-            config=types.EmbedContentConfig(
+            config=genai.types.EmbedContentConfig(
                 output_dimensionality=output_dimensionality,
             ),
         )
