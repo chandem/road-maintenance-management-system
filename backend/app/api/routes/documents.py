@@ -1,11 +1,17 @@
+import json
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from google import genai
 
 from app.api.dependencies import get_current_user
+from app.core.config import get_settings
 from app.schemas.documents import (
     DocumentClassificationRequest,
     DocumentClassificationResponse,
+    DocumentEvidence,
+    DocumentQuestionRequest,
+    DocumentQuestionResponse,
     DocumentSearchRequest,
     DocumentSearchResponse,
     DocumentSearchResult,
@@ -14,13 +20,11 @@ from app.services.document_extraction import extract_text
 from app.services.document_intelligence import classify_document
 
 router = APIRouter(prefix="/documents", tags=["documents"])
-
 ALLOWED_EXTENSIONS = {".txt", ".csv", ".pdf", ".docx", ".xlsx", ".xlsm"}
 MAX_FILE_SIZE = 10 * 1024 * 1024
 
 
 def _document_snippet(text: str | None, query: str, max_length: int = 240) -> str:
-    """Return a compact evidence snippet around the first query match."""
     if not text:
         return ""
     normalized_text = text.strip()
@@ -30,7 +34,6 @@ def _document_snippet(text: str | None, query: str, max_length: int = 240) -> st
     position = normalized_text.lower().find(clean_query.lower())
     if position < 0:
         return normalized_text[:max_length].strip()
-
     query_length = len(clean_query)
     available = max(max_length - query_length - 2, 0)
     before = available // 2
@@ -38,7 +41,6 @@ def _document_snippet(text: str | None, query: str, max_length: int = 240) -> st
     start = max(0, position - before)
     end = min(len(normalized_text), position + query_length + after)
     snippet = normalized_text[start:end].strip()
-
     if start > 0:
         snippet = "…" + snippet
     if end < len(normalized_text):
@@ -56,29 +58,55 @@ def classify_document_text(request: DocumentClassificationRequest, current_user=
 
 @router.post("/search", response_model=DocumentSearchResponse)
 def search_documents(request: DocumentSearchRequest, current_user=Depends(get_current_user)):
-    """Search the authenticated user's organization documents by title or extracted text."""
     query = request.query.strip()
     escaped_query = query.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
     pattern = f"%{escaped_query}%"
-    document_query = (
-        current_user["client"].table("documents")
+    document_query = (current_user["client"].table("documents")
         .select("id,title,document_type,status,extraction_status,document_date,extracted_text")
         .or_(f"title.ilike.{pattern},extracted_text.ilike.{pattern}")
-        .order("created_at", desc=True).limit(request.limit)
-    )
+        .order("created_at", desc=True).limit(request.limit))
     if request.document_type:
         document_query = document_query.eq("document_type", request.document_type)
     rows = document_query.execute().data or []
-    results = [
-        DocumentSearchResult(
-            id=str(row["id"]), title=row["title"], document_type=row.get("document_type"),
-            status=row["status"], extraction_status=row["extraction_status"],
-            document_date=str(row["document_date"]) if row.get("document_date") else None,
-            snippet=_document_snippet(row.get("extracted_text"), query),
-        )
-        for row in rows
-    ]
+    results = [DocumentSearchResult(id=str(row["id"]), title=row["title"], document_type=row.get("document_type"), status=row["status"], extraction_status=row["extraction_status"], document_date=str(row["document_date"]) if row.get("document_date") else None, snippet=_document_snippet(row.get("extracted_text"), query)) for row in rows]
     return DocumentSearchResponse(query=query, results=results)
+
+
+@router.post("/question", response_model=DocumentQuestionResponse)
+def ask_document_question(request: DocumentQuestionRequest, current_user=Depends(get_current_user)):
+    """Answer a document question using retrieved organization documents as evidence."""
+    question = request.question.strip()
+    escaped_query = question.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+    pattern = f"%{escaped_query}%"
+    document_query = (current_user["client"].table("documents")
+        .select("id,title,document_type,status,extraction_status,document_date,extracted_text")
+        .or_(f"title.ilike.{pattern},extracted_text.ilike.{pattern}")
+        .order("created_at", desc=True).limit(request.limit))
+    if request.document_type:
+        document_query = document_query.eq("document_type", request.document_type)
+    rows = document_query.execute().data or []
+
+    evidence = [DocumentEvidence(document_id=str(row["id"]), title=row["title"], document_type=row.get("document_type"), snippet=_document_snippet(row.get("extracted_text"), question)) for row in rows]
+    if not evidence:
+        return DocumentQuestionResponse(question=question, answer="I could not find a stored document containing the requested question text. The answer is not available from the retrieved documents.", evidence=[], ai_generated=False)
+
+    settings = get_settings()
+    if not settings.gemini_api_key:
+        return DocumentQuestionResponse(question=question, answer="Relevant documents were found, but the AI provider is not configured yet. Review the evidence below.", evidence=evidence, ai_generated=False)
+
+    context = [{"document_id": item.document_id, "title": item.title, "document_type": item.document_type, "evidence": item.snippet} for item in evidence]
+    prompt = ("Answer the user's question using ONLY the supplied document evidence. "
+        "If the evidence does not contain the answer, say it is not available. "
+        "Do not invent facts, costs, dates, quantities, causes, measurements, or site observations. "
+        "Do not make approvals or binding decisions. Keep the answer concise and suitable for a road-maintenance engineering office.\n\n"
+        f"Question: {question}\n\nEvidence:\n{json.dumps(context, default=str)}")
+    try:
+        client = genai.Client(api_key=settings.gemini_api_key)
+        response = client.models.generate_content(model=settings.gemini_model, contents=prompt, config={"system_instruction": "You are the AI-RMMS evidence-based document assistant."})
+        answer = response.text.strip() if response.text else ""
+    except Exception:
+        answer = "I could not generate the AI answer right now. Please review the retrieved document evidence."
+    return DocumentQuestionResponse(question=question, answer=answer, evidence=evidence, ai_generated=bool(answer))
 
 
 @router.post("/upload-and-classify", response_model=DocumentClassificationResponse)
@@ -98,12 +126,7 @@ async def classify_uploaded_document(file: UploadFile = File(...), current_user=
     organization_id = (profile.data or {}).get("organization_id")
     if not organization_id:
         raise HTTPException(status_code=409, detail="User is not assigned to an organization.")
-    document = current_user["client"].table("documents").insert({
-        "organization_id": organization_id, "title": filename, "document_type": result.document_type,
-        "mime_type": file.content_type, "status": "processed", "extraction_status": "completed",
-        "classification_confidence": result.confidence, "extracted_text": text,
-        "file_size_bytes": len(content), "uploaded_by": current_user["id"],
-    }).execute()
+    document = current_user["client"].table("documents").insert({"organization_id": organization_id, "title": filename, "document_type": result.document_type, "mime_type": file.content_type, "status": "processed", "extraction_status": "completed", "classification_confidence": result.confidence, "extracted_text": text, "file_size_bytes": len(content), "uploaded_by": current_user["id"]}).execute()
     if not document.data:
         raise HTTPException(status_code=500, detail="Document could not be saved.")
     return DocumentClassificationResponse(filename=filename, document_type=result.document_type, confidence=result.confidence, reasons=result.reasons + [f"Stored {len(text)} extracted characters in the document record."])
