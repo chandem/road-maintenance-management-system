@@ -35,7 +35,7 @@ def test_closed_work_order_does_not_count_as_active():
     assert any("0 active work order(s)" in reason for reason in reasons)
     assert any("active: 0" in item and "urgent/high: 0" in item for item in evidence)
 
-    # A closed order is still recorded evidence, so it contributes to data quality,
+    # A closed order is recorded evidence, so it contributes to data quality,
     # but it must not contribute to urgency or planning as an active order.
     assert score == Decimal("35.29")
 
