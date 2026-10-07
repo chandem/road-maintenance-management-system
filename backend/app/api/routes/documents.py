@@ -31,7 +31,7 @@ def classify_document_text(
 
 
 @router.post("/upload-and-classify", response_model=DocumentClassificationResponse)
-async def upload_and_classify_document(
+async def classify_uploaded_document(
     file: UploadFile = File(...),
     current_user=Depends(get_current_user),
 ):
@@ -46,7 +46,10 @@ async def upload_and_classify_document(
 
     content = await file.read()
     if len(content) > MAX_FILE_SIZE:
-        raise HTTPException(status_code=413, detail="Document exceeds the 10 MB upload limit.")
+        raise HTTPException(
+            status_code=413,
+            detail="Document exceeds the 10 MB upload limit.",
+        )
 
     text = extract_text(filename, content)
     if not text:
@@ -67,7 +70,10 @@ async def upload_and_classify_document(
     )
     organization_id = (profile.data or {}).get("organization_id")
     if not organization_id:
-        raise HTTPException(status_code=409, detail="User is not assigned to an organization.")
+        raise HTTPException(
+            status_code=409,
+            detail="User is not assigned to an organization.",
+        )
 
     document = (
         current_user["client"]
@@ -90,11 +96,15 @@ async def upload_and_classify_document(
     )
 
     if not document.data:
-        raise HTTPException(status_code=500, detail="Document could not be saved.")
+        raise HTTPException(
+            status_code=500,
+            detail="Document could not be saved.",
+        )
 
     return DocumentClassificationResponse(
         filename=filename,
         document_type=result.document_type,
         confidence=result.confidence,
-        reasons=result.reasons + [f"Stored {len(text)} extracted characters in the document record."],
+        reasons=result.reasons
+        + [f"Stored {len(text)} extracted characters in the document record."],
     )
