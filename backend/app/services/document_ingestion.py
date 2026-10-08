@@ -3,12 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from app.services.document_chunking import chunk_document_text
-from app.services.document_embeddings import (
-    DEFAULT_EMBEDDING_MODEL,
-    DEFAULT_OUTPUT_DIMENSIONALITY,
-    EmbeddingProviderError,
-    generate_embeddings,
-)
+from app.services.document_embeddings import generate_embeddings
 
 
 @dataclass(frozen=True)
