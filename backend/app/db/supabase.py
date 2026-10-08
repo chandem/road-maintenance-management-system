@@ -15,7 +15,6 @@ Two client modes:
 from __future__ import annotations
 
 from supabase import Client, create_client
-from supabase.lib.client_options import ClientOptions
 
 from app.core.config import get_settings
 
@@ -24,17 +23,15 @@ def get_supabase_client(access_token: str | None = None) -> Client:
     """Create a Supabase client, optionally authenticated as the end user."""
     settings = get_settings()
 
-    options = None
-    if access_token:
-        options = ClientOptions(
-            headers={"Authorization": f"Bearer {access_token}"},
-        )
-
-    return create_client(
+    client = create_client(
         settings.supabase_url,
         settings.supabase_publishable_key,
-        options=options,
     )
+    
+    if access_token:
+        client.auth.set_session(access_token, access_token)
+    
+    return client
 
 
 def get_service_client() -> Client:
