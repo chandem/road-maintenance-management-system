@@ -23,4 +23,4 @@ def get_current_user(
     if response.user is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired access token")
 
-    return {"id": response.user.id, "client": supabase}
+    return {"id": response.user.id, "client": supabase, "access_token": token}
