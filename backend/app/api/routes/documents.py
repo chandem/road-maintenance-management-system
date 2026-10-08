@@ -18,6 +18,7 @@ from app.schemas.documents import (
 )
 from app.services.document_extraction import extract_text
 from app.services.document_intelligence import classify_document
+from app.services.document_ingestion import ingest_document_chunks
 from app.services.semantic_search import search_document_chunks
 
 router = APIRouter(prefix="/documents", tags=["documents"])
@@ -212,4 +213,24 @@ async def classify_uploaded_document(file: UploadFile = File(...), current_user=
     document = current_user["client"].table("documents").insert({"organization_id": organization_id, "title": filename, "document_type": result.document_type, "mime_type": file.content_type, "status": "processed", "extraction_status": "completed", "classification_confidence": result.confidence, "extracted_text": text, "file_size_bytes": len(content), "uploaded_by": current_user["id"]}).execute()
     if not document.data:
         raise HTTPException(status_code=500, detail="Document could not be saved.")
-    return DocumentClassificationResponse(filename=filename, document_type=result.document_type, confidence=result.confidence, reasons=result.reasons + [f"Stored {len(text)} extracted characters in the document record."])
+
+    ingestion_note = "Document chunks were not generated yet."
+    try:
+        ingestion = ingest_document_chunks(
+            current_user["client"],
+            document_id=str(document.data[0]["id"]),
+            organization_id=str(organization_id),
+            extracted_text=text,
+        )
+        ingestion_note = (
+            f"Created {ingestion.chunk_count} document chunks; "
+            f"{ingestion.embedded_count} embeddings ready "
+            f"(status: {ingestion.embedding_status})."
+        )
+    except Exception:
+        ingestion_note = (
+            "Document was saved, but semantic indexing is not available yet. "
+            "The document can be indexed after the vector database migration is applied."
+        )
+
+    return DocumentClassificationResponse(filename=filename, document_type=result.document_type, confidence=result.confidence, reasons=result.reasons + [f"Stored {len(text)} extracted characters in the document record.", ingestion_note])
