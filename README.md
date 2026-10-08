@@ -1,6 +1,6 @@
 # AI-RMMS — AI-Powered Road Maintenance Management System
 
-AI-RMMS is an **AI-first road maintenance management and decision-intelligence platform** designed to help road maintenance organizations manage infrastructure, resources, operations, documents, and decisions from one connected system.
+AI-RMMS is an **AI-first road maintenance management and decision-intelligence platform** designed to help road maintenance organizations manage roads, machinery, finances, general assets, human resources, maintenance operations, documents, and management decisions from one connected system.
 
 > **AI is the intelligence layer — not an add-on.**
 
@@ -8,100 +8,344 @@ The platform combines structured operational data, engineering rules, historical
 
 ## Vision
 
-Build an intelligent road-maintenance office where decision-makers can ask questions in natural language and receive answers grounded in actual organizational data and documents.
+Build an intelligent road-maintenance organization where engineers, managers, and decision-makers can manage the complete maintenance operation and ask questions in natural language using evidence from actual organizational data and documents.
 
-AI-RMMS is intended to connect:
+AI-RMMS is designed as **one integrated platform with independent major modules**.
 
-- Road assets and condition
-- Maintenance plans and work orders
-- Machinery and equipment
-- Materials and inventory
-- Finance and budgets
-- Human resources
-- Technical and administrative documents
-- Historical maintenance records
+## Final Platform Architecture
 
-## AI Capabilities
+```text
+                         AI-RMMS
+          AI-Powered Road Maintenance Management
+                              │
+                    ┌─────────┴─────────┐
+                    │  AI INTELLIGENCE │
+                    └─────────┬─────────┘
+                              │
+       ┌──────────┬───────────┼───────────┬───────────┐
+       │          │           │           │           │
+      RAMS       MMMS      Financial   General      HR
+                           Management   Assets
+       │          │           │           │           │
+       └──────────┴───────────┴───────────┴───────────┘
+                              │
+                    Maintenance Operations
+                              │
+                         Materials
+                              │
+                         Documents
+                              │
+                    Reports & Analytics
+```
+
+The five major management systems remain **separate modules**, while the AI layer connects information across them.
+
+---
+
+# Core Modules
+
+## 1. RAMS — Road Asset Management System
+
+The road infrastructure management module.
+
+It covers:
+
+- Road inventory
+- Road sections and chainage
+- GPS/GIS
+- Road condition
+- Road inspections
+- Defects
+- Maintenance history
+- Maintenance planning
+- Road work orders
+- Road condition analysis
+- Road prioritization
+- Road performance
+- Road reports
+
+RAMS provides the engineering foundation for understanding the condition and maintenance needs of the road network.
+
+## 2. MMMS — Machinery Maintenance Management System
+
+The machinery and equipment management module.
+
+It covers:
+
+- Machinery and equipment registration
+- Equipment specifications
+- Operating hours
+- Maintenance schedules
+- Preventive maintenance
+- Corrective maintenance
+- Machinery work orders
+- Breakdown history
+- Spare parts
+- Fuel and operating records
+- Equipment availability
+- Maintenance costs
+- Machinery reports
+
+MMMS provides operational intelligence about the equipment required to execute maintenance activities.
+
+## 3. Financial Management
+
+The financial management module.
+
+It covers:
+
+- Annual budgets
+- Budget allocation
+- Road/project budgets
+- Expenses
+- Payments
+- Commitments
+- Planned costs
+- Actual costs
+- Cost tracking
+- Budget versus actual analysis
+- Cost by road
+- Cost by activity
+- Cost by machinery
+- Financial reports
+
+Financial data can be connected with road, machinery, materials, and workforce information to provide a complete view of maintenance expenditure.
+
+## 4. General Asset Management
+
+The organization's general asset management module, separate from RAMS and MMMS.
+
+It covers assets such as:
+
+- Buildings
+- Offices
+- Stores
+- Furniture
+- IT equipment
+- Vehicles
+- Tools
+- Land and property
+- Other organizational assets
+
+It also covers:
+
+- Asset registration
+- Asset location
+- Asset custodian
+- Asset condition
+- Transfers
+- Maintenance
+- Depreciation
+- Disposal
+- Asset history
+- Asset reports
+
+Road assets remain under **RAMS**, while machinery and equipment maintenance remain under **MMMS**.
+
+## 5. Human Resources Management
+
+The workforce management module.
+
+It covers:
+
+- Employee records
+- Departments
+- Positions
+- Qualifications
+- Skills
+- Employment information
+- Staff assignments
+- Attendance
+- Leave
+- Training
+- Workforce planning
+- Workload analysis
+- Performance information
+- Personnel history
+- HR reports
+
+HR information can support workforce planning for road maintenance operations.
+
+---
+
+# Supporting Modules
+
+## 6. Maintenance Operations
+
+The operational layer connecting planning and execution.
+
+It covers:
+
+- Maintenance plans
+- Maintenance activities
+- Work orders
+- Priorities
+- Assignments
+- Execution tracking
+- Progress
+- Completion
+- Verification
+- Maintenance history
+
+Maintenance operations can use information from RAMS, MMMS, Finance, HR, Materials, and Documents.
+
+## 7. Materials and Inventory
+
+The maintenance materials layer.
+
+It covers:
+
+- Materials
+- Stores
+- Inventory
+- Stock levels
+- Material requests
+- Material issues
+- Material receipts
+- Consumption
+- Availability
+- Reorder information
+- Material costs
+
+It can connect material consumption with maintenance activities and financial records.
+
+## 8. Document Management
+
+The organizational document intelligence layer.
+
+It supports:
+
+- Maintenance plans
+- Reports
+- Official letters
+- Contracts
+- BOQs
+- Payment certificates
+- Budgets
+- Machinery records
+- Material documents
+- Technical documents
+- Excel spreadsheets
+- Word documents
+- PDFs
+
+Document Intelligence provides:
+
+- Document classification
+- Text extraction
+- Structured extraction
+- Validation
+- Text chunking
+- Embeddings
+- Semantic search
+- Evidence-based question answering
+- Document analysis
+
+---
+
+# AI Intelligence Layer
+
+AI is the central intelligence layer across the platform.
 
 ### Road Intelligence
-- Road-section priority scoring
+
+- Road priority scoring
 - Road ranking
 - Condition analysis
 - Maintenance recommendations
-- Risk and priority explanations
-- Future predictive maintenance capabilities
-
-### Document Intelligence
-- Document classification
-- Text and table extraction
-- Structured information extraction
-- Document validation
-- Semantic search
-- Evidence-based question answering
-- Report and plan analysis
+- Risk indicators
+- Priority explanations
+- Predictive maintenance capabilities
 
 ### Machinery Intelligence
+
 - Equipment utilization analysis
 - Maintenance status analysis
 - Failure-risk indicators
 - Work-order intelligence
 - Maintenance planning support
 
-### Finance Intelligence
+### Financial Intelligence
+
 - Budget monitoring
-- Planned vs actual expenditure analysis
-- Cost summaries
+- Planned versus actual expenditure
+- Cost analysis
 - Budget-risk indicators
-- Evidence-based financial explanations
+- Financial explanations
+- Forecasting support
+
+### Asset Intelligence
+
+- Asset condition analysis
+- Maintenance needs
+- Asset lifecycle insights
+- Utilization and replacement indicators
 
 ### Workforce Intelligence
-- Workforce and assignment visibility
+
+- Workforce visibility
 - Workload analysis
-- Maintenance-team insights
-- Resource planning support
+- Staff allocation insights
+- Resource planning
+- Training and capability insights
+
+### Document Intelligence
+
+- Classification
+- Extraction
+- Semantic retrieval
+- Evidence-based Q&A
+- Document comparison and analysis
 
 ### AI Office Assistant
-Users will be able to ask questions such as:
+
+Users can ask questions such as:
 
 > Which road sections currently require the highest maintenance priority?
 
-> What maintenance activities are planned for this fiscal year?
-
-> Which machinery requires attention?
+> Which machinery requires maintenance?
 
 > How much of the maintenance budget has been utilized?
 
+> Which employees are assigned to the current maintenance activities?
+
+> Which organizational assets require attention?
+
 > What does the latest maintenance plan say about a particular road?
 
-Answers should be grounded in available organizational data and documents rather than generated from assumptions.
+Answers should be grounded in available organizational data and documents.
 
-## Engineering-First AI
+---
+
+# Engineering-First AI
 
 AI-RMMS follows an important principle:
 
-**Database data → Engineering/scoring engine → Evidence → AI explanation**
+**Verified data → Engineering/scoring engine → Evidence → AI explanation**
 
-The LLM does not determine official engineering scores by itself.
+The LLM does not independently determine official engineering scores.
 
 For example, road priority can be calculated from verified factors such as:
 
-- Recorded condition
+- Recorded road condition
 - Active work orders
 - Maintenance status
 - Planning signals
 - Data quality
 
-The AI then explains the calculated result using the available evidence.
+The AI explains the calculated result using the available evidence.
 
-This makes the system more transparent and suitable for engineering decision support.
+This makes the system transparent and suitable for engineering decision support.
 
-## Human Approval and Safety
+---
 
-AI-RMMS is designed as a **decision-support system**, not an autonomous authority.
+# Human Approval and Safety
 
-AI should not independently:
+AI-RMMS is a **decision-support system**, not an autonomous authority.
 
-- Approve expenditure
+AI must not independently:
+
+- Approve expenditures
 - Authorize payments
 - Change official budgets
 - Approve contracts
@@ -111,203 +355,184 @@ AI should not independently:
 
 Human officials remain responsible for final decisions.
 
-## Core Modules
+---
 
-### 1. Road Asset Management
-Roads, sections, chainage, condition, inspections, defects, and maintenance history.
+# Cross-Module Intelligence
 
-### 2. Maintenance Operations
-Maintenance plans, work orders, priorities, execution, and completion tracking.
+The main advantage of AI-RMMS is that the modules remain independent while their information can be analyzed together.
 
-### 3. Asset Management
-Organizational assets, equipment, machinery, and maintenance status.
+For example:
 
-### 4. Machinery Management
-Equipment records, maintenance activities, work orders, and operational intelligence.
+**Question:**
 
-### 5. Finance
-Budgets, expenses, planned costs, actual costs, and financial analysis.
+> Which road should be maintained first, and what resources are required?
 
-### 6. Human Resources
-Employees, organizational structure, assignments, and workforce intelligence.
+AI can combine:
 
-### 7. Materials
-Materials, inventory, consumption, availability, and future AI-supported forecasting.
+- **RAMS** → road condition and priority
+- **MMMS** → available machinery
+- **Finance** → available budget
+- **HR** → available workforce
+- **Materials** → available materials
+- **Documents** → plans, BOQs, reports, and official records
 
-### 8. Documents
-Plans, reports, letters, contracts, technical documents, spreadsheets, and other office records.
+The result is an evidence-based management recommendation rather than an isolated answer from one module.
 
-### 9. AI Intelligence Layer
-AI analysis, recommendations, explanations, document intelligence, semantic search, and office assistance.
+---
 
-## Relationship to Existing Systems
+# Technology Stack
 
-AI-RMMS is intended to complement existing specialized systems rather than unnecessarily duplicate them.
+## Frontend
 
-### RAMS
-**Road Asset Management System**
-
-RAMS focuses on detailed road infrastructure, field inspection, GIS, defects, condition assessment, maintenance activities, and road asset operations.
-
-### MMMS
-**Machinery Maintenance Management System**
-
-MMMS focuses on machinery, equipment, maintenance, work orders, and inventory.
-
-### AI-RMMS
-AI-RMMS provides the **cross-system intelligence and organizational management layer**.
-
-The long-term architecture can connect road, machinery, finance, workforce, documents, and maintenance data so management can understand the organization as one system.
-
-## Technology Stack
-
-### Frontend
 - React
 - TypeScript
 - Vite
 - Tailwind CSS
 
-### Backend
+## Backend
+
 - Python
 - FastAPI
 - Pydantic
 
-### Database
+## Database
+
 - PostgreSQL
 - PostGIS
 - pgvector
 
-### Platform Services
+## Platform Services
+
 - Supabase Auth
 - Supabase Storage
 - Vercel
 - Render
 
-### AI
+## AI
+
+- Gemini
 - Large Language Models
 - Retrieval-Augmented Generation (RAG)
 - Embeddings
 - Deterministic engineering scoring
 - Evidence-based AI explanations
 
-## Architecture
+---
 
-```text
-                    AI-RMMS
-                       │
-             ┌─────────┴─────────┐
-             │   AI Intelligence │
-             └─────────┬─────────┘
-                       │
-      ┌────────────────┼────────────────┐
-      │                │                │
-   Structured       Documents        Historical
-      Data             │                Data
-      │           RAG / Search          │
-      └────────────────┼────────────────┘
-                       │
-       ┌───────────────┼────────────────┐
-       │               │                │
-     Roads          Machinery        Finance
-       │               │                │
-    Maintenance     Workforce       Materials
-```
-
-## Development Status
+# Development Status
 
 AI-RMMS is under active development.
 
-Current foundation includes:
+The current foundation includes:
 
-- Project architecture
-- Development roadmap
+- Platform architecture
+- Authentication-aware backend
+- Organization foundation
 - Database foundation
-- Organization authorization foundation
-- FastAPI backend foundation
-- Authentication-aware API dependencies
-- Road API
-- Road-section API
-- Maintenance-plan API
-- Work-order API
-- Initial AI road-priority analysis
-- Evidence-based AI road explanation
-- OpenAI Python SDK integration
+- Road APIs
+- Road-section APIs
+- Maintenance-plan APIs
+- Work-order APIs
+- Deterministic AI road-priority scoring
+- AI road ranking
+- Evidence-based road explanations
+- Document classification
+- Office/PDF/Excel/Word text extraction
+- Document metadata persistence design
+- Keyword document search
+- Evidence-based document Q&A
+- Document text chunking
+- Gemini embedding service
+- pgvector document-chunk schema
+- Semantic search service foundation
+- Backend automated tests
 
-### Current AI Feature
+Some major management modules are still being implemented and integrated.
 
-The first AI capability analyzes an individual road section using recorded engineering data and produces:
+---
 
-- Priority score
-- Priority level
-- Reasons
-- Evidence
-- Confidence
-- AI explanation
-- Recommended action
+# Development Roadmap
 
-## Roadmap
+## Phase 1 — Foundation
 
-### Phase 1 — Foundation
 - Project architecture
 - Authentication
+- Organization management
 - Authorization
 - Database foundation
 - Backend API foundation
 
-### Phase 2 — Data Foundation
-- Roads
-- Road sections
-- Maintenance plans
-- Work orders
-- Machinery
-- Assets
-- Employees
-- Finance
+## Phase 2 — Core Management Modules
+
+- RAMS
+- MMMS
+- Financial Management
+- General Asset Management
+- Human Resources
+- Maintenance Operations
+- Materials and Inventory
 - Documents
 
-### Phase 3 — AI Core
+## Phase 3 — AI Core
+
 - Engineering scoring
 - AI explanations
 - AI road ranking
 - Recommendation engine
-- AI confidence and evidence
+- AI confidence
+- Evidence management
 
-### Phase 4 — Document Intelligence
+## Phase 4 — Document Intelligence
+
 - Document ingestion
 - Classification
 - Extraction
 - Validation
+- Chunking
 - Embeddings
 - Semantic search
 - RAG
+- Document Q&A
 
-### Phase 5 — Operational Intelligence
-- Maintenance intelligence
+## Phase 5 — Cross-Module Operational Intelligence
+
+- Road intelligence
 - Machinery intelligence
-- Finance intelligence
+- Financial intelligence
+- Asset intelligence
 - Workforce intelligence
-- Alerts
+- Materials intelligence
 - Management dashboards
+- Alerts
+- Reports
 
-### Phase 6 — Predictive Intelligence
-- Failure-risk prediction
+## Phase 6 — Predictive Intelligence
+
+- Road deterioration prediction
+- Machinery failure prediction
 - Maintenance forecasting
 - Budget forecasting
-- Resource forecasting
+- Workforce forecasting
+- Materials forecasting
 - Advanced decision support
 
-## Design Principles
+---
+
+# Design Principles
 
 1. **AI-first** — intelligence is built into the platform from the beginning.
-2. **Evidence-based** — AI answers should be grounded in available data.
-3. **Engineering-controlled** — deterministic calculations control official scores.
-4. **Human-in-the-loop** — important decisions require human approval.
-5. **Transparent** — recommendations should show reasons and evidence.
-6. **Modular** — road, machinery, finance, HR, materials, and documents can evolve independently.
-7. **Integration-ready** — designed to work with existing specialized systems.
-8. **Scalable** — architecture should support multiple organizations and larger datasets.
+2. **Modular** — RAMS, MMMS, Finance, General Assets, and HR remain independent modules.
+3. **Evidence-based** — AI answers should be grounded in available data.
+4. **Engineering-controlled** — deterministic calculations control official engineering scores.
+5. **Human-in-the-loop** — important decisions require human approval.
+6. **Transparent** — recommendations should show reasons and evidence.
+7. **Integrated** — independent modules can share relevant information.
+8. **Scalable** — the platform should support multiple organizations and larger datasets.
+9. **Extensible** — new intelligence capabilities can be added without replacing core modules.
 
-## Repository Structure
+---
+
+# Repository Structure
 
 ```text
 road-maintenance-management-system/
@@ -316,23 +541,36 @@ road-maintenance-management-system/
 │   │   ├── api/
 │   │   ├── core/
 │   │   ├── db/
-│   │   └── schemas/
+│   │   ├── schemas/
+│   │   └── services/
+│   ├── tests/
 │   ├── requirements.txt
-│   └── README.md
+│   └── pytest.ini
 ├── database/
 │   ├── migrations/
 │   └── seed/
 ├── frontend/
+│   ├── src/
 │   └── README.md
 ├── docs/
 │   ├── architecture.md
 │   └── development-roadmap.md
+├── .github/
+│   └── workflows/
 └── README.md
 ```
 
-## Long-Term Goal
+---
 
-The long-term goal is to create an **AI-powered operating system for road maintenance organizations** where operational data and organizational documents become a continuously usable source of engineering and management intelligence.
+# Long-Term Goal
+
+The long-term goal is to create an **AI-powered operating system for road maintenance organizations**.
+
+The platform will bring together:
+
+**Roads + Machinery + Finance + General Assets + Human Resources + Maintenance + Materials + Documents + AI**
+
+while keeping each major management system independent and clearly defined.
 
 AI-RMMS is not intended to replace engineers or managers.
 
