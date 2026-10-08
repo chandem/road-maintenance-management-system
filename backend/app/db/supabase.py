@@ -3,13 +3,17 @@
 Two client modes:
 
 1. **User-scoped client** (`get_supabase_client(access_token)`)
-   Uses the publishable key + the caller's JWT.
+   Uses the publishable key + the caller's JWT on PostgREST.
    RLS and `private.is_org_member()` apply. Use for all API requests.
 
 2. **Service client** (`get_service_client()`)
    Uses the service-role key when configured.
    Bypasses RLS — only for controlled server jobs (migrations helpers,
    bulk embedding backfills). Prefer the user-scoped client whenever possible.
+
+Note: Do not pass a partial ClientOptions object into create_client — some
+supabase-py versions raise AttributeError: 'ClientOptions' object has no
+attribute 'storage'. Prefer postgrest.auth(token) for user-scoped RLS.
 """
 
 from __future__ import annotations
@@ -27,10 +31,12 @@ def get_supabase_client(access_token: str | None = None) -> Client:
         settings.supabase_url,
         settings.supabase_publishable_key,
     )
-    
+
     if access_token:
-        client.auth.set_session(access_token, access_token)
-    
+        # Attach the user JWT so PostgREST/RLS see auth.uid().
+        # Avoid ClientOptions(headers=...) which breaks on some package combos.
+        client.postgrest.auth(access_token)
+
     return client
 
 
@@ -64,8 +70,8 @@ def probe_supabase() -> dict[str, str | bool]:
 
     try:
         client = get_supabase_client()
-        # Auth settings endpoint is a cheap authenticated-API surface probe.
-        client.auth.get_session()
+        # Cheap client construction probe — auth session may be empty.
+        _ = client.auth
         return {
             "configured": True,
             "reachable": True,
