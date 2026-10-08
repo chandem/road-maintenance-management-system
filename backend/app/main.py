@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routes.ai import router as ai_router
 from app.api.routes.assets import router as assets_router
@@ -15,6 +16,20 @@ from app.api.routes.system import router as system_router
 from app.api.routes.work_orders import router as work_orders_router
 
 app = FastAPI(title="AI-RMMS API", version="0.1.0")
+
+# The frontend is hosted on Vercel while this API is hosted on Render.
+# Allow local development and Vercel deployments without exposing credentials.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:5173",
+        "http://localhost:4173",
+    ],
+    allow_origin_regex=r"https://[a-zA-Z0-9-]+(?:\\.[a-zA-Z0-9-]+)*\\.vercel\\.app",
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 app.include_router(health_router, prefix="/api/v1")
 app.include_router(ai_router, prefix="/api/v1")
