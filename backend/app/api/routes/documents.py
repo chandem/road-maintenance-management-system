@@ -18,6 +18,7 @@ from app.schemas.documents import (
 )
 from app.services.document_extraction import extract_text
 from app.services.document_intelligence import classify_document
+from app.services.semantic_search import search_document_chunks
 
 router = APIRouter(prefix="/documents", tags=["documents"])
 ALLOWED_EXTENSIONS = {".txt", ".csv", ".pdf", ".docx", ".xlsx", ".xlsm"}
@@ -74,35 +75,117 @@ def search_documents(request: DocumentSearchRequest, current_user=Depends(get_cu
 
 @router.post("/question", response_model=DocumentQuestionResponse)
 def ask_document_question(request: DocumentQuestionRequest, current_user=Depends(get_current_user)):
-    """Answer a document question using retrieved organization documents as evidence."""
+    """Answer using semantic document evidence, with keyword retrieval as a safe fallback."""
     question = request.question.strip()
-    escaped_query = question.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
-    pattern = f"%{escaped_query}%"
-    document_query = (current_user["client"].table("documents")
-        .select("id,title,document_type,status,extraction_status,document_date,extracted_text")
-        .or_(f"title.ilike.{pattern},extracted_text.ilike.{pattern}")
-        .order("created_at", desc=True).limit(request.limit))
-    if request.document_type:
-        document_query = document_query.eq("document_type", request.document_type)
-    rows = document_query.execute().data or []
+    evidence = []
 
-    evidence = [DocumentEvidence(document_id=str(row["id"]), title=row["title"], document_type=row.get("document_type"), snippet=_document_snippet(row.get("extracted_text"), question)) for row in rows]
+    if not request.document_type:
+        try:
+            profile = (
+                current_user["client"]
+                .table("user_profiles")
+                .select("organization_id")
+                .eq("id", current_user["id"])
+                .maybe_single()
+                .execute()
+            )
+            organization_id = (profile.data or {}).get("organization_id")
+            if organization_id:
+                matches = search_document_chunks(
+                    question,
+                    organization_id=organization_id,
+                    access_token=current_user["access_token"],
+                    limit=request.limit,
+                    minimum_similarity=0.35,
+                )
+                document_ids = list(dict.fromkeys(match.document_id for match in matches))
+                if document_ids:
+                    documents = (
+                        current_user["client"]
+                        .table("documents")
+                        .select("id,title,document_type")
+                        .in_("id", document_ids)
+                        .execute()
+                        .data
+                        or []
+                    )
+                    metadata = {str(row["id"]): row for row in documents}
+                    evidence = [
+                        DocumentEvidence(
+                            document_id=match.document_id,
+                            title=metadata[match.document_id]["title"],
+                            document_type=metadata[match.document_id].get("document_type"),
+                            snippet=match.content[:500].strip(),
+                        )
+                        for match in matches
+                        if match.document_id in metadata
+                    ]
+        except Exception:
+            evidence = []
+
     if not evidence:
-        return DocumentQuestionResponse(question=question, answer="I could not find a stored document containing the requested question text. The answer is not available from the retrieved documents.", evidence=[], ai_generated=False)
+        escaped_query = question.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        pattern = f"%{escaped_query}%"
+        document_query = (
+            current_user["client"].table("documents")
+            .select("id,title,document_type,status,extraction_status,document_date,extracted_text")
+            .or_(f"title.ilike.{pattern},extracted_text.ilike.{pattern}")
+            .order("created_at", desc=True)
+            .limit(request.limit)
+        )
+        if request.document_type:
+            document_query = document_query.eq("document_type", request.document_type)
+        rows = document_query.execute().data or []
+        evidence = [
+            DocumentEvidence(
+                document_id=str(row["id"]),
+                title=row["title"],
+                document_type=row.get("document_type"),
+                snippet=_document_snippet(row.get("extracted_text"), question),
+            )
+            for row in rows
+        ]
+
+    if not evidence:
+        return DocumentQuestionResponse(
+            question=question,
+            answer="I could not find relevant stored document evidence. The answer is not available from the retrieved documents.",
+            evidence=[],
+            ai_generated=False,
+        )
 
     settings = get_settings()
     if not settings.gemini_api_key:
-        return DocumentQuestionResponse(question=question, answer="Relevant documents were found, but the AI provider is not configured yet. Review the evidence below.", evidence=evidence, ai_generated=False)
+        return DocumentQuestionResponse(
+            question=question,
+            answer="Relevant document evidence was found, but the AI provider is not configured yet. Review the evidence below.",
+            evidence=evidence,
+            ai_generated=False,
+        )
 
-    context = [{"document_id": item.document_id, "title": item.title, "document_type": item.document_type, "evidence": item.snippet} for item in evidence]
-    prompt = ("Answer the user's question using ONLY the supplied document evidence. "
+    context = [
+        {
+            "document_id": item.document_id,
+            "title": item.title,
+            "document_type": item.document_type,
+            "evidence": item.snippet,
+        }
+        for item in evidence
+    ]
+    prompt = (
+        "Answer the user's question using ONLY the supplied document evidence. "
         "If the evidence does not contain the answer, say it is not available. "
         "Do not invent facts, costs, dates, quantities, causes, measurements, or site observations. "
         "Do not make approvals or binding decisions. Keep the answer concise and suitable for a road-maintenance engineering office.\n\n"
-        f"Question: {question}\n\nEvidence:\n{json.dumps(context, default=str)}")
+        f"Question: {question}\n\nEvidence:\n{json.dumps(context, default=str)}"
+    )
     try:
         client = genai.Client(api_key=settings.gemini_api_key)
-        response = client.models.generate_content(model=settings.gemini_model, contents=prompt, config={"system_instruction": "You are the AI-RMMS evidence-based document assistant."})
+        response = client.models.generate_content(
+            model=settings.gemini_model,
+            contents=prompt,
+            config={"system_instruction": "You are the AI-RMMS evidence-based document assistant."},
+        )
         answer = response.text.strip() if response.text else ""
     except Exception:
         answer = "I could not generate the AI answer right now. Please review the retrieved document evidence."
