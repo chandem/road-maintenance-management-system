@@ -16,6 +16,8 @@ type AssistantResponse = { answer: string; evidence: string[]; advisory: boolean
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL_RMMS ??
   "https://ai-rmms-backend.onrender.com/api/v1";
+  import.meta.env.VITE_API_BASE_URL_RMMS ??
+  "https://ai-rmms-backend.onrender.com/api/v1";
 
 function App() {
   const [data, setData] = useState<RankingResponse | null>(null);
