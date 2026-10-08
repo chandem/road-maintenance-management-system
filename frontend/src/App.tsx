@@ -13,7 +13,9 @@ type RankingItem = {
 type RankingResponse = { total_sections_analyzed: number; rankings: RankingItem[]; methodology: string; ai_generated: boolean; };
 type AssistantResponse = { answer: string; evidence: string[]; advisory: boolean };
 
-const API_BASE_URL =\n  import.meta.env.VITE_API_BASE_URL_RMMS ??\n  "https://ai-rmms-backend.onrender.com/api/v1";
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL_RMMS ??
+  "https://ai-rmms-backend.onrender.com/api/v1";
 
 function App() {
   const [data, setData] = useState<RankingResponse | null>(null);
