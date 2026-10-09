@@ -37,10 +37,11 @@ def list_conversations(
 ):
     """List AI conversations for the caller's organization."""
     supabase = current_user["client"]
+    organization_id = _org_id(current_user)
     response = (
         supabase.table("ai_conversations")
         .select("id,organization_id,created_by,title,status,created_at,updated_at")
-        .eq("created_by", current_user["id"])
+        .eq("organization_id", organization_id)
         .order("updated_at", desc=True)
         .limit(limit)
         .execute()
