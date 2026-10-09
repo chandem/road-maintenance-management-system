@@ -4,7 +4,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 
-from app.api.dependencies import get_current_user
+from app.api.dependencies import require_org_admin
 from app.core.config import get_settings
 from app.schemas.documents import (
     DocumentClassificationRequest,
@@ -28,6 +28,10 @@ from app.services.document_ingestion import ingest_document_chunks
 from app.services.semantic_search import search_document_chunks
 
 router = APIRouter(prefix="/documents", tags=["documents"])
+
+# Document records do not yet carry a department ACL. Restrict all document
+# ingestion, listing, retrieval, and semantic search to organization admins
+# until department-aware document permissions are implemented.
 ALLOWED_EXTENSIONS = {".txt", ".csv", ".pdf", ".docx", ".xlsx", ".xlsm"}
 MAX_FILE_SIZE = 10 * 1024 * 1024
 
@@ -75,7 +79,7 @@ def _organization_id(current_user) -> str:
 
 @router.get("", response_model=list[DocumentSummary])
 def list_documents(
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_org_admin()),
     limit: int = Query(default=50, ge=1, le=200),
     document_type: str | None = Query(default=None, max_length=100),
 ):
@@ -116,7 +120,7 @@ def list_documents(
 @router.get("/{document_id}", response_model=DocumentSummary)
 def get_document(
     document_id: UUID,
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_org_admin()),
 ):
     """Get one document summary by ID."""
     row = (
@@ -153,7 +157,7 @@ def get_document(
 @router.post("/classify", response_model=DocumentClassificationResponse)
 def classify_document_text(
     request: DocumentClassificationRequest,
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_org_admin()),
 ):
     result = classify_document(request.filename, request.text)
     return DocumentClassificationResponse(
@@ -167,7 +171,7 @@ def classify_document_text(
 @router.post("/search", response_model=DocumentSearchResponse)
 def search_documents(
     request: DocumentSearchRequest,
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_org_admin()),
 ):
     """Keyword search over document titles and extracted text."""
     query = request.query.strip()
@@ -202,7 +206,7 @@ def search_documents(
 @router.post("/semantic-search", response_model=SemanticSearchResponse)
 def semantic_search_documents(
     request: SemanticSearchRequest,
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_org_admin()),
 ):
     """Vector search over organization document chunks (Step 4)."""
     organization_id = _organization_id(current_user)
@@ -249,7 +253,7 @@ def semantic_search_documents(
 @router.post("/question", response_model=DocumentQuestionResponse)
 def ask_document_question(
     request: DocumentQuestionRequest,
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_org_admin()),
 ):
     """Evidence-based Q&A: semantic retrieval first, keyword fallback."""
     question = request.question.strip()
@@ -391,7 +395,7 @@ def ask_document_question(
 @router.post("/upload-and-classify", response_model=DocumentClassificationResponse)
 async def classify_uploaded_document(
     file: UploadFile = File(...),
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_org_admin()),
 ):
     """Upload → extract → classify → store → chunk → embed."""
     filename = Path(file.filename or "").name
@@ -482,7 +486,7 @@ async def classify_uploaded_document(
 @router.post("/{document_id}/ingest", response_model=DocumentIngestionResponse)
 def reindex_document(
     document_id: UUID,
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_org_admin()),
 ):
     """Re-run chunk + embed for an existing document."""
     organization_id = _organization_id(current_user)
