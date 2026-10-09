@@ -72,6 +72,12 @@ def collect_cross_module_context(client: Any) -> CrossModuleContext:
         "id,asset_code,name,category,location,status,current_value",
         200,
     )
+    materials = _select(
+        client,
+        "materials",
+        "id,material_code,name,category,unit,quantity_on_hand,reorder_level,status",
+        200,
+    )
 
     active_orders = [
         item
@@ -119,6 +125,7 @@ def collect_cross_module_context(client: Any) -> CrossModuleContext:
         "Financial Management",
         "HR Management",
         "General Asset Management",
+        "Materials Management",
     ]
 
     ctx.evidence = [
@@ -138,6 +145,7 @@ def collect_cross_module_context(client: Any) -> CrossModuleContext:
         ),
         f"Expense records: {len(expenses)}.",
         f"General assets: {len(assets)}; active: {len(active_assets)}.",
+        f"Materials inventory records: {len(materials)}.",
     ]
 
     ctx.samples = {
@@ -150,6 +158,7 @@ def collect_cross_module_context(client: Any) -> CrossModuleContext:
         "budgets": budgets[:10],
         "expenses": expenses[:10],
         "assets": assets[:10],
+        "materials": materials[:10],
     }
 
     ctx.summary = {
@@ -164,6 +173,7 @@ def collect_cross_module_context(client: Any) -> CrossModuleContext:
         "budget_spent": total_spent,
         "budget_committed": total_committed,
         "active_assets": len(active_assets),
+        "materials": len(materials),
     }
     return ctx
 
