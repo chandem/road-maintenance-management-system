@@ -128,6 +128,42 @@ BEGIN
     RAISE EXCEPTION 'anon role unexpectedly has USAGE on private schema';
   END IF;
 
+  IF NOT has_function_privilege(
+    'authenticated',
+    'public.has_department_role(uuid,text,text[])',
+    'EXECUTE'
+  ) THEN
+    RAISE EXCEPTION 'authenticated role cannot execute public.has_department_role RPC wrapper';
+  END IF;
+
+  IF NOT has_function_privilege(
+    'authenticated',
+    'private.has_department_role(uuid,text,text[])',
+    'EXECUTE'
+  ) THEN
+    RAISE EXCEPTION 'authenticated role cannot execute private.has_department_role helper';
+  END IF;
+
+  IF has_function_privilege(
+    'anon',
+    'public.has_department_role(uuid,text,text[])',
+    'EXECUTE'
+  ) OR has_function_privilege(
+    'anon',
+    'private.has_department_role(uuid,text,text[])',
+    'EXECUTE'
+  ) THEN
+    RAISE EXCEPTION 'anon role unexpectedly has EXECUTE on department-role helper functions';
+  END IF;
+
+  IF has_function_privilege(
+    'service_role',
+    'private.has_department_role(uuid,text,text[])',
+    'EXECUTE'
+  ) THEN
+    RAISE EXCEPTION 'service_role unexpectedly has EXECUTE on private department-role helper';
+  END IF;
+
   -- Direct authenticated inserts must be limited to user-role messages.
   -- Assistant/system replies are written only by the server-side trusted client.
   IF NOT EXISTS (
