@@ -56,7 +56,7 @@ Also verify:
 - A user cannot insert/update chunks linked to a document in another department or organization.
 - Read-only users cannot DELETE (test explicitly; a broad FOR ALL policy could accidentally allow this).
 - A document with NULL/invalid department classification remains admin-only.
-- The route layer stays admin-only until its upload, list, get, reindex, keyword search, semantic search, and Q&A paths all accept/resolve an authorized department and apply the same department filter.
+- The backend API now requires department scope for non-admin list, keyword search, semantic search, and Q&A; document GET/reindex authorize against the stored department; upload requires an explicit department_code and write permission. Verify these routes with real JWTs. The SQL migration remains required so direct Data API access and the semantic RPC enforce the same policy.
 - Existing documents are not auto-classified from title, filename, or document_type.
 - Cross-department AI assistant and dashboards remain admin-only until their complete retrieval pipeline has equivalent authorization.
 
