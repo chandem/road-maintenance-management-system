@@ -58,7 +58,12 @@ def log_analysis_run(
 
 
 def resolve_organization_id(client: Any, user_id: str) -> str | None:
-    """Look up the caller's organization_id from user_profiles."""
+    """Return the profile organization only when backed by active membership.
+
+    user_profiles.organization_id is user-editable under the current profile
+    policy, so it is a selector, not an authorization source. The active
+    organization_members row is authoritative.
+    """
     try:
         profile = (
             client.table("user_profiles")
@@ -67,6 +72,21 @@ def resolve_organization_id(client: Any, user_id: str) -> str | None:
             .maybe_single()
             .execute()
         )
-        return (profile.data or {}).get("organization_id")
+        organization_id = (profile.data or {}).get("organization_id")
+        if not organization_id:
+            return None
+
+        membership = (
+            client.table("organization_members")
+            .select("organization_id")
+            .eq("organization_id", organization_id)
+            .eq("user_id", user_id)
+            .eq("is_active", True)
+            .maybe_single()
+            .execute()
+        )
+        if not membership.data:
+            return None
+        return str(membership.data["organization_id"])
     except Exception:
         return None
