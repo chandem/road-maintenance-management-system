@@ -236,12 +236,12 @@ def test_document_department_authorization_keeps_legacy_documents_admin_only(mon
     )
     with pytest.raises(HTTPException) as exc:
         _authorize_document_row(
+            {"id": "user-1", "client": client},
             {
                 "id": "doc-1",
                 "organization_id": "org-1",
                 "department_code": None,
             },
-            {"id": "user-1", "client": client},
         )
     assert exc.value.status_code == 403
 
