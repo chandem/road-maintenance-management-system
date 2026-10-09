@@ -81,3 +81,46 @@ def require_department_access(department_code: str, allowed_roles: list[str]):
         return current_user
 
     return _check
+
+
+def require_org_admin():
+    """Require an active organization owner/admin for cross-department features.
+
+    Use this until the endpoint can filter every piece of retrieved data by the
+    caller's department grants. Fails closed on membership lookup errors.
+    """
+    from app.services.ai_audit import resolve_organization_id
+
+    def _check(current_user=Depends(get_current_user)):
+        organization_id = resolve_organization_id(
+            current_user["client"], current_user["id"]
+        )
+        if not organization_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Active organization membership is required.",
+            )
+        try:
+            membership = (
+                current_user["client"]
+                .table("organization_members")
+                .select("role")
+                .eq("organization_id", organization_id)
+                .eq("user_id", current_user["id"])
+                .eq("is_active", True)
+                .maybe_single()
+                .execute()
+            )
+        except Exception as exc:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Organization administrator access could not be verified.",
+            ) from exc
+        if not membership.data or membership.data.get("role") not in {"owner", "admin"}:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Organization administrator access is required.",
+            )
+        return current_user
+
+    return _check
