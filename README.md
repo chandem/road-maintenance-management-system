@@ -166,6 +166,41 @@ It covers:
 
 HR information can support workforce planning for road maintenance operations.
 
+
+---
+
+# Department Access and Permissions
+
+AI-RMMS is designed for department-based access within each organization. Permissions must be enforced by the backend and database—not only by hiding navigation items in the frontend.
+
+## Initial Departments
+
+| Department | Primary workspace |
+|---|---|
+| Road Asset Management | RAMS — roads, sections, inspections, defects, and maintenance priorities |
+| Machinery Maintenance Management | MMMS — equipment, maintenance schedules, breakdowns, and machinery work orders |
+| Finance | Budgets, commitments, expenditure, payments, and financial reports |
+| Human Resources | Employee records, workforce assignments, leave, training, and HR reports |
+| General Asset Management | Buildings, offices, vehicles, IT equipment, land, furniture, and other organizational assets |
+
+## Access Roles
+
+- **Department manager** — manages permitted records and activities within the assigned department.
+- **Officer** — performs permitted day-to-day departmental work.
+- **Read-only** — views permitted departmental information without changing it.
+
+Organization administrators manage department assignments. Assignments must belong to the same organization as the user, and users must not be able to grant themselves permissions or elevate their own roles.
+
+## Cross-Department AI Collaboration
+
+AI-RMMS can provide approved cross-department insights when needed—for example, combining road condition, machinery availability, budget, and workforce information to support a maintenance recommendation. Cross-department access must be limited to authorized users and the minimum information required.
+
+The AI layer must follow the same access rules as ordinary application features. AI responses, document search, semantic retrieval, reports, and APIs must not reveal data the requesting user is not authorized to access. Important engineering, financial, and administrative actions remain subject to human approval.
+
+## Implementation Status
+
+Department and role-assignment foundations are being developed. **Department-level isolation is not yet complete across all APIs, database policies, AI retrieval, RAMS, and MMMS integrations.** The department list or role-assignment schema alone does not prove that every module is secured. Full access control requires verified backend checks, database row-level security, integration testing, and authorization tests for both permitted and denied access.
+
 ---
 
 # Supporting Modules
