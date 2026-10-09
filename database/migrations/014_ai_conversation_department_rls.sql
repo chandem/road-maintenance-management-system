@@ -85,11 +85,8 @@ CREATE POLICY ai_conversations_insert
     AND private.is_org_member(organization_id)
   );
 
-DROP POLICY IF EXISTS ai_conversations_update ON public.ai_conversations;
-CREATE POLICY ai_conversations_update
-  ON public.ai_conversations FOR UPDATE TO authenticated
-  USING (private.is_org_member(organization_id))
-  WITH CHECK (private.is_org_member(organization_id));
+-- Authenticated users have no UPDATE grant on ai_conversations. The trusted
+-- backend service role alone updates timestamps; no caller UPDATE policy is needed.
 
 DROP POLICY IF EXISTS ai_messages_select ON public.ai_messages;
 CREATE POLICY ai_messages_select
