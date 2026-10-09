@@ -41,7 +41,10 @@ def list_roads(
 
 
 @router.get("/{road_id}", response_model=Road)
-def get_road(road_id: UUID, current_user=Depends(require_department_access("road_asset", ["department_manager", "officer", "read_only"])))
+def get_road(
+    road_id: UUID,
+    current_user=Depends(require_department_access("road_asset", ["department_manager", "officer", "read_only"])),
+):
     response = (
         current_user["client"]
         .table("roads")
@@ -57,7 +60,10 @@ def get_road(road_id: UUID, current_user=Depends(require_department_access("road
 
 
 @router.post("", response_model=Road, status_code=201)
-def create_road(payload: RoadCreate, current_user=Depends(require_department_access("road_asset", ["department_manager", "officer"])))
+def create_road(
+    payload: RoadCreate,
+    current_user=Depends(require_department_access("road_asset", ["department_manager", "officer"])),
+):
     organization_id = _org_id(current_user)
     row = {"organization_id": organization_id, **payload.model_dump(mode="json")}
     response = current_user["client"].table("roads").insert(row).execute()
