@@ -2,7 +2,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from app.api.dependencies import get_current_user
+from app.api.dependencies import get_current_user, require_department_access, require_org_admin
 from app.schemas.conversations import (
     Conversation,
     ConversationCreate,
@@ -31,7 +31,7 @@ def _org_id(current_user) -> str:
 
 @router.get("", response_model=list[Conversation])
 def list_conversations(
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_department_access("road_asset", ['department_manager', 'officer', 'read_only'])),
     limit: int = Query(default=20, ge=1, le=50),
 ):
     """List AI conversations for the caller's organization."""
@@ -50,7 +50,7 @@ def list_conversations(
 @router.post("", response_model=Conversation, status_code=201)
 def create_conversation(
     body: ConversationCreate,
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_department_access("road_asset", ['department_manager', 'officer', 'read_only'])),
 ):
     """Start a new AI conversation."""
     org_id = _org_id(current_user)
@@ -76,7 +76,7 @@ def create_conversation(
 @router.get("/{conversation_id}/messages", response_model=list[Message])
 def list_messages(
     conversation_id: UUID,
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_department_access("road_asset", ['department_manager', 'officer', 'read_only'])),
     limit: int = Query(default=50, ge=1, le=100),
 ):
     """List messages in a conversation."""
@@ -108,7 +108,7 @@ def list_messages(
 def post_message(
     conversation_id: UUID,
     body: MessageCreate,
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_department_access("road_asset", ['department_manager', 'officer', 'read_only'])),
 ):
     """Post a user message and receive an evidence-aware assistant reply."""
     supabase = current_user["client"]
