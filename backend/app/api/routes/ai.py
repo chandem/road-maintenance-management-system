@@ -4,7 +4,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from app.api.dependencies import get_current_user
+from app.api.dependencies import get_current_user, require_department_access, require_org_admin
 from app.core.config import get_settings
 from app.schemas.ai import (
     RoadPriorityRecommendation,
@@ -132,7 +132,7 @@ def generate_ranking_ai_explanations(
 @router.post("/road-priority", response_model=RoadPriorityRecommendation)
 def analyze_road_priority(
     request: RoadPriorityRequest,
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_department_access("road_asset", ['department_manager', 'officer', 'read_only'])),
 ):
     supabase = current_user["client"]
     section = (
@@ -279,7 +279,7 @@ def analyze_road_priority(
 @router.get("/road-ranking", response_model=RoadRankingResponse)
 def rank_road_sections(
     limit: int = Query(default=10, ge=1, le=100),
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_department_access("road_asset", ['department_manager', 'officer', 'read_only'])),
 ):
     supabase = current_user["client"]
 
@@ -443,7 +443,7 @@ def rank_road_sections(
 @router.post("/office-assistant", response_model=OfficeAssistantResponse)
 def office_assistant(
     request: OfficeAssistantRequest,
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_org_admin()),
 ):
     """Cross-module assistant: RAMS + MMMS + Finance + HR + Assets + Documents."""
     supabase = current_user["client"]
