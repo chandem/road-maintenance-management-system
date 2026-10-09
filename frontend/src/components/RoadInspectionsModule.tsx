@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import type { FormEvent } from "react";
 import { supabase } from "../lib/supabase";
 
 type Section = { id: string; section_code: string | null; start_chainage_km: number; end_chainage_km: number; condition_rating: number | null };
@@ -41,7 +42,7 @@ export default function RoadInspectionsModule() {
   }, []);
   useEffect(() => { void load(); }, [load]);
 
-  const save = async (event: React.FormEvent<HTMLFormElement>) => {
+  const save = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault(); setSaving(true); setError("");
     try {
       const { data } = await supabase.auth.getSession();
