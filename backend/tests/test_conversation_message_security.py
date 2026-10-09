@@ -56,6 +56,11 @@ class FakeQuery:
             "payload": self.payload,
             "filters": dict(self.filters),
         })
+        if (
+            self.table_name in self.client.fail_count_tables
+            and self.operation == "select"
+        ):
+            raise RuntimeError(f"{self.table_name} count query failed")
         if self.table_name == "ai_conversations" and self.operation == "select":
             return SimpleNamespace(data={
                 "id": str(CONVERSATION_ID),
@@ -75,6 +80,7 @@ class FakeQuery:
 class FakeClient:
     def __init__(self):
         self.calls = []
+        self.fail_count_tables = set()
 
     def table(self, name):
         return FakeQuery(self, name)
@@ -135,5 +141,39 @@ def test_missing_trusted_client_fails_before_persisting_user_message(monkeypatch
     assert exc.value.status_code == 503
     assert not any(
         call["table"] == "ai_messages" and call["operation"] == "insert"
+        for call in user_client.calls
+    )
+
+
+
+def test_count_query_failure_is_reported_as_unavailable_without_failing_turn(monkeypatch):
+    user_client = FakeClient()
+    user_client.fail_count_tables.add("roads")
+    trusted_client = FakeClient()
+    captured_prompts = []
+
+    monkeypatch.setattr(conversations, "get_service_client", lambda: trusted_client)
+    monkeypatch.setattr(
+        conversations,
+        "generate_text",
+        lambda prompt: (captured_prompts.append(prompt) or None),
+    )
+
+    result = conversations.post_message(
+        conversation_id=CONVERSATION_ID,
+        body=MessageCreate(content="Summarize the road network."),
+        current_user={"id": "user-1", "client": user_client},
+    )
+
+    assert len(captured_prompts) == 1
+    assert "Roads: unavailable" in captured_prompts[0]
+    assert "Roads: 0" not in captured_prompts[0]
+    assert "Sections: 0" in captured_prompts[0]
+    assert "Work orders: 0" in captured_prompts[0]
+    assert result["role"] == "assistant"
+    assert any(
+        call["table"] == "ai_messages"
+        and call["operation"] == "insert"
+        and call["payload"]["role"] == "user"
         for call in user_client.calls
     )
