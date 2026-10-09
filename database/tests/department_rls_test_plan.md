@@ -113,3 +113,19 @@ Also verify direct Data API access, not just FastAPI dependency checks. Messages
 ## Migration-history reconciliation (required before apply)
 
 The live Supabase migration history uses timestamp-based versions and currently contains entries through `20261009115736`, while the repository uses numbered SQL filenames (001–014). These are not proven to be a one-to-one mapping. Do not apply files based only on their filename or assume that migrations 011–014 are new to the live database. Compare every repository migration with the live migration history and catalog state, then prepare a timestamped, forward-only deployment plan. No migration in this branch has been applied to production.
+
+
+## AI conversations and message authorization (migration 014)
+
+The live-schema preflight found that `ai_conversations`, `ai_messages`, and `ai_message_sources` are referenced by backend routes but absent from the live public schema. Migration 014 creates them idempotently and adds restrictive department/ownership policies. Do not apply until tested in staging.
+
+- A road department manager/officer can create and update their own conversations and post messages.
+- A road department read-only user can read their own conversation and messages but cannot create a conversation, post a message, or update conversation state.
+- A non-admin cannot read another user's conversation or messages, even when both users belong to the same organization.
+- An organization owner/admin can read and manage conversations in their organization, subject to the explicit grants in migration 014.
+- A finance-only, unassigned, inactive, or cross-organization user cannot read road conversations, messages, or message sources.
+- A caller cannot attach a message or source to another user's conversation.
+- The Data API must reject anonymous access; authenticated users receive only SELECT/INSERT/UPDATE table grants, and message sources receive SELECT/INSERT only.
+- Verify backend behavior: conversation creation and message posting require manager/officer; list and message-read routes permit read_only for the caller's own conversation.
+
+Migration 014 is a source-controlled proposal and has not been applied to production.
