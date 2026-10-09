@@ -11,6 +11,19 @@ class DocumentClassificationResponse(BaseModel):
     document_type: str
     confidence: float
     reasons: list[str]
+    document_id: str | None = None
+    chunk_count: int | None = None
+    embedded_count: int | None = None
+    embedding_status: str | None = None
+
+
+class DocumentIngestionResponse(BaseModel):
+    document_id: str
+    title: str
+    chunk_count: int
+    embedded_count: int
+    embedding_status: str
+    message: str
 
 
 class DocumentSearchRequest(BaseModel):

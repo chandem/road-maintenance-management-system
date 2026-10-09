@@ -5,7 +5,6 @@ from dataclasses import dataclass
 from app.core.config import get_settings
 
 
-DEFAULT_EMBEDDING_MODEL = "gemini-embedding-2"
 DEFAULT_OUTPUT_DIMENSIONALITY = 768
 
 
@@ -24,7 +23,7 @@ class EmbeddingProviderError(Exception):
 def generate_embedding(
     text: str,
     *,
-    model: str = DEFAULT_EMBEDDING_MODEL,
+    model: str | None = None,
     output_dimensionality: int = DEFAULT_OUTPUT_DIMENSIONALITY,
 ) -> EmbeddingResult | None:
     """Generate a semantic embedding for one document chunk.
@@ -44,12 +43,14 @@ def generate_embedding(
     if not settings.gemini_api_key:
         return None
 
+    embedding_model = model or settings.gemini_embedding_model
+
     try:
         from google import genai
 
         client = genai.Client(api_key=settings.gemini_api_key)
         response = client.models.embed_content(
-            model=model,
+            model=embedding_model,
             contents=normalized,
             config=genai.types.EmbedContentConfig(
                 output_dimensionality=output_dimensionality,
@@ -62,7 +63,7 @@ def generate_embedding(
         values = [float(value) for value in embeddings[0].values]
         return EmbeddingResult(
             values=values,
-            model=model,
+            model=embedding_model,
             dimension=len(values),
             provider="gemini",
         )
@@ -75,16 +76,24 @@ def generate_embedding(
 def generate_embeddings(
     texts: list[str],
     *,
-    model: str = DEFAULT_EMBEDDING_MODEL,
+    model: str | None = None,
     output_dimensionality: int = DEFAULT_OUTPUT_DIMENSIONALITY,
 ) -> list[EmbeddingResult | None]:
-    """Generate embeddings independently for a batch of document chunks."""
+    """Generate embeddings for a batch of chunks.
 
-    return [
-        generate_embedding(
-            text,
-            model=model,
-            output_dimensionality=output_dimensionality,
-        )
-        for text in texts
-    ]
+    Individual failures become None so partial ingestion can still succeed.
+    """
+
+    results: list[EmbeddingResult | None] = []
+    for text in texts:
+        try:
+            results.append(
+                generate_embedding(
+                    text,
+                    model=model,
+                    output_dimensionality=output_dimensionality,
+                )
+            )
+        except EmbeddingProviderError:
+            results.append(None)
+    return results
