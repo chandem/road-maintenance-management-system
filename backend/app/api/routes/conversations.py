@@ -206,20 +206,35 @@ def post_message(
 
     # Persist the generated assistant reply using the server-only service role.
     # The conversation was first verified through the caller's RLS-scoped client.
-    assistant_msg = (
-        trusted_client.table("ai_messages")
-        .insert(
-            {
-                "conversation_id": str(conversation_id),
-                "role": "assistant",
-                "content": assistant_content,
-                "model": model_name,
-            }
+    try:
+        assistant_msg = (
+            trusted_client.table("ai_messages")
+            .insert(
+                {
+                    "conversation_id": str(conversation_id),
+                    "role": "assistant",
+                    "content": assistant_content,
+                    "model": model_name,
+                }
+            )
+            .execute()
         )
-        .execute()
-    )
+    except Exception as exc:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "Your message was saved, but the assistant reply could not be stored. "
+                "Refresh the conversation before sending another message."
+            ),
+        ) from exc
     if not assistant_msg.data:
-        raise HTTPException(status_code=500, detail="Assistant reply could not be saved.")
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "Your message was saved, but the assistant reply could not be stored. "
+                "Refresh the conversation before sending another message."
+            ),
+        )
 
     # Updating the list-sort timestamp is best-effort: the assistant reply
     # is already saved, so a timestamp failure must not turn success into an
