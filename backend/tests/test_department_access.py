@@ -111,6 +111,22 @@ def test_owner_can_access_department_without_department_assignment(monkeypatch):
     assert dependency(current_user=current_user) == current_user
 
 
+def test_department_authorization_returns_503_when_organization_lookup_fails(monkeypatch):
+    from app.services import ai_audit
+
+    def broken_resolve(*_args):
+        raise RuntimeError("database unavailable")
+
+    monkeypatch.setattr(ai_audit, "resolve_organization_id", broken_resolve)
+    client = FakeClient(membership={"role": "member"})
+    dependency = require_department_access("road_asset", ["officer"])
+
+    with pytest.raises(HTTPException) as exc:
+        dependency(current_user={"id": "user-1", "client": client})
+
+    assert exc.value.status_code == 503
+
+
 def test_missing_department_role_is_forbidden(monkeypatch):
     from app.services import ai_audit
 
