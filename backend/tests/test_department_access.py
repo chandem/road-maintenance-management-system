@@ -181,3 +181,87 @@ def test_org_admin_dependency_fails_closed_on_lookup_error(monkeypatch):
         require_org_admin()(current_user={"id": "user-1", "client": BrokenClient()})
 
     assert exc.value.status_code == 503
+
+
+
+def test_document_department_authorization_allows_matching_manager(monkeypatch):
+    from app.api.routes.documents import _authorize_department
+    from app.services import ai_audit
+
+    monkeypatch.setattr(ai_audit, "resolve_organization_id", lambda *_args: "org-1")
+    client = FakeClient(
+        membership={
+            "organization_id": "org-1",
+            "user_id": "user-1",
+            "is_active": True,
+            "role": "member",
+        },
+        rpc_result=True,
+    )
+    assert _authorize_department(
+        {"id": "user-1", "client": client}, "road_asset", write=True
+    ) == "org-1"
+
+
+def test_document_department_authorization_requires_scope_for_non_admin(monkeypatch):
+    from app.api.routes.documents import _authorize_department
+    from app.services import ai_audit
+
+    monkeypatch.setattr(ai_audit, "resolve_organization_id", lambda *_args: "org-1")
+    client = FakeClient(
+        membership={
+            "organization_id": "org-1",
+            "user_id": "user-1",
+            "is_active": True,
+            "role": "member",
+        }
+    )
+    with pytest.raises(HTTPException) as exc:
+        _authorize_department({"id": "user-1", "client": client}, None)
+    assert exc.value.status_code == 403
+
+
+def test_document_department_authorization_keeps_legacy_documents_admin_only(monkeypatch):
+    from app.api.routes.documents import _authorize_document_row
+    from app.services import ai_audit
+
+    monkeypatch.setattr(ai_audit, "resolve_organization_id", lambda *_args: "org-1")
+    client = FakeClient(
+        membership={
+            "organization_id": "org-1",
+            "user_id": "user-1",
+            "is_active": True,
+            "role": "member",
+        }
+    )
+    with pytest.raises(HTTPException) as exc:
+        _authorize_document_row(
+            {
+                "id": "doc-1",
+                "organization_id": "org-1",
+                "department_code": None,
+            },
+            {"id": "user-1", "client": client},
+        )
+    assert exc.value.status_code == 403
+
+
+def test_document_department_authorization_fails_closed_on_rpc_error(monkeypatch):
+    from app.api.routes.documents import _authorize_department
+    from app.services import ai_audit
+
+    monkeypatch.setattr(ai_audit, "resolve_organization_id", lambda *_args: "org-1")
+    client = FakeClient(
+        membership={
+            "organization_id": "org-1",
+            "user_id": "user-1",
+            "is_active": True,
+            "role": "member",
+        },
+        rpc_error=RuntimeError("database unavailable"),
+    )
+    with pytest.raises(HTTPException) as exc:
+        _authorize_department(
+            {"id": "user-1", "client": client}, "road_asset"
+        )
+    assert exc.value.status_code == 503
