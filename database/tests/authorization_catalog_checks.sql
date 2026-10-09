@@ -19,6 +19,8 @@ DECLARE
     'budgets',
     'expenses',
     'employees',
+    'ai_analysis_runs',
+    'ai_recommendations',
     'documents',
     'document_chunks',
     'ai_conversations',
@@ -37,6 +39,8 @@ DECLARE
     'budgets',
     'expenses',
     'employees',
+    'ai_analysis_runs',
+    'ai_recommendations',
     'documents',
     'document_chunks',
     'ai_conversations',
@@ -154,6 +158,23 @@ BEGIN
   ) THEN
     RAISE EXCEPTION 'ai_message_sources missing restrictive SELECT policy';
   END IF;
+
+  -- RLS does not protect TRUNCATE. Normal authenticated users must not
+  -- retain elevated table privileges from project defaults or older migrations.
+  FOREACH rel_name IN ARRAY ARRAY[
+    'roads', 'road_sections', 'road_inspections',
+    'materials', 'maintenance_plans', 'work_orders',
+    'machinery', 'assets', 'budgets', 'expenses', 'employees',
+    'documents', 'document_chunks', 'ai_analysis_runs', 'ai_recommendations',
+    'ai_conversations', 'ai_messages', 'ai_message_sources'
+  ] LOOP
+    IF has_table_privilege('authenticated', to_regclass(format('public.%I', rel_name)), 'TRUNCATE')
+       OR has_table_privilege('authenticated', to_regclass(format('public.%I', rel_name)), 'REFERENCES')
+       OR has_table_privilege('authenticated', to_regclass(format('public.%I', rel_name)), 'TRIGGER') THEN
+      RAISE EXCEPTION
+        'Authenticated role retains TRUNCATE/REFERENCES/TRIGGER on public.%', rel_name;
+    END IF;
+  END LOOP;
 
   -- The public RPC wrapper should be SECURITY INVOKER; the privileged helper
   -- belongs in private and must not be SECURITY INVOKER accidentally replaced.
