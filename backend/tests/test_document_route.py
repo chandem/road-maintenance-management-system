@@ -105,3 +105,23 @@ def test_read_only_user_cannot_reindex_document(monkeypatch):
 
     assert error.value.status_code == 403
 
+def test_unauthorized_user_is_rejected_before_upload_is_read(monkeypatch):
+    upload = OversizedUpload()
+
+    def deny_upload(*_args, **_kwargs):
+        raise HTTPException(status_code=403, detail="Department access denied")
+
+    monkeypatch.setattr(document_routes, "_authorize_department", deny_upload)
+
+    with pytest.raises(HTTPException) as error:
+        asyncio.run(
+            document_routes.classify_uploaded_document(
+                file=upload,
+                department_code="finance",
+                current_user={"id": "road-user", "client": object()},
+            )
+        )
+
+    assert error.value.status_code == 403
+    assert upload.read_size is None
+
