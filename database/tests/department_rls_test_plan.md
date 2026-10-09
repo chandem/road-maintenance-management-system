@@ -93,3 +93,23 @@ These findings came from catalog/schema queries only. No production DDL or polic
 - [ ] Add test users and department assignments in a non-production environment without copying sensitive production data.
 - [ ] Execute the role and document matrix with each user's own JWT; capture expected and actual HTTP results.
 - [ ] Run the Supabase Security Advisor after staging migrations and resolve any newly introduced warnings.
+
+
+## AI conversation authorization (migration 014)
+
+Use each test user's own authenticated JWT against the Data API and the API endpoints.
+
+| Test identity | Read own conversation/messages | Read another user's conversation | Create conversation | Insert message |
+|---|---|---|---|---|
+| Organization owner/admin | allowed | allowed within their organization | allowed | allowed within their organization |
+| Road department manager/officer | allowed | denied | allowed | allowed only in own active conversation |
+| Road department read-only | allowed | denied | denied | denied |
+| Other department only | denied | denied | denied | denied |
+| No department role / inactive member | denied | denied | denied | denied |
+| User from another organization | denied | denied | denied | denied |
+
+Also verify direct Data API access, not just FastAPI dependency checks. Messages must inherit access from their parent conversation; guessing a conversation UUID must not reveal messages. Confirm read-only users cannot mutate either table and cannot post a user- or assistant-role message directly.
+
+## Migration-history reconciliation (required before apply)
+
+The live Supabase migration history uses timestamp-based versions and currently contains entries through `20261009115736`, while the repository uses numbered SQL filenames (001–014). These are not proven to be a one-to-one mapping. Do not apply files based only on their filename or assume that migrations 011–014 are new to the live database. Compare every repository migration with the live migration history and catalog state, then prepare a timestamped, forward-only deployment plan. No migration in this branch has been applied to production.
