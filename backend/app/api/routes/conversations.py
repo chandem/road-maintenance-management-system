@@ -3,6 +3,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.api.dependencies import get_current_user, require_department_access, require_org_admin
+from app.db.supabase import get_service_client
 from app.schemas.conversations import (
     Conversation,
     ConversationCreate,
@@ -125,7 +126,18 @@ def post_message(
     if conv.data.get("status") != "active":
         raise HTTPException(status_code=409, detail="Conversation is not active.")
 
-    # Store user message
+    # Assistant messages are written only through the backend's trusted service client.
+    # Create it before persisting the user message so missing server configuration
+    # fails without leaving a partial conversation turn.
+    try:
+        trusted_client = get_service_client()
+    except RuntimeError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="Trusted AI message storage is not configured.",
+        ) from exc
+
+    # Store user message with the caller's JWT; RLS permits only role='user'.
     user_msg = (
         supabase.table("ai_messages")
         .insert(
@@ -172,8 +184,10 @@ def post_message(
         )
         model_name = None
 
+    # Persist the generated assistant reply using the server-only service role.
+    # The conversation was first verified through the caller's RLS-scoped client.
     assistant_msg = (
-        supabase.table("ai_messages")
+        trusted_client.table("ai_messages")
         .insert(
             {
                 "conversation_id": str(conversation_id),
@@ -188,7 +202,7 @@ def post_message(
         raise HTTPException(status_code=500, detail="Assistant reply could not be saved.")
 
     # Touch conversation updated_at
-    supabase.table("ai_conversations").update(
+    trusted_client.table("ai_conversations").update(
         {"updated_at": "now()"}
     ).eq("id", str(conversation_id)).execute()
 
