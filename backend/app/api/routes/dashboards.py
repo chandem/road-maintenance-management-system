@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections import Counter
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends
 
@@ -105,7 +106,6 @@ def maintenance_dashboard(current_user=Depends(get_current_user)):
     client = current_user["client"]
     ctx = collect_cross_module_context(client)
     orders = ctx.samples.get("work_orders") or []
-    # Prefer full counts from summary; status breakdown from sample + live query
     try:
         all_orders = (
             client.table("work_orders")
@@ -119,7 +119,9 @@ def maintenance_dashboard(current_user=Depends(get_current_user)):
         all_orders = orders
 
     by_status = Counter((o.get("status") or "unknown").lower() for o in all_orders)
-    by_priority = Counter((o.get("priority") or "unspecified").lower() for o in all_orders)
+    by_priority = Counter(
+        (o.get("priority") or "unspecified").lower() for o in all_orders
+    )
 
     metrics = [
         MetricCount(label="Road sections", value=ctx.summary.get("sections", 0)),
@@ -172,7 +174,9 @@ def financial_dashboard(current_user=Depends(get_current_user)):
         module="Financial Management",
         title="Financial Dashboard",
         metrics=metrics,
-        alerts=[a for a in _alerts_from_summary(s) if a.module == "Financial Management"],
+        alerts=[
+            a for a in _alerts_from_summary(s) if a.module == "Financial Management"
+        ],
     )
 
 
@@ -255,3 +259,25 @@ def hr_dashboard(current_user=Depends(get_current_user)):
         metrics=metrics,
         alerts=[],
     )
+
+
+@router.get("/report/operational")
+def operational_report(current_user=Depends(get_current_user)) -> dict:
+    """Structured operational report combining all module KPIs and alerts."""
+    ctx = collect_cross_module_context(current_user["client"])
+    alerts = _alerts_from_summary(ctx.summary)
+    generated_at = datetime.now(timezone.utc).isoformat()
+    return {
+        "report_type": "operational",
+        "generated_at": generated_at,
+        "title": "AI-RMMS Operational Report",
+        "summary": ctx.summary,
+        "evidence": ctx.evidence,
+        "alerts": [a.model_dump() for a in alerts],
+        "modules": ctx.modules_consulted,
+        "advisory_note": (
+            "This report is generated from verified operational records. "
+            "It is decision-support only and does not authorize expenditure "
+            "or maintenance actions."
+        ),
+    }
