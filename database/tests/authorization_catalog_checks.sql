@@ -133,6 +133,11 @@ BEGIN
     RAISE EXCEPTION 'ai_messages lacks an authenticated INSERT policy that restricts role to user';
   END IF;
 
+  -- Authenticated users must not be able to fabricate AI evidence/source rows.
+  IF has_table_privilege('authenticated', 'public.ai_message_sources', 'INSERT') THEN
+    RAISE EXCEPTION 'authenticated role unexpectedly has INSERT privilege on ai_message_sources';
+  END IF;
+
   -- AI message SELECT policies must not reference ai_message_sources directly:
   -- PostgreSQL policy expressions cannot use a table that is not in their query.
   IF EXISTS (
