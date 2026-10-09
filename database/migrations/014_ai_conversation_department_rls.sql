@@ -56,6 +56,14 @@ ALTER TABLE public.ai_conversations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.ai_messages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.ai_message_sources ENABLE ROW LEVEL SECURITY;
 
+-- Explicitly grant only the commands required by the API. RLS narrows these
+-- table-level grants by organization, conversation ownership, and department.
+REVOKE ALL ON public.ai_conversations, public.ai_messages, public.ai_message_sources
+  FROM anon;
+GRANT SELECT, INSERT, UPDATE ON public.ai_conversations, public.ai_messages
+  TO authenticated;
+GRANT SELECT, INSERT ON public.ai_message_sources TO authenticated;
+
 -- Keep permissive policies so restrictive policies below can narrow them.
 DROP POLICY IF EXISTS ai_conversations_select ON public.ai_conversations;
 CREATE POLICY ai_conversations_select
