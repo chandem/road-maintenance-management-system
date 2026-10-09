@@ -29,7 +29,13 @@ EXPENSE_COLS = (
 
 
 def _org_id(current_user) -> str:
-    org_id = resolve_organization_id(current_user["client"], current_user["id"])
+    try:
+        org_id = resolve_organization_id(current_user["client"], current_user["id"])
+    except Exception as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="Organization membership could not be verified.",
+        ) from exc
     if not org_id:
         raise HTTPException(status_code=409, detail="User is not assigned to an organization.")
     return org_id
