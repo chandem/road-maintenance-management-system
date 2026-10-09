@@ -14,8 +14,6 @@ from app.services.ai_audit import resolve_organization_id
 
 router = APIRouter(prefix="/departments", tags=["departments"])
 
-ROLE_NAMES = {"department_manager", "officer", "read_only"}
-
 
 class DepartmentRoleAssignment(BaseModel):
     user_id: UUID
@@ -30,7 +28,7 @@ def _organization_id(current_user) -> str:
     if not organization_id:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="User is not assigned to an organization.",
+            detail="User is not an active member of an organization.",
         )
     return str(organization_id)
 
@@ -46,7 +44,7 @@ def _require_org_admin(current_user, organization_id: str) -> None:
         .maybe_single()
         .execute()
     )
-    if not result.data or result.data.get("role") != "admin":
+    if not result.data or result.data.get("role") not in {"owner", "admin"}:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Organization administrator permission required.",
