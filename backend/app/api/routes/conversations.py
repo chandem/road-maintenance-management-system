@@ -186,7 +186,13 @@ def post_message(
         f"User message: {body.content}"
     )
 
-    ai_result = generate_text(prompt)
+    try:
+        ai_result = generate_text(prompt)
+    except Exception:
+        # A provider/network error must not leave the persisted user message
+        # without a corresponding assistant response.
+        ai_result = None
+
     if ai_result:
         assistant_content = ai_result.text
         model_name = ai_result.model
@@ -215,9 +221,14 @@ def post_message(
     if not assistant_msg.data:
         raise HTTPException(status_code=500, detail="Assistant reply could not be saved.")
 
-    # Touch conversation updated_at
-    trusted_client.table("ai_conversations").update(
-        {"updated_at": datetime.now(timezone.utc).isoformat()}
-    ).eq("id", str(conversation_id)).execute()
+    # Updating the list-sort timestamp is best-effort: the assistant reply
+    # is already saved, so a timestamp failure must not turn success into an
+    # API error that encourages clients to resend the same message.
+    try:
+        trusted_client.table("ai_conversations").update(
+            {"updated_at": datetime.now(timezone.utc).isoformat()}
+        ).eq("id", str(conversation_id)).execute()
+    except Exception:
+        pass
 
     return assistant_msg.data[0]
