@@ -206,6 +206,40 @@ BEGIN
     RAISE EXCEPTION 'service_role unexpectedly has EXECUTE on private department-role helper';
   END IF;
 
+  -- Policies also depend on the private organization-admin helper. Keep it
+  -- SECURITY DEFINER with a locked search_path, callable by authenticated only.
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_proc p
+    JOIN pg_namespace n ON n.oid = p.pronamespace
+    WHERE n.nspname = 'private'
+      AND p.proname = 'is_org_admin'
+      AND p.prosecdef
+      AND coalesce(array_to_string(p.proconfig, ','), '') LIKE '%search_path=%'
+  ) THEN
+    RAISE EXCEPTION 'private.is_org_admin SECURITY DEFINER helper with fixed search_path is missing';
+  END IF;
+
+  IF NOT has_function_privilege(
+    'authenticated',
+    'private.is_org_admin(uuid)',
+    'EXECUTE'
+  ) THEN
+    RAISE EXCEPTION 'authenticated role cannot execute private.is_org_admin';
+  END IF;
+
+  IF has_function_privilege(
+    'anon',
+    'private.is_org_admin(uuid)',
+    'EXECUTE'
+  ) OR has_function_privilege(
+    'service_role',
+    'private.is_org_admin(uuid)',
+    'EXECUTE'
+  ) THEN
+    RAISE EXCEPTION 'anon or service_role unexpectedly has EXECUTE on private.is_org_admin';
+  END IF;
+
   -- Direct authenticated inserts must be limited to user-role messages.
   -- Assistant/system replies are written only by the server-side trusted client.
   IF NOT EXISTS (
