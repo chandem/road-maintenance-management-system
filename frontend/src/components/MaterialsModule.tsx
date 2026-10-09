@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import type { FormEvent } from "react";
 import { supabase } from "../lib/supabase";
 
 type Material = {
@@ -43,7 +44,7 @@ export default function MaterialsModule() {
   }, []);
   useEffect(() => { void load(); }, [load]);
 
-  const save = async (event: React.FormEvent<HTMLFormElement>) => {
+  const save = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault(); setSaving(true); setError("");
     try {
       const { data } = await supabase.auth.getSession();
