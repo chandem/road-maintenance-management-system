@@ -262,7 +262,7 @@ def hr_dashboard(current_user=Depends(require_department_access("human_resources
 
 
 @router.get("/report/operational")
-def operational_report(current_user=Depends(get_current_user)) -> dict:
+def operational_report(current_user=Depends(require_org_admin())) -> dict:
     """Structured operational report combining all module KPIs and alerts."""
     ctx = collect_cross_module_context(current_user["client"])
     alerts = _alerts_from_summary(ctx.summary)
