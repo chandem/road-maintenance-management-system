@@ -5,7 +5,7 @@ from types import SimpleNamespace
 import pytest
 from fastapi import HTTPException
 
-from app.api.dependencies import require_department_access
+from app.api.dependencies import require_department_access, require_org_admin
 from app.services.ai_audit import resolve_organization_id
 
 
@@ -139,5 +139,45 @@ def test_department_lookup_failure_fails_closed(monkeypatch):
 
     with pytest.raises(HTTPException) as exc:
         dependency(current_user={"id": "user-1", "client": client})
+
+    assert exc.value.status_code == 503
+
+
+
+def test_org_admin_dependency_allows_active_owner(monkeypatch):
+    from app.services import ai_audit
+
+    monkeypatch.setattr(ai_audit, "resolve_organization_id", lambda *_args: "org-1")
+    client = FakeClient(membership={"role": "owner"})
+    current_user = {"id": "user-1", "client": client}
+
+    assert require_org_admin()(current_user=current_user) == current_user
+
+
+def test_org_admin_dependency_rejects_department_member(monkeypatch):
+    from app.services import ai_audit
+
+    monkeypatch.setattr(ai_audit, "resolve_organization_id", lambda *_args: "org-1")
+    client = FakeClient(membership={"role": "member"})
+
+    with pytest.raises(HTTPException) as exc:
+        require_org_admin()(current_user={"id": "user-1", "client": client})
+
+    assert exc.value.status_code == 403
+
+
+def test_org_admin_dependency_fails_closed_on_lookup_error(monkeypatch):
+    from app.services import ai_audit
+
+    monkeypatch.setattr(ai_audit, "resolve_organization_id", lambda *_args: "org-1")
+
+    class BrokenClient(FakeClient):
+        def table(self, table_name):
+            if table_name == "organization_members":
+                raise RuntimeError("database unavailable")
+            return super().table(table_name)
+
+    with pytest.raises(HTTPException) as exc:
+        require_org_admin()(current_user={"id": "user-1", "client": BrokenClient()})
 
     assert exc.value.status_code == 503
