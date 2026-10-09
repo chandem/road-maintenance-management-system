@@ -60,11 +60,16 @@ ALTER TABLE public.ai_message_sources ENABLE ROW LEVEL SECURITY;
 -- table-level grants by organization, conversation ownership, and department.
 REVOKE ALL ON public.ai_conversations, public.ai_messages, public.ai_message_sources
   FROM PUBLIC, anon;
+
+-- Reset authenticated grants too, so rerunning this migration on a database
+-- with pre-existing tables cannot preserve stale privileges such as TRUNCATE,
+-- REFERENCES, TRIGGER, or unexpected writes from an earlier schema version.
+REVOKE ALL ON public.ai_conversations, public.ai_messages, public.ai_message_sources
+  FROM authenticated;
+
 GRANT SELECT, INSERT, UPDATE ON public.ai_conversations TO authenticated;
 GRANT SELECT, INSERT ON public.ai_messages TO authenticated;
-REVOKE UPDATE, DELETE ON public.ai_messages FROM authenticated;
 GRANT SELECT ON public.ai_message_sources TO authenticated;
-REVOKE INSERT, UPDATE, DELETE ON public.ai_message_sources FROM authenticated;
 
 -- Keep permissive policies so restrictive policies below can narrow them.
 DROP POLICY IF EXISTS ai_conversations_select ON public.ai_conversations;
