@@ -2,9 +2,9 @@ import json
 from pathlib import Path
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 
-from app.api.dependencies import require_org_admin
+from app.api.dependencies import get_current_user, require_org_admin
 from app.core.config import get_settings
 from app.schemas.documents import (
     DocumentClassificationRequest,
@@ -29,9 +29,8 @@ from app.services.semantic_search import search_document_chunks
 
 router = APIRouter(prefix="/documents", tags=["documents"])
 
-# Document records do not yet carry a department ACL. Restrict all document
-# ingestion, listing, retrieval, and semantic search to organization admins
-# until department-aware document permissions are implemented.
+# Department-aware API authorization complements database RLS. Keep the SQL
+# migration unapplied until the authenticated-JWT staging matrix passes.
 ALLOWED_EXTENSIONS = {".txt", ".csv", ".pdf", ".docx", ".xlsx", ".xlsm"}
 MAX_FILE_SIZE = 10 * 1024 * 1024
 
@@ -77,23 +76,120 @@ def _organization_id(current_user) -> str:
     return str(organization_id)
 
 
+VALID_DEPARTMENT_CODES = {
+    "road_asset",
+    "machinery_maintenance",
+    "finance",
+    "human_resources",
+    "general_assets",
+}
+
+
+def _authorize_department(current_user, department_code: str | None, *, write: bool = False) -> str:
+    """Return the active organization ID after checking department access.
+
+    Admins may omit department_code to access all organization documents.
+    Non-admins must specify a department and hold a matching active role.
+    Authorization lookups use the caller's JWT-scoped client and fail closed.
+    """
+    from app.services.ai_audit import resolve_organization_id
+
+    client = current_user["client"]
+    user_id = current_user["id"]
+    organization_id = resolve_organization_id(client, user_id)
+    if not organization_id:
+        raise HTTPException(status_code=403, detail="Active organization membership is required.")
+
+    try:
+        membership = (
+            client.table("organization_members")
+            .select("role")
+            .eq("organization_id", organization_id)
+            .eq("user_id", user_id)
+            .eq("is_active", True)
+            .maybe_single()
+            .execute()
+        )
+    except Exception as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="Document authorization could not be verified.",
+        ) from exc
+
+    if not membership.data:
+        raise HTTPException(status_code=403, detail="Active organization membership is required.")
+    if membership.data.get("role") in {"owner", "admin"}:
+        if department_code is not None and department_code not in VALID_DEPARTMENT_CODES:
+            raise HTTPException(status_code=422, detail="Invalid department code.")
+        return str(organization_id)
+
+    if department_code is None:
+        raise HTTPException(
+            status_code=403,
+            detail="Specify a department you are authorized to access.",
+        )
+    if department_code not in VALID_DEPARTMENT_CODES:
+        raise HTTPException(status_code=422, detail="Invalid department code.")
+
+    allowed_roles = ["department_manager", "officer"] if write else [
+        "department_manager", "officer", "read_only"
+    ]
+    try:
+        result = client.rpc(
+            "has_department_role",
+            {
+                "p_organization_id": organization_id,
+                "p_department_code": department_code,
+                "p_allowed_roles": allowed_roles,
+            },
+        ).execute()
+    except Exception as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="Document department permissions could not be verified.",
+        ) from exc
+    if result.data is not True:
+        raise HTTPException(
+            status_code=403,
+            detail="You do not have the required document department permissions.",
+        )
+    return str(organization_id)
+
+
+def _authorize_document_row(current_user, row: dict, *, write: bool = False) -> str:
+    """Authorize one fetched document; unclassified records are admin-only."""
+    organization_id = _authorize_department(
+        current_user,
+        row.get("department_code"),
+        write=write,
+    )
+    if str(row.get("organization_id")) != organization_id:
+        raise HTTPException(status_code=404, detail="Document not found")
+    return organization_id
+
+
 @router.get("", response_model=list[DocumentSummary])
 def list_documents(
-    current_user=Depends(require_org_admin()),
+    current_user=Depends(get_current_user),
     limit: int = Query(default=50, ge=1, le=200),
     document_type: str | None = Query(default=None, max_length=100),
+    department_code: str | None = Query(default=None),
 ):
-    """List documents for the caller's organization."""
+    """List documents only within an authorized department (or all for admins)."""
+    organization_id = _authorize_department(current_user, department_code)
     query = (
         current_user["client"]
         .table("documents")
         .select(
-            "id,title,document_type,status,extraction_status,document_date,"
-            "file_size_bytes,classification_confidence,created_at"
+            "id,title,organization_id,department_code,status,extraction_status,document_date,"
+            "file_size_bytes,classification_confidence,created_at,document_type"
         )
+        .eq("organization_id", organization_id)
         .order("created_at", desc=True)
         .limit(limit)
     )
+    if department_code:
+        query = query.eq("department_code", department_code)
     if document_type:
         query = query.eq("document_type", document_type)
     rows = query.execute().data or []
@@ -101,6 +197,7 @@ def list_documents(
         DocumentSummary(
             id=str(row["id"]),
             title=row["title"],
+            department_code=row.get("department_code"),
             document_type=row.get("document_type"),
             status=row["status"],
             extraction_status=row["extraction_status"],
@@ -120,14 +217,14 @@ def list_documents(
 @router.get("/{document_id}", response_model=DocumentSummary)
 def get_document(
     document_id: UUID,
-    current_user=Depends(require_org_admin()),
+    current_user=Depends(get_current_user),
 ):
     """Get one document summary by ID."""
     row = (
         current_user["client"]
         .table("documents")
         .select(
-            "id,title,document_type,status,extraction_status,document_date,"
+            "id,title,organization_id,department_code,document_type,status,extraction_status,document_date,"
             "file_size_bytes,classification_confidence,created_at"
         )
         .eq("id", str(document_id))
@@ -137,9 +234,11 @@ def get_document(
     if not row.data:
         raise HTTPException(status_code=404, detail="Document not found")
     data = row.data
+    _authorize_document_row(current_user, data)
     return DocumentSummary(
         id=str(data["id"]),
         title=data["title"],
+        department_code=data.get("department_code"),
         document_type=data.get("document_type"),
         status=data["status"],
         extraction_status=data["extraction_status"],
@@ -171,20 +270,24 @@ def classify_document_text(
 @router.post("/search", response_model=DocumentSearchResponse)
 def search_documents(
     request: DocumentSearchRequest,
-    current_user=Depends(require_org_admin()),
+    current_user=Depends(get_current_user),
 ):
     """Keyword search over document titles and extracted text."""
+    organization_id = _authorize_department(current_user, request.department_code)
     query = request.query.strip()
     escaped_query = query.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
     pattern = f"%{escaped_query}%"
     document_query = (
         current_user["client"]
         .table("documents")
-        .select("id,title,document_type,status,extraction_status,document_date,extracted_text")
+        .select("id,title,organization_id,department_code,document_type,status,extraction_status,document_date,extracted_text")
+        .eq("organization_id", organization_id)
         .or_(f"title.ilike.{pattern},extracted_text.ilike.{pattern}")
         .order("created_at", desc=True)
         .limit(request.limit)
     )
+    if request.department_code:
+        document_query = document_query.eq("department_code", request.department_code)
     if request.document_type:
         document_query = document_query.eq("document_type", request.document_type)
     rows = document_query.execute().data or []
@@ -206,10 +309,10 @@ def search_documents(
 @router.post("/semantic-search", response_model=SemanticSearchResponse)
 def semantic_search_documents(
     request: SemanticSearchRequest,
-    current_user=Depends(require_org_admin()),
+    current_user=Depends(get_current_user),
 ):
     """Vector search over organization document chunks (Step 4)."""
-    organization_id = _organization_id(current_user)
+    organization_id = _authorize_department(current_user, request.department_code)
     matches = search_document_chunks(
         request.query,
         organization_id=organization_id,
@@ -224,13 +327,19 @@ def semantic_search_documents(
     documents = (
         current_user["client"]
         .table("documents")
-        .select("id,title,document_type")
+        .select("id,title,document_type,department_code")
+        .eq("organization_id", organization_id)
         .in_("id", document_ids)
         .execute()
         .data
         or []
     )
+    if request.department_code:
+        documents = [row for row in documents if row.get("department_code") == request.department_code]
     metadata = {str(row["id"]): row for row in documents}
+    # Filter the RPC results again in the API before any content is returned or
+    # passed to an LLM. Database RLS remains the required defense-in-depth layer.
+    matches = [match for match in matches if match.document_id in metadata]
 
     enriched = [
         SemanticSearchMatch(
@@ -253,16 +362,16 @@ def semantic_search_documents(
 @router.post("/question", response_model=DocumentQuestionResponse)
 def ask_document_question(
     request: DocumentQuestionRequest,
-    current_user=Depends(require_org_admin()),
+    current_user=Depends(get_current_user),
 ):
     """Evidence-based Q&A: semantic retrieval first, keyword fallback."""
+    organization_id = _authorize_department(current_user, request.department_code)
     question = request.question.strip()
     evidence: list[DocumentEvidence] = []
     retrieval_method = "none"
 
     if not request.document_type:
         try:
-            organization_id = _organization_id(current_user)
             matches = search_document_chunks(
                 question,
                 organization_id=organization_id,
@@ -275,12 +384,15 @@ def ask_document_question(
                 documents = (
                     current_user["client"]
                     .table("documents")
-                    .select("id,title,document_type")
+                    .select("id,title,document_type,department_code")
+                    .eq("organization_id", organization_id)
                     .in_("id", document_ids)
                     .execute()
                     .data
                     or []
                 )
+                if request.department_code:
+                    documents = [row for row in documents if row.get("department_code") == request.department_code]
                 metadata = {str(row["id"]): row for row in documents}
                 evidence = [
                     DocumentEvidence(
@@ -309,12 +421,15 @@ def ask_document_question(
             current_user["client"]
             .table("documents")
             .select(
-                "id,title,document_type,status,extraction_status,document_date,extracted_text"
+                "id,title,organization_id,department_code,document_type,status,extraction_status,document_date,extracted_text"
             )
+            .eq("organization_id", organization_id)
             .or_(f"title.ilike.{pattern},extracted_text.ilike.{pattern}")
             .order("created_at", desc=True)
             .limit(request.limit)
         )
+        if request.department_code:
+            document_query = document_query.eq("department_code", request.department_code)
         if request.document_type:
             document_query = document_query.eq("document_type", request.document_type)
         rows = document_query.execute().data or []
@@ -395,7 +510,8 @@ def ask_document_question(
 @router.post("/upload-and-classify", response_model=DocumentClassificationResponse)
 async def classify_uploaded_document(
     file: UploadFile = File(...),
-    current_user=Depends(require_org_admin()),
+    department_code: str = Form(...),
+    current_user=Depends(get_current_user),
 ):
     """Upload → extract → classify → store → chunk → embed."""
     filename = Path(file.filename or "").name
@@ -415,8 +531,8 @@ async def classify_uploaded_document(
             detail="No readable text could be extracted from the document.",
         )
 
+    organization_id = _authorize_department(current_user, department_code, write=True)
     result = classify_document(filename, text)
-    organization_id = _organization_id(current_user)
 
     document = (
         current_user["client"]
@@ -424,6 +540,7 @@ async def classify_uploaded_document(
         .insert(
             {
                 "organization_id": organization_id,
+                "department_code": department_code,
                 "title": filename,
                 "document_type": result.document_type,
                 "mime_type": file.content_type,
@@ -486,7 +603,7 @@ async def classify_uploaded_document(
 @router.post("/{document_id}/ingest", response_model=DocumentIngestionResponse)
 def reindex_document(
     document_id: UUID,
-    current_user=Depends(require_org_admin()),
+    current_user=Depends(get_current_user),
 ):
     """Re-run chunk + embed for an existing document."""
     organization_id = _organization_id(current_user)
@@ -494,7 +611,7 @@ def reindex_document(
 
     document = (
         supabase.table("documents")
-        .select("id,title,organization_id,extracted_text,extraction_status")
+        .select("id,title,organization_id,department_code,extracted_text,extraction_status")
         .eq("id", str(document_id))
         .maybe_single()
         .execute()
@@ -503,8 +620,7 @@ def reindex_document(
         raise HTTPException(status_code=404, detail="Document not found")
 
     row = document.data
-    if str(row.get("organization_id")) != organization_id:
-        raise HTTPException(status_code=404, detail="Document not found")
+    organization_id = _authorize_document_row(current_user, row, write=True)
 
     text = (row.get("extracted_text") or "").strip()
     if not text:
