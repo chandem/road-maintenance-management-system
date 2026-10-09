@@ -62,6 +62,13 @@ class FakeQuery:
         ):
             raise RuntimeError(f"{self.table_name} count query failed")
         if (
+            self.client.fail_assistant_insert
+            and self.table_name == "ai_messages"
+            and self.operation == "insert"
+            and self.payload.get("role") == "assistant"
+        ):
+            raise RuntimeError("assistant message insert failed")
+        if (
             self.client.fail_timestamp_update
             and self.table_name == "ai_conversations"
             and self.operation == "update"
@@ -88,6 +95,7 @@ class FakeClient:
         self.calls = []
         self.fail_count_tables = set()
         self.fail_timestamp_update = False
+        self.fail_assistant_insert = False
 
     def table(self, name):
         return FakeQuery(self, name)
@@ -236,6 +244,39 @@ def test_timestamp_update_failure_does_not_hide_saved_assistant_reply(monkeypatc
     )
 
     assert result["role"] == "assistant"
+    assert any(
+        call["table"] == "ai_messages"
+        and call["operation"] == "insert"
+        and call["payload"]["role"] == "assistant"
+        for call in trusted_client.calls
+    )
+
+
+
+def test_assistant_storage_failure_returns_clear_recovery_message(monkeypatch):
+    user_client = FakeClient()
+    trusted_client = FakeClient()
+    trusted_client.fail_assistant_insert = True
+
+    monkeypatch.setattr(conversations, "get_service_client", lambda: trusted_client)
+    monkeypatch.setattr(conversations, "generate_text", lambda _prompt: None)
+
+    with pytest.raises(HTTPException) as exc:
+        conversations.post_message(
+            conversation_id=CONVERSATION_ID,
+            body=MessageCreate(content="Check road maintenance status."),
+            current_user={"id": "user-1", "client": user_client},
+        )
+
+    assert exc.value.status_code == 503
+    assert "Your message was saved" in exc.value.detail
+    assert "Refresh the conversation" in exc.value.detail
+    assert any(
+        call["table"] == "ai_messages"
+        and call["operation"] == "insert"
+        and call["payload"]["role"] == "user"
+        for call in user_client.calls
+    )
     assert any(
         call["table"] == "ai_messages"
         and call["operation"] == "insert"
