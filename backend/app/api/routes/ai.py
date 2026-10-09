@@ -26,6 +26,15 @@ from app.services.semantic_search import search_document_chunks
 router = APIRouter(prefix="/ai", tags=["ai"])
 
 
+def _best_effort_organization_id(supabase, user_id: str) -> str | None:
+    """Resolve organization for optional evidence/audit work without hiding auth checks."""
+    try:
+        return resolve_organization_id(supabase, user_id)
+    except Exception:
+        return None
+
+
+
 def calculate_priority(
     data: dict, work_orders: list[dict]
 ) -> tuple[Decimal, str, Decimal, list[str], list[str]]:
@@ -238,7 +247,7 @@ def analyze_road_priority(
 
     document_evidence: list[str] = []
     if request.include_document_evidence:
-        org_id = resolve_organization_id(supabase, current_user["id"])
+        org_id = _best_effort_organization_id(supabase, current_user["id"])
         query_bits = [
             data.get("section_code") or "",
             road_meta.get("road_name") or "",
@@ -289,7 +298,7 @@ def analyze_road_priority(
         recommended_action=action,
     )
 
-    org_id = resolve_organization_id(supabase, current_user["id"])
+    org_id = _best_effort_organization_id(supabase, current_user["id"])
     if org_id:
         log_analysis_run(
             supabase,
@@ -460,7 +469,7 @@ def rank_road_sections(
         ai_generated=ai_generated,
     )
 
-    org_id = resolve_organization_id(supabase, current_user["id"])
+    org_id = _best_effort_organization_id(supabase, current_user["id"])
     if org_id:
         log_analysis_run(
             supabase,
@@ -495,7 +504,7 @@ def office_assistant(
 
     if request.include_documents:
         try:
-            org_id = resolve_organization_id(supabase, current_user["id"])
+            org_id = _best_effort_organization_id(supabase, current_user["id"])
             if org_id and current_user.get("access_token"):
                 matches = search_document_chunks(
                     question,
@@ -573,7 +582,7 @@ def office_assistant(
         )
     )
 
-    org_id = resolve_organization_id(supabase, current_user["id"])
+    org_id = _best_effort_organization_id(supabase, current_user["id"])
     if org_id:
         log_analysis_run(
             supabase,
