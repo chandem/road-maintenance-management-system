@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import type { User } from "@supabase/supabase-js";
 import { supabase } from "./lib/supabase";
+import MaterialsModule from "./components/MaterialsModule";
+import RoadInspectionsModule from "./components/RoadInspectionsModule";
 
 type Priority = "Critical" | "High" | "Medium" | "Low";
 
@@ -364,6 +366,16 @@ function App() {
       </header>
 
       <main className="content">
+        {authReady && user && organizationId && (
+          <nav className="module-nav" aria-label="AI-RMMS modules">
+            <a href="#dashboard">Dashboard</a>
+            <a href="#road-ranking">Road ranking</a>
+            <a href="#materials">Materials</a>
+            <a href="#inspections">Road inspections</a>
+            <a href="#documents">Documents</a>
+            <a href="#office-assistant">AI assistant</a>
+          </nav>
+        )}
         {!authReady && <div className="empty-state">Checking session…</div>}
 
         {authReady && !user && (
@@ -417,7 +429,7 @@ function App() {
 
         {authReady && user && organizationId && (
           <>
-            <section className="dashboard-panel">
+            <section id="dashboard" className="dashboard-panel">
               <div className="section-heading">
                 <div>
                   <p className="eyebrow">EXECUTIVE DASHBOARD</p>
@@ -466,7 +478,7 @@ function App() {
               )}
             </section>
 
-            <section className="ranking-panel">
+            <section id="road-ranking" className="ranking-panel">
               <div className="section-heading">
                 <div>
                   <p className="eyebrow">AI ROAD INTELLIGENCE</p>
@@ -533,7 +545,10 @@ function App() {
               )}
             </section>
 
-            <section className="documents-panel">
+            <MaterialsModule />
+            <RoadInspectionsModule />
+
+            <section id="documents" className="documents-panel">
               <div className="section-heading">
                 <div>
                   <p className="eyebrow">DOCUMENT INTELLIGENCE</p>
@@ -633,7 +648,7 @@ function App() {
               </div>
             </section>
 
-            <section className="assistant-panel">
+            <section id="office-assistant" className="assistant-panel">
               <div>
                 <p className="eyebrow">AI OFFICE ASSISTANT</p>
                 <h2>Ask about your maintenance office</h2>
