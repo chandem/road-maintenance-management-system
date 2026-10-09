@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.routes.ai import router as ai_router
 from app.api.routes.assets import router as assets_router
 from app.api.routes.conversations import router as conversations_router
+from app.api.routes.dashboards import router as dashboards_router
 from app.api.routes.documents import router as documents_router
 from app.api.routes.employees import router as employees_router
 from app.api.routes.finance import router as finance_router
@@ -34,6 +35,7 @@ app.add_middleware(
 app.include_router(health_router, prefix="/api/v1")
 app.include_router(ai_router, prefix="/api/v1")
 app.include_router(documents_router, prefix="/api/v1")
+app.include_router(dashboards_router, prefix="/api/v1")
 app.include_router(system_router, prefix="/api/v1")
 app.include_router(roads_router, prefix="/api/v1")
 app.include_router(road_sections_router, prefix="/api/v1")
