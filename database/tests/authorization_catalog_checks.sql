@@ -130,6 +130,48 @@ BEGIN
 
   IF NOT has_function_privilege(
     'authenticated',
+    'private.has_department_role(uuid,text,text[])',
+    'EXECUTE'
+  ) THEN
+    RAISE EXCEPTION 'authenticated role cannot execute private department-role helper';
+  END IF;
+
+  IF has_function_privilege(
+       'anon',
+       'private.has_department_role(uuid,text,text[])',
+       'EXECUTE'
+     )
+     OR has_function_privilege(
+       'service_role',
+       'private.has_department_role(uuid,text,text[])',
+       'EXECUTE'
+     ) THEN
+    RAISE EXCEPTION 'anon or service_role unexpectedly can execute private department-role helper';
+  END IF;
+
+  IF NOT has_function_privilege(
+    'authenticated',
+    'public.has_department_role(uuid,text,text[])',
+    'EXECUTE'
+  ) THEN
+    RAISE EXCEPTION 'authenticated role cannot execute public department-role RPC wrapper';
+  END IF;
+
+  IF has_function_privilege(
+       'anon',
+       'public.has_department_role(uuid,text,text[])',
+       'EXECUTE'
+     )
+     OR has_function_privilege(
+       'service_role',
+       'public.has_department_role(uuid,text,text[])',
+       'EXECUTE'
+     ) THEN
+    RAISE EXCEPTION 'anon or service_role unexpectedly can execute public department-role RPC wrapper';
+  END IF;
+
+  IF NOT has_function_privilege(
+    'authenticated',
     'public.has_department_role(uuid,text,text[])',
     'EXECUTE'
   ) THEN
