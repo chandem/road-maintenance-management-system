@@ -60,8 +60,9 @@ ALTER TABLE public.ai_message_sources ENABLE ROW LEVEL SECURITY;
 -- table-level grants by organization, conversation ownership, and department.
 REVOKE ALL ON public.ai_conversations, public.ai_messages, public.ai_message_sources
   FROM PUBLIC, anon;
-GRANT SELECT, INSERT, UPDATE ON public.ai_conversations, public.ai_messages
-  TO authenticated;
+GRANT SELECT, INSERT, UPDATE ON public.ai_conversations TO authenticated;
+GRANT SELECT, INSERT ON public.ai_messages TO authenticated;
+REVOKE UPDATE, DELETE ON public.ai_messages FROM authenticated;
 GRANT SELECT ON public.ai_message_sources TO authenticated;
 REVOKE INSERT, UPDATE, DELETE ON public.ai_message_sources FROM authenticated;
 
