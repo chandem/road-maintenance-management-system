@@ -528,7 +528,9 @@ async def classify_uploaded_document(
             status_code=400,
             detail="Unsupported document type. Use TXT, CSV, PDF, DOCX, XLSX, or XLSM.",
         )
-    content = await file.read()
+    # Read at most one byte beyond the limit so oversized uploads cannot be
+    # copied wholesale into application memory before the size check.
+    content = await file.read(MAX_FILE_SIZE + 1)
     if len(content) > MAX_FILE_SIZE:
         raise HTTPException(status_code=413, detail="Document exceeds the 10 MB upload limit.")
     text = extract_text(filename, content)
