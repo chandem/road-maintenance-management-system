@@ -2,7 +2,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from app.api.dependencies import get_current_user
+from app.api.dependencies import get_current_user, require_department_access
 from app.schemas.road_sections import RoadSection, RoadSectionCreate, RoadSectionUpdate
 from app.services.ai_audit import resolve_organization_id
 
@@ -23,7 +23,7 @@ def _org_id(current_user) -> str:
 
 @router.get("", response_model=list[RoadSection])
 def list_road_sections(
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_department_access("road_asset", ['department_manager', 'officer', 'read_only'])),
     road_id: str | None = Query(default=None),
     limit: int = Query(default=100, ge=1, le=200),
 ):
@@ -40,7 +40,7 @@ def list_road_sections(
 
 
 @router.get("/{section_id}", response_model=RoadSection)
-def get_road_section(section_id: UUID, current_user=Depends(get_current_user)):
+def get_road_section(section_id: UUID, current_user=Depends(require_department_access("road_asset", ['department_manager', 'officer', 'read_only']))):
     response = (
         current_user["client"]
         .table("road_sections")
@@ -57,7 +57,7 @@ def get_road_section(section_id: UUID, current_user=Depends(get_current_user)):
 @router.post("", response_model=RoadSection, status_code=201)
 def create_road_section(
     payload: RoadSectionCreate,
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_department_access("road_asset", ['department_manager', 'officer'])),
 ):
     organization_id = _org_id(current_user)
     row = {"organization_id": organization_id, **payload.model_dump(mode="json")}
@@ -71,7 +71,7 @@ def create_road_section(
 def update_road_section(
     section_id: UUID,
     payload: RoadSectionUpdate,
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_department_access("road_asset", ['department_manager', 'officer'])),
 ):
     updates = {
         k: v for k, v in payload.model_dump(mode="json", exclude_unset=True).items()
