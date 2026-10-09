@@ -26,7 +26,6 @@ def get_current_user(
     return {"id": response.user.id, "client": supabase, "access_token": token}
 
 
-
 def require_department_access(department_code: str, allowed_roles: list[str]):
     """FastAPI dependency that requires an active department assignment.
 
@@ -42,10 +41,9 @@ def require_department_access(department_code: str, allowed_roles: list[str]):
         if not organization_id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Organization membership is required.",
+                detail="Active organization membership is required.",
             )
-        # Organization administrators can manage and inspect all departments.
-        # All other users need an explicit active assignment for this department.
+        # Owner/admin privileges come from the authoritative active membership row.
         try:
             membership = (
                 current_user["client"]
@@ -58,7 +56,8 @@ def require_department_access(department_code: str, allowed_roles: list[str]):
                 .execute()
             )
             is_org_admin = bool(
-                membership.data and membership.data.get("role") == "admin"
+                membership.data
+                and membership.data.get("role") in {"owner", "admin"}
             )
             result = current_user["client"].rpc(
                 "has_department_role",
