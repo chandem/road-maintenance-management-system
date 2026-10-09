@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime
 from types import SimpleNamespace
 from uuid import UUID
 
@@ -105,6 +106,15 @@ def test_user_message_uses_user_client_and_assistant_uses_trusted_client(monkeyp
     assert len(trusted_inserts) == 1
     assert trusted_inserts[0]["payload"]["role"] == "assistant"
     assert result["role"] == "assistant"
+
+    timestamp_updates = [
+        call for call in trusted_client.calls
+        if call["table"] == "ai_conversations" and call["operation"] == "update"
+    ]
+    assert len(timestamp_updates) == 1
+    updated_at = datetime.fromisoformat(timestamp_updates[0]["payload"]["updated_at"])
+    assert updated_at.tzinfo is not None
+    assert updated_at.utcoffset().total_seconds() == 0
 
 
 def test_missing_trusted_client_fails_before_persisting_user_message(monkeypatch):
