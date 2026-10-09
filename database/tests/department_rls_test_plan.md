@@ -71,3 +71,25 @@ Also verify:
 ## Current project state
 
 The live project has zero active department-role assignments. Existing document and chunk rows must remain admin-only until explicitly classified. The proposed migrations are source-controlled only; no production schema or policy has been changed. Do not apply these policies until role assignments exist and the complete staging matrix passes.
+
+
+## Read-only production preflight findings (2026-10-09)
+
+These findings came from catalog/schema queries only. No production DDL or policy changes were executed.
+
+- Migrations 011–013 are not recorded in the live migration history.
+- The live `public.documents` table does not yet have `department_code`; migration 013 is required before document-department policies can work.
+- The live project currently has zero rows in `public.user_department_roles`, so a role-based test cannot pass meaningfully until test assignments exist.
+- The live `public.has_department_role(uuid,text,text[])` function is currently SECURITY DEFINER and executable by `anon`, `authenticated`, and `service_role`. Migration 011 is intended to harden this, but its schema move and wrapper must be tested before production use.
+- The live `public.match_document_chunks` function is SECURITY INVOKER, but currently checks organization membership only. Department-level chunk RLS is still required before semantic results can be trusted for non-admin users.
+- `storage.objects` and `storage.buckets` have RLS enabled but no policies were returned by the catalog query. Before introducing private file uploads/downloads, define and test object policies or document a strictly server-mediated access design; never assume database row policies protect service-role storage calls.
+- The backend conversation routes reference `public.ai_conversations` and `public.ai_messages`, but those tables were not present in the live public-table inventory. Reconcile this schema/code mismatch before treating conversation authorization as complete. If these tables are added, they need explicit organization + road-department/owner RLS policies, including parent-conversation checks for messages.
+- Existing public-table organization policies are permissive. The proposed restrictive policies depend on those baseline policies and must be tested together; a policy review alone is not runtime validation.
+
+## Additional release gates
+
+- [ ] Reconcile every table referenced by backend routes with the live/migration-managed schema, including `ai_conversations` and `ai_messages`.
+- [ ] Decide whether document binaries are stored in Supabase Storage. If yes, test authenticated object read/write/delete authorization and ensure object paths cannot be used to bypass document department ACLs. If files remain server-mediated, verify each download endpoint authorizes the parent document before using any service-role client.
+- [ ] Add test users and department assignments in a non-production environment without copying sensitive production data.
+- [ ] Execute the role and document matrix with each user's own JWT; capture expected and actual HTTP results.
+- [ ] Run the Supabase Security Advisor after staging migrations and resolve any newly introduced warnings.
