@@ -35,9 +35,15 @@ def require_department_access(department_code: str, allowed_roles: list[str]):
     from app.services.ai_audit import resolve_organization_id
 
     def _check(current_user=Depends(get_current_user)):
-        organization_id = resolve_organization_id(
-            current_user["client"], current_user["id"]
-        )
+        try:
+            organization_id = resolve_organization_id(
+                current_user["client"], current_user["id"]
+            )
+        except Exception as exc:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Organization membership could not be verified.",
+            ) from exc
         if not organization_id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
@@ -92,9 +98,15 @@ def require_org_admin():
     from app.services.ai_audit import resolve_organization_id
 
     def _check(current_user=Depends(get_current_user)):
-        organization_id = resolve_organization_id(
-            current_user["client"], current_user["id"]
-        )
+        try:
+            organization_id = resolve_organization_id(
+                current_user["client"], current_user["id"]
+            )
+        except Exception as exc:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Organization membership could not be verified.",
+            ) from exc
         if not organization_id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
