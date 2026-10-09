@@ -67,7 +67,7 @@ REVOKE ALL ON public.ai_conversations, public.ai_messages, public.ai_message_sou
 REVOKE ALL ON public.ai_conversations, public.ai_messages, public.ai_message_sources
   FROM authenticated;
 
-GRANT SELECT, INSERT, UPDATE ON public.ai_conversations TO authenticated;
+-- The API never updates conversations with a caller JWT. The trusted backend\n-- may update timestamps using service_role; authenticated users need no UPDATE grant.\nGRANT SELECT, INSERT ON public.ai_conversations TO authenticated;
 GRANT SELECT, INSERT ON public.ai_messages TO authenticated;
 GRANT SELECT ON public.ai_message_sources TO authenticated;
 
