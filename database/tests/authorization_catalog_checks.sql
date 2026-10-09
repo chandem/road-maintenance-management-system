@@ -119,6 +119,15 @@ BEGIN
     RAISE EXCEPTION 'private.has_department_role SECURITY DEFINER helper is missing';
   END IF;
 
+  -- The SECURITY INVOKER public wrapper calls the private helper as the caller.
+  -- Schema USAGE is therefore required for authenticated users, but not anon.
+  IF NOT has_schema_privilege('authenticated', 'private', 'USAGE') THEN
+    RAISE EXCEPTION 'authenticated role lacks USAGE on private schema required by role helper';
+  END IF;
+  IF has_schema_privilege('anon', 'private', 'USAGE') THEN
+    RAISE EXCEPTION 'anon role unexpectedly has USAGE on private schema';
+  END IF;
+
   -- Direct authenticated inserts must be limited to user-role messages.
   -- Assistant/system replies are written only by the server-side trusted client.
   IF NOT EXISTS (
