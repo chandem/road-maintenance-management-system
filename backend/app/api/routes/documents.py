@@ -606,7 +606,6 @@ def reindex_document(
     current_user=Depends(get_current_user),
 ):
     """Re-run chunk + embed for an existing document."""
-    organization_id = _organization_id(current_user)
     supabase = current_user["client"]
 
     document = (
