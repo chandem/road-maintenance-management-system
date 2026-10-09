@@ -155,15 +155,27 @@ def post_message(
         raise HTTPException(status_code=500, detail="Message could not be saved.")
 
     # Lightweight context for the assistant (counts only — full office assistant
-    # endpoint remains available for deep queries).
-    roads = supabase.table("roads").select("id", count="exact").limit(1).execute()
-    sections = supabase.table("road_sections").select("id", count="exact").limit(1).execute()
-    orders = supabase.table("work_orders").select("id", count="exact").limit(1).execute()
+    # endpoint remains available for deep queries). A failed count must not
+    # abort the turn after the user message is persisted or be presented as zero.
+    def count_label(table_name: str) -> str:
+        try:
+            result = (
+                supabase.table(table_name)
+                .select("id", count="exact")
+                .limit(1)
+                .execute()
+            )
+            count = getattr(result, "count", None)
+            if count is None:
+                count = len(result.data or [])
+            return str(count)
+        except Exception:
+            return "unavailable"
 
     evidence_summary = (
-        f"Roads: {getattr(roads, 'count', None) or len(roads.data or [])}; "
-        f"Sections: {getattr(sections, 'count', None) or len(sections.data or [])}; "
-        f"Work orders: {getattr(orders, 'count', None) or len(orders.data or [])}."
+        f"Roads: {count_label('roads')}; "
+        f"Sections: {count_label('road_sections')}; "
+        f"Work orders: {count_label('work_orders')}."
     )
 
     prompt = (
