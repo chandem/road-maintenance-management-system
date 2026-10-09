@@ -133,6 +133,12 @@ BEGIN
     RAISE EXCEPTION 'ai_messages lacks an authenticated INSERT policy that restricts role to user';
   END IF;
 
+  -- Message rows are append-only for authenticated clients. Without UPDATE,
+  -- users cannot rewrite a user message into an assistant/system response.
+  IF has_table_privilege('authenticated', 'public.ai_messages', 'UPDATE') THEN
+    RAISE EXCEPTION 'authenticated role unexpectedly has UPDATE privilege on ai_messages';
+  END IF;
+
   -- Authenticated users must not be able to fabricate AI evidence/source rows.
   IF has_table_privilege('authenticated', 'public.ai_message_sources', 'INSERT') THEN
     RAISE EXCEPTION 'authenticated role unexpectedly has INSERT privilege on ai_message_sources';
