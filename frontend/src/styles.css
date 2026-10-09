@@ -258,3 +258,69 @@ button:disabled {
     align-items: flex-start;
   }
 }
+
+
+/* Integrated materials and road-inspection modules */
+.module-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  padding: 0.8rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  background: #fff;
+  position: sticky;
+  top: 0.5rem;
+  z-index: 5;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.06);
+}
+.module-nav a {
+  color: #1d4ed8;
+  font-weight: 650;
+  text-decoration: none;
+  padding: 0.45rem 0.7rem;
+  border-radius: 8px;
+  background: #eff6ff;
+}
+.module-nav a:hover { background: #dbeafe; }
+.module-form {
+  display: grid;
+  gap: 0.8rem;
+  margin: 1rem 0 1.25rem;
+  padding: 1rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #f8fafc;
+}
+.module-form h3 { margin: 0; }
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+.form-grid label {
+  display: grid;
+  gap: 0.3rem;
+  color: #475569;
+  font-size: 0.9rem;
+}
+.form-grid select {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  padding: 0.7rem 0.85rem;
+  background: #fff;
+  font: inherit;
+}
+.form-grid .span-two { grid-column: 1 / -1; }
+.module-table { overflow-x: auto; }
+.module-table .table-row { min-width: 700px; }
+@media (max-width: 640px) {
+  .app-shell { padding: 0.75rem; }
+  .topbar { flex-direction: column; }
+  .topbar h1 { font-size: 1.3rem; }
+  .form-grid { grid-template-columns: 1fr; }
+  .form-grid .span-two { grid-column: auto; }
+  .module-nav { position: static; }
+}
