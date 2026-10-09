@@ -289,6 +289,24 @@ BEGIN
     RAISE EXCEPTION 'authenticated role unexpectedly has UPDATE privilege on ai_conversations';
   END IF;
 
+  -- The trusted backend relies on explicit grants, not environment-specific
+  -- default privileges, to save assistant replies and touch conversation time.
+  IF NOT has_table_privilege('service_role', 'public.ai_conversations', 'SELECT')
+     OR NOT has_table_privilege('service_role', 'public.ai_conversations', 'INSERT')
+     OR NOT has_table_privilege('service_role', 'public.ai_conversations', 'UPDATE') THEN
+    RAISE EXCEPTION 'service_role lacks required SELECT/INSERT/UPDATE on ai_conversations';
+  END IF;
+
+  IF NOT has_table_privilege('service_role', 'public.ai_messages', 'SELECT')
+     OR NOT has_table_privilege('service_role', 'public.ai_messages', 'INSERT') THEN
+    RAISE EXCEPTION 'service_role lacks required SELECT/INSERT on ai_messages';
+  END IF;
+
+  IF NOT has_table_privilege('service_role', 'public.ai_message_sources', 'SELECT')
+     OR NOT has_table_privilege('service_role', 'public.ai_message_sources', 'INSERT') THEN
+    RAISE EXCEPTION 'service_role lacks required SELECT/INSERT on ai_message_sources';
+  END IF;
+
   IF has_table_privilege('authenticated', 'public.ai_conversations', 'DELETE')
      OR has_table_privilege('authenticated', 'public.ai_conversations', 'TRUNCATE')
      OR has_table_privilege('authenticated', 'public.ai_conversations', 'REFERENCES')
