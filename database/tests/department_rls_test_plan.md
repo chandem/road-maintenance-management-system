@@ -56,3 +56,25 @@ For a denied SELECT, PostgREST may return HTTP 200 with an empty array because R
 ## Current project state
 
 The live tables `roads`, `road_sections`, and `road_inspections` currently have zero rows, and there are zero active department-role assignments. Applying the restrictive policies before assigning and verifying intended roles would deny normal users access. No production policy changes should be made until test users are assigned and the staging matrix passes.
+
+
+## Function exposure verification after migration (staging only)
+
+Run this read-only catalog query after applying the migration to staging. Expected:
+- `public.has_department_role` exists and is **not** SECURITY DEFINER (it is the RPC wrapper).
+- `private.has_department_role` exists and is SECURITY DEFINER.
+- The private helper has EXECUTE for `authenticated` and `service_role`, but not `anon` or `PUBLIC`.
+
+```sql
+select n.nspname as schema_name,
+       p.proname,
+       p.prosecdef as security_definer,
+       pg_get_function_identity_arguments(p.oid) as arguments,
+       coalesce(array_to_string(p.proacl, ', '), '(default privileges)') as grants
+from pg_proc p
+join pg_namespace n on n.oid = p.pronamespace
+where p.proname = 'has_department_role'
+order by n.nspname;
+```
+
+Then call `/rest/v1/rpc/has_department_role` with an authenticated test user's JWT and confirm it returns only the caller's own role membership result. An unauthenticated call must be rejected. Re-run Supabase Security Advisor; the exposed-schema SECURITY DEFINER warning for this helper should be gone.
