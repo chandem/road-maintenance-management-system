@@ -44,7 +44,22 @@ def require_department_access(department_code: str, allowed_roles: list[str]):
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Organization membership is required.",
             )
+        # Organization administrators can manage and inspect all departments.
+        # All other users need an explicit active assignment for this department.
         try:
+            membership = (
+                current_user["client"]
+                .table("organization_members")
+                .select("role")
+                .eq("organization_id", organization_id)
+                .eq("user_id", current_user["id"])
+                .eq("is_active", True)
+                .maybe_single()
+                .execute()
+            )
+            is_org_admin = bool(
+                membership.data and membership.data.get("role") == "admin"
+            )
             result = current_user["client"].rpc(
                 "has_department_role",
                 {
@@ -59,7 +74,7 @@ def require_department_access(department_code: str, allowed_roles: list[str]):
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                 detail="Department authorization could not be verified.",
             ) from exc
-        if result.data is not True:
+        if not is_org_admin and result.data is not True:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="You do not have the required department permissions.",
