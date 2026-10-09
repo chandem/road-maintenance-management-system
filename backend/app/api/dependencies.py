@@ -24,3 +24,46 @@ def get_current_user(
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired access token")
 
     return {"id": response.user.id, "client": supabase, "access_token": token}
+
+
+
+def require_department_access(department_code: str, allowed_roles: list[str]):
+    """FastAPI dependency that requires an active department assignment.
+
+    Uses the caller's JWT-scoped client and the database authorization helper.
+    The database RLS policies remain a separate required protection layer.
+    """
+    from app.services.ai_audit import resolve_organization_id
+
+    def _check(current_user=Depends(get_current_user)):
+        organization_id = resolve_organization_id(
+            current_user["client"], current_user["id"]
+        )
+        if not organization_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Organization membership is required.",
+            )
+        try:
+            result = current_user["client"].rpc(
+                "has_department_role",
+                {
+                    "p_organization_id": organization_id,
+                    "p_department_code": department_code,
+                    "p_allowed_roles": allowed_roles,
+                },
+            ).execute()
+        except Exception as exc:
+            # Fail closed if the authorization lookup is unavailable.
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Department authorization could not be verified.",
+            ) from exc
+        if result.data is not True:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You do not have the required department permissions.",
+            )
+        return current_user
+
+    return _check
