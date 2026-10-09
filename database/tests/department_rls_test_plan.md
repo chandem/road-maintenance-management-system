@@ -125,12 +125,12 @@ The live-schema preflight found that `ai_conversations`, `ai_messages`, and `ai_
 - An organization owner/admin can read and manage conversations in their organization, subject to the explicit grants in migration 014.
 - A finance-only, unassigned, inactive, or cross-organization user cannot read road conversations, messages, or message sources.
 - A caller cannot attach a message or source to another user's conversation.
-- The Data API must reject anonymous access; authenticated users receive only SELECT/INSERT/UPDATE table grants, and message sources receive SELECT/INSERT only.
+- The Data API must reject anonymous access; authenticated users receive only SELECT/INSERT/UPDATE grants on conversations/messages, while `ai_message_sources` is SELECT-only for authenticated users. Trusted backend source insertion is not implemented yet.
 - Verify backend behavior: conversation creation and message posting require manager/officer; list and message-read routes permit read_only for the caller's own conversation.
 
 Migration 014 is a source-controlled proposal and has not been applied to production.
 
-- Non-admin road conversation source rows are restricted to road-safe source types (`road`, `road_section`, `maintenance_plan`, `work_order`, `other`). Finance, employee, asset, machinery, expense, budget, and document source types must remain unavailable to non-admin users until each source type has a matching record-level authorization check.
+- Non-admin road conversation source rows are restricted to `road`, `road_section`, `maintenance_plan`, and `work_order`. `other`, finance, employee, asset, machinery, expense, budget, and document source types must remain unavailable to non-admin users until each type has a matching record-level authorization check.
 
 
 ## Road-section organization integrity (migration 015)
@@ -171,17 +171,21 @@ distinguish a genuine backend-generated assistant reply from a direct Data API i
 by that same authenticated user. Do not assume the RLS ownership policies prevent
 users from fabricating assistant-role messages.
 
-Before production, choose and implement one of these designs:
-- Route assistant-message writes through a narrowly scoped trusted backend operation
-  after it verifies conversation ownership and department access; or
-- Use a database RPC with a carefully constrained execution context that only the
-  backend can invoke, with explicit input validation and no general-purpose privilege
-  escalation.
+Implemented on the feature branch:
+- Direct authenticated inserts into `ai_messages` are restricted to `role='user'`.
+- The FastAPI route verifies conversation access with the caller's JWT, saves the user
+  message through that JWT client, and persists the assistant response with the
+  server-only trusted client.
+- If the trusted client is unavailable, the route fails before inserting the user
+  message.
+- `ai_message_sources` is SELECT-only for authenticated users; clients cannot
+  fabricate evidence-source rows.
 
-Then add a test that an ordinary authenticated user cannot directly insert
-`role='assistant'` or `role='system'`, while the authorized backend can persist
-the generated assistant response. Do not solve this by exposing the service-role key
-to the frontend or granting broad privileges to authenticated users.
+Automated unit tests cover client separation and missing trusted-client configuration.
+Still required in isolated staging: real-JWT Data API tests proving direct assistant and
+system inserts fail, legitimate backend assistant persistence succeeds, and a user
+cannot read or write another user's conversation. Never expose the service-role key
+to the frontend.
 
 The source-type restrictions for non-admin AI evidence are limited to
 `road`, `road_section`, `maintenance_plan`, and `work_order`. Other source types
