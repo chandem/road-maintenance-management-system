@@ -61,6 +61,12 @@ class FakeQuery:
             and self.operation == "select"
         ):
             raise RuntimeError(f"{self.table_name} count query failed")
+        if (
+            self.client.fail_timestamp_update
+            and self.table_name == "ai_conversations"
+            and self.operation == "update"
+        ):
+            raise RuntimeError("timestamp update failed")
         if self.table_name == "ai_conversations" and self.operation == "select":
             return SimpleNamespace(data={
                 "id": str(CONVERSATION_ID),
@@ -81,6 +87,7 @@ class FakeClient:
     def __init__(self):
         self.calls = []
         self.fail_count_tables = set()
+        self.fail_timestamp_update = False
 
     def table(self, name):
         return FakeQuery(self, name)
@@ -176,4 +183,62 @@ def test_count_query_failure_is_reported_as_unavailable_without_failing_turn(mon
         and call["operation"] == "insert"
         and call["payload"]["role"] == "user"
         for call in user_client.calls
+    )
+
+
+
+def test_ai_provider_exception_returns_saved_fallback_reply(monkeypatch):
+    user_client = FakeClient()
+    trusted_client = FakeClient()
+
+    monkeypatch.setattr(conversations, "get_service_client", lambda: trusted_client)
+
+    def provider_failure(_prompt):
+        raise RuntimeError("provider unavailable")
+
+    monkeypatch.setattr(conversations, "generate_text", provider_failure)
+
+    result = conversations.post_message(
+        conversation_id=CONVERSATION_ID,
+        body=MessageCreate(content="What should we inspect?"),
+        current_user={"id": "user-1", "client": user_client},
+    )
+
+    assert result["role"] == "assistant"
+    assert result["model"] is None
+    assert "temporarily unavailable" in result["content"]
+    assert any(
+        call["table"] == "ai_messages"
+        and call["operation"] == "insert"
+        and call["payload"]["role"] == "user"
+        for call in user_client.calls
+    )
+    assert any(
+        call["table"] == "ai_messages"
+        and call["operation"] == "insert"
+        and call["payload"]["role"] == "assistant"
+        for call in trusted_client.calls
+    )
+
+
+def test_timestamp_update_failure_does_not_hide_saved_assistant_reply(monkeypatch):
+    user_client = FakeClient()
+    trusted_client = FakeClient()
+    trusted_client.fail_timestamp_update = True
+
+    monkeypatch.setattr(conversations, "get_service_client", lambda: trusted_client)
+    monkeypatch.setattr(conversations, "generate_text", lambda _prompt: None)
+
+    result = conversations.post_message(
+        conversation_id=CONVERSATION_ID,
+        body=MessageCreate(content="Give me a brief update."),
+        current_user={"id": "user-1", "client": user_client},
+    )
+
+    assert result["role"] == "assistant"
+    assert any(
+        call["table"] == "ai_messages"
+        and call["operation"] == "insert"
+        and call["payload"]["role"] == "assistant"
+        for call in trusted_client.calls
     )
