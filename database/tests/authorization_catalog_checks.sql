@@ -119,6 +119,20 @@ BEGIN
     RAISE EXCEPTION 'private.has_department_role SECURITY DEFINER helper is missing';
   END IF;
 
+  -- Direct authenticated inserts must be limited to user-role messages.
+  -- Assistant/system replies are written only by the server-side trusted client.
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_policies p
+    WHERE p.schemaname = 'public'
+      AND p.tablename = 'ai_messages'
+      AND p.cmd = 'INSERT'
+      AND 'authenticated' = ANY(p.roles)
+      AND coalesce(p.with_check, '') ILIKE '%role%user%'
+  ) THEN
+    RAISE EXCEPTION 'ai_messages lacks an authenticated INSERT policy that restricts role to user';
+  END IF;
+
   -- AI message SELECT policies must not reference ai_message_sources directly:
   -- PostgreSQL policy expressions cannot use a table that is not in their query.
   IF EXISTS (
