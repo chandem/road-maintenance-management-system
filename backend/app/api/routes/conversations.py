@@ -50,9 +50,9 @@ def list_conversations(
 @router.post("", response_model=Conversation, status_code=201)
 def create_conversation(
     body: ConversationCreate,
-    current_user=Depends(require_department_access("road_asset", ['department_manager', 'officer', 'read_only'])),
+    current_user=Depends(require_department_access("road_asset", ['department_manager', 'officer'])),
 ):
-    """Start a new AI conversation."""
+    """Start a new AI conversation (read-only users cannot create one)."""
     org_id = _org_id(current_user)
     supabase = current_user["client"]
 
@@ -108,9 +108,9 @@ def list_messages(
 def post_message(
     conversation_id: UUID,
     body: MessageCreate,
-    current_user=Depends(require_department_access("road_asset", ['department_manager', 'officer', 'read_only'])),
+    current_user=Depends(require_department_access("road_asset", ['department_manager', 'officer'])),
 ):
-    """Post a user message and receive an evidence-aware assistant reply."""
+    """Post a message; read-only users cannot mutate conversation history."""
     supabase = current_user["client"]
 
     conv = (
