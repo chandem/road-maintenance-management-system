@@ -190,7 +190,7 @@ CREATE POLICY ai_messages_department_select
         OR (
           c.created_by = (SELECT auth.uid())
           AND ai_message_sources.source_type IN (
-            'road', 'road_section', 'maintenance_plan', 'work_order', 'other'
+            'road', 'road_section', 'maintenance_plan', 'work_order'
           )
           AND public.has_department_role(
             c.organization_id, 'road_asset',
@@ -252,7 +252,7 @@ CREATE POLICY ai_message_sources_department_insert
         OR (
           c.created_by = (SELECT auth.uid())
           AND ai_message_sources.source_type IN (
-            'road', 'road_section', 'maintenance_plan', 'work_order', 'other'
+            'road', 'road_section', 'maintenance_plan', 'work_order'
           )
           AND public.has_department_role(
             c.organization_id, 'road_asset',
