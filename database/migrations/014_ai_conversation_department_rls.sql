@@ -67,7 +67,9 @@ REVOKE ALL ON public.ai_conversations, public.ai_messages, public.ai_message_sou
 REVOKE ALL ON public.ai_conversations, public.ai_messages, public.ai_message_sources
   FROM authenticated;
 
--- The API never updates conversations with a caller JWT. The trusted backend\n-- may update timestamps using service_role; authenticated users need no UPDATE grant.\nGRANT SELECT, INSERT ON public.ai_conversations TO authenticated;
+-- The API never updates conversations with a caller JWT. The trusted backend
+-- may update timestamps using service_role; authenticated users need no UPDATE grant.
+GRANT SELECT, INSERT ON public.ai_conversations TO authenticated;
 GRANT SELECT, INSERT ON public.ai_messages TO authenticated;
 GRANT SELECT ON public.ai_message_sources TO authenticated;
 
@@ -153,29 +155,8 @@ CREATE POLICY ai_conversations_department_insert
     )
   );
 
-DROP POLICY IF EXISTS ai_conversations_department_update ON public.ai_conversations;
-CREATE POLICY ai_conversations_department_update
-  ON public.ai_conversations AS RESTRICTIVE FOR UPDATE TO authenticated
-  USING (
-    private.is_org_admin(organization_id)
-    OR (
-      created_by = (SELECT auth.uid())
-      AND public.has_department_role(
-        organization_id, 'road_asset',
-        ARRAY['department_manager', 'officer']::text[]
-      )
-    )
-  )
-  WITH CHECK (
-    private.is_org_admin(organization_id)
-    OR (
-      created_by = (SELECT auth.uid())
-      AND public.has_department_role(
-        organization_id, 'road_asset',
-        ARRAY['department_manager', 'officer']::text[]
-      )
-    )
-  );
+-- Authenticated users have no UPDATE grant on ai_conversations. The trusted
+-- backend service role alone updates timestamps; no caller UPDATE policy is needed.
 
 DROP POLICY IF EXISTS ai_messages_department_select ON public.ai_messages;
 CREATE POLICY ai_messages_department_select
