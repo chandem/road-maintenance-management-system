@@ -147,6 +147,35 @@ BEGIN
     RAISE EXCEPTION 'authenticated role unexpectedly has INSERT privilege on ai_message_sources';
   END IF;
 
+  -- These tables contain user conversations and trusted AI output. Verify that
+  -- no stale grants survived a rerun against a pre-existing table definition.
+  IF has_table_privilege('authenticated', 'public.ai_conversations', 'DELETE')
+     OR has_table_privilege('authenticated', 'public.ai_conversations', 'TRUNCATE')
+     OR has_table_privilege('authenticated', 'public.ai_conversations', 'REFERENCES')
+     OR has_table_privilege('authenticated', 'public.ai_conversations', 'TRIGGER') THEN
+    RAISE EXCEPTION 'authenticated role has an unexpected privilege on ai_conversations';
+  END IF;
+
+  IF has_table_privilege('authenticated', 'public.ai_messages', 'TRUNCATE')
+     OR has_table_privilege('authenticated', 'public.ai_messages', 'REFERENCES')
+     OR has_table_privilege('authenticated', 'public.ai_messages', 'TRIGGER') THEN
+    RAISE EXCEPTION 'authenticated role has an unexpected non-DML privilege on ai_messages';
+  END IF;
+
+  IF has_table_privilege('authenticated', 'public.ai_message_sources', 'UPDATE')
+     OR has_table_privilege('authenticated', 'public.ai_message_sources', 'DELETE')
+     OR has_table_privilege('authenticated', 'public.ai_message_sources', 'TRUNCATE')
+     OR has_table_privilege('authenticated', 'public.ai_message_sources', 'REFERENCES')
+     OR has_table_privilege('authenticated', 'public.ai_message_sources', 'TRIGGER') THEN
+    RAISE EXCEPTION 'authenticated role has an unexpected privilege on ai_message_sources';
+  END IF;
+
+  IF has_table_privilege('anon', 'public.ai_conversations', 'SELECT')
+     OR has_table_privilege('anon', 'public.ai_messages', 'SELECT')
+     OR has_table_privilege('anon', 'public.ai_message_sources', 'SELECT') THEN
+    RAISE EXCEPTION 'anon role unexpectedly has SELECT privilege on AI conversation tables';
+  END IF;
+
   -- AI message SELECT policies must not reference ai_message_sources directly:
   -- PostgreSQL policy expressions cannot use a table that is not in their query.
   IF EXISTS (
