@@ -131,3 +131,21 @@ The live-schema preflight found that `ai_conversations`, `ai_messages`, and `ai_
 Migration 014 is a source-controlled proposal and has not been applied to production.
 
 - Non-admin road conversation source rows are restricted to road-safe source types (`road`, `road_section`, `maintenance_plan`, `work_order`, `other`). Finance, employee, asset, machinery, expense, budget, and document source types must remain unavailable to non-admin users until each source type has a matching record-level authorization check.
+
+
+## Road-section organization integrity (migration 015)
+
+Migration 015 is a source-controlled proposal. It backfills legacy `road_sections.organization_id` from the parent road, makes the field non-null, and adds a trigger that derives the organization from the parent road and rejects cross-organization references. It intentionally aborts if existing orphaned sections or organization mismatches are found; resolve those records in staging rather than silently reassigning them.
+
+Staging checks:
+- [ ] Preflight detects and reports orphaned sections, NULL parent organization, or a section/road organization mismatch without modifying rows.
+- [ ] A valid section insert with matching organization succeeds for an authorized user.
+- [ ] A section insert omitting organization_id derives the parent road's organization before RLS checks.
+- [ ] A section insert specifying another organization's ID is rejected.
+- [ ] Updating an existing section to reference a road in another organization is rejected.
+- [ ] Updating organization_id to a different organization is rejected.
+- [ ] Read-only and unauthorized users remain blocked by RLS even when the trigger derives a valid organization.
+- [ ] Existing section counts and IDs are unchanged by the backfill; only NULL organization IDs are populated.
+- [ ] Confirm trigger behavior with authenticated JWTs because the trigger function is SECURITY DEFINER, uses an empty search_path, and is revoked from API roles for direct execution.
+
+Migration order for a full staging run: 011 (role helper and road RLS), 012 (module RLS), 013 (document ACL), 014 (conversation schema/RLS), 015 (road-section organization integrity). Validate dependencies and existing policies before executing this sequence in any environment.
