@@ -514,6 +514,7 @@ async def classify_uploaded_document(
     current_user=Depends(get_current_user),
 ):
     """Upload → extract → classify → store → chunk → embed."""
+    organization_id = _authorize_department(current_user, department_code, write=True)
     filename = Path(file.filename or "").name
     suffix = Path(filename).suffix.lower()
     if not filename or suffix not in ALLOWED_EXTENSIONS:
@@ -531,7 +532,6 @@ async def classify_uploaded_document(
             detail="No readable text could be extracted from the document.",
         )
 
-    organization_id = _authorize_department(current_user, department_code, write=True)
     result = classify_document(filename, text)
 
     document = (
