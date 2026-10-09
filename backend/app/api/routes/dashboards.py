@@ -104,7 +104,7 @@ def executive_dashboard(current_user=Depends(require_org_admin())):
 def maintenance_dashboard(current_user=Depends(require_department_access("road_asset", ['department_manager', 'officer', 'read_only']))):
     """Maintenance operations dashboard (plans + work orders + sections)."""
     client = current_user["client"]
-    ctx = collect_cross_module_context(client)
+    ctx = collect_cross_module_context(client, allowed_modules={"road_asset"})
     orders = ctx.samples.get("work_orders") or []
     try:
         all_orders = (
@@ -155,7 +155,7 @@ def maintenance_dashboard(current_user=Depends(require_department_access("road_a
 @router.get("/financial", response_model=ModuleDashboard)
 def financial_dashboard(current_user=Depends(require_department_access("finance", ['department_manager', 'officer', 'read_only']))):
     """Financial management dashboard."""
-    ctx = collect_cross_module_context(current_user["client"])
+    ctx = collect_cross_module_context(current_user["client"], allowed_modules={"finance"})
     s = ctx.summary
     allocated = float(s.get("budget_allocated") or 0)
     spent = float(s.get("budget_spent") or 0)
@@ -184,7 +184,7 @@ def financial_dashboard(current_user=Depends(require_department_access("finance"
 def machinery_dashboard(current_user=Depends(require_department_access("machinery_maintenance", ['department_manager', 'officer', 'read_only']))):
     """MMMS machinery dashboard."""
     client = current_user["client"]
-    ctx = collect_cross_module_context(client)
+    ctx = collect_cross_module_context(client, allowed_modules={"machinery_maintenance"})
     try:
         rows = (
             client.table("machinery")
@@ -228,7 +228,7 @@ def machinery_dashboard(current_user=Depends(require_department_access("machiner
 def hr_dashboard(current_user=Depends(require_department_access("human_resources", ['department_manager', 'officer', 'read_only']))):
     """HR workforce dashboard."""
     client = current_user["client"]
-    ctx = collect_cross_module_context(client)
+    ctx = collect_cross_module_context(client, allowed_modules={"human_resources"})
     try:
         rows = (
             client.table("employees")
