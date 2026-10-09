@@ -13,6 +13,7 @@ ORG = "11111111-1111-1111-1111-111111111111"
 USER = "22222222-2222-2222-2222-222222222222"
 DEPT = "33333333-3333-3333-3333-333333333333"
 ASSIGNMENT = "44444444-4444-4444-4444-444444444444"
+TARGET = "55555555-5555-5555-5555-555555555555"
 
 
 class Query:
@@ -80,17 +81,22 @@ class Query:
 class Client:
     def __init__(self, *, role="admin", active_member=True, department=True, target_member=True):
         self.rows = {
-            "organization_members": [{
+            "organization_members": ([{
                 "organization_id": ORG,
                 "user_id": USER,
                 "role": role,
                 "is_active": active_member,
-            }],
+            }] + ([{
+                "organization_id": ORG,
+                "user_id": TARGET,
+                "role": "member",
+                "is_active": True,
+            }] if target_member else [])),
             "departments": ([{"id": DEPT, "organization_id": ORG}] if department else []),
             "user_department_roles": ([{
                 "id": ASSIGNMENT,
                 "organization_id": ORG,
-                "user_id": USER,
+                "user_id": TARGET,
                 "department_id": DEPT,
                 "role": "officer",
                 "is_active": True,
@@ -115,7 +121,7 @@ def test_admin_can_assign_role_to_active_org_member(monkeypatch):
     patch_org(monkeypatch)
     client = Client()
     payload = departments.DepartmentRoleAssignment(
-        user_id=UUID(USER), department_id=UUID(DEPT), role="officer"
+        user_id=UUID(TARGET), department_id=UUID(DEPT), role="officer"
     )
 
     result = departments.assign_department_role(payload, current_user(client))
@@ -175,7 +181,7 @@ def test_cannot_assign_role_to_inactive_or_nonmember_user(monkeypatch):
     patch_org(monkeypatch)
     client = Client(target_member=False)
     payload = departments.DepartmentRoleAssignment(
-        user_id=UUID(USER), department_id=UUID(DEPT), role="officer"
+        user_id=UUID(TARGET), department_id=UUID(DEPT), role="officer"
     )
 
     with pytest.raises(HTTPException) as exc:
