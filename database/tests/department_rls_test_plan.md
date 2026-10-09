@@ -125,7 +125,7 @@ The live-schema preflight found that `ai_conversations`, `ai_messages`, and `ai_
 - An organization owner/admin can read and manage conversations in their organization, subject to the explicit grants in migration 014.
 - A finance-only, unassigned, inactive, or cross-organization user cannot read road conversations, messages, or message sources.
 - A caller cannot attach a message or source to another user's conversation.
-- The Data API must reject anonymous access; authenticated users receive only SELECT/INSERT/UPDATE grants on conversations/messages, while `ai_message_sources` is SELECT-only for authenticated users. Trusted backend source insertion is not implemented yet.
+- The Data API must reject anonymous access. Authenticated users may SELECT/INSERT/UPDATE conversations subject to RLS, but messages are SELECT/INSERT only (append-only) and `ai_message_sources` is SELECT-only. Trusted backend source insertion is not implemented yet.
 - Verify backend behavior: conversation creation and message posting require manager/officer; list and message-read routes permit read_only for the caller's own conversation.
 
 Migration 014 is a source-controlled proposal and has not been applied to production.
@@ -165,11 +165,10 @@ permit or deny the correct rows. Run the JWT/Data API matrix above as well.
 
 ## Additional AI message integrity gate
 
-The backend currently inserts both `role='user'` and `role='assistant'` messages
-using the caller's user-scoped JWT. Consequently, a database policy cannot safely
-distinguish a genuine backend-generated assistant reply from a direct Data API insert
-by that same authenticated user. Do not assume the RLS ownership policies prevent
-users from fabricating assistant-role messages.
+The original implementation inserted both `role='user'` and `role='assistant'` messages
+using the caller's user-scoped JWT. That made assistant-message forgery possible unless
+both the row policy and table grants prevented it. The feature branch now separates the
+write paths and removes authenticated UPDATE/DELETE privileges on messages.
 
 Implemented on the feature branch:
 - Direct authenticated inserts into `ai_messages` are restricted to `role='user'`.
