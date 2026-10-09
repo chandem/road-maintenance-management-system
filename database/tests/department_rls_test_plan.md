@@ -190,3 +190,21 @@ The source-type restrictions for non-admin AI evidence are limited to
 `road`, `road_section`, `maintenance_plan`, and `work_order`. Other source types
 must remain unavailable to non-admin users until record-level authorization is
 implemented for them.
+
+
+## Road-section migration 015 preflight script
+
+Before testing migration 015 in an isolated non-production database, run
+`database/tests/road_section_organization_preflight.sql` using a read-only
+database role where catalog access permits. It returns:
+- a summary count of orphaned sections, sections whose parent road lacks an
+  organization, organization mismatches, NULL section organization IDs eligible
+  for backfill, and total sections;
+- the exact rows that would cause migration 015 to abort; and
+- the NULL organization IDs eligible for backfill from a valid parent road.
+
+Expected blockers are zero. Review and record the candidate backfill IDs/count
+before applying migration 015, then verify section IDs/counts remain unchanged
+and the backfilled rows match their parent roads afterward. The preflight itself
+does not update data and is not a substitute for the authenticated-JWT trigger
+tests listed above.
