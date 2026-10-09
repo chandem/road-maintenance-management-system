@@ -1,5 +1,6 @@
 import json
 from decimal import Decimal
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
@@ -14,137 +15,28 @@ from app.schemas.ai import (
 from app.schemas.office_assistant import OfficeAssistantRequest, OfficeAssistantResponse
 from app.services.ai_audit import log_analysis_run, resolve_organization_id
 from app.services.ai_provider import generate_text
+from app.services.road_priority import (
+    PriorityResult,
+    baseline_action,
+    calculate_priority as score_road_section,
+)
+from app.services.semantic_search import search_document_chunks
 
 router = APIRouter(prefix="/ai", tags=["ai"])
-
-
-def clamp(value: Decimal) -> Decimal:
-    return max(Decimal("0"), min(Decimal("100"), value))
 
 
 def calculate_priority(
     data: dict, work_orders: list[dict]
 ) -> tuple[Decimal, str, Decimal, list[str], list[str]]:
-    reasons: list[str] = []
-    evidence: list[str] = []
-
-    rating = data.get("condition_rating")
-    if rating is None:
-        condition = Decimal("50")
-        reasons.append("Condition rating is not available; a neutral score was used.")
-    else:
-        condition = clamp((Decimal("5") - Decimal(str(rating))) * Decimal("25"))
-        reasons.append(f"Recorded condition rating is {rating}.")
-
-    evidence.append(
-        f"Road section status: {data.get('status') or 'not recorded'}."
-    )
-
-    open_orders = [
-        w
-        for w in work_orders
-        if (w.get("status") or "").lower()
-        not in {"completed", "closed", "cancelled"}
-    ]
-    urgent_orders = [
-        w
-        for w in open_orders
-        if (w.get("priority") or "").lower() in {"critical", "high", "urgent"}
-    ]
-
-    urgency = (
-        Decimal("100")
-        if urgent_orders
-        else Decimal("60")
-        if open_orders
-        else Decimal("0")
-    )
-
-    reasons.append(f"{len(open_orders)} active work order(s) are linked to this section.")
-    evidence.append(
-        f"Linked work orders: {len(work_orders)}; active: {len(open_orders)}; "
-        f"urgent/high: {len(urgent_orders)}."
-    )
-
-    planning = (
-        Decimal("100")
-        if open_orders
-        else Decimal("70")
-        if str(data.get("status") or "").lower()
-        in {"critical", "poor", "failed"}
-        else Decimal("0")
-    )
-
-    status = str(data.get("status") or "").lower()
-    if rating is None:
-        data_points = 2
-        data_quality = Decimal("0")
-    else:
-        data_points = sum(
-            1 for value in (rating, data.get("status")) if value is not None
-        ) + (1 if work_orders else 0)
-        data_quality = (
-            Decimal("100")
-            if data_points == 3
-            else Decimal("70")
-            if data_points == 2
-            else Decimal("40")
-        )
-
-    if urgent_orders and (
-        rating is None
-        or rating >= 4
-        or status in {"critical", "poor", "failed"}
-    ):
-        score = Decimal("100.00")
-    else:
-        raw_score = (
-            condition * Decimal("0.50")
-            + urgency * Decimal("0.20")
-            + planning * Decimal("0.10")
-            + data_quality * Decimal("0.05")
-        )
-        score = clamp(raw_score / Decimal("0.85"))
-
-    level = (
-        "critical"
-        if score >= 80
-        else "high"
-        if score >= 60
-        else "medium"
-        if score >= 40
-        else "low"
-    )
-
-    confidence = (
-        Decimal("0.90")
-        if data_points == 3
-        else Decimal("0.70")
-        if data_points >= 2
-        else Decimal("0.45")
-    )
-
-    evidence.append(
-        f"Score components: condition={condition}, urgency={urgency}, "
-        f"planning={planning}, data_quality={data_quality}."
-    )
-
+    """Compatibility wrapper for existing unit tests."""
+    result = score_road_section(data, work_orders)
     return (
-        score.quantize(Decimal("0.01")),
-        level,
-        confidence,
-        reasons,
-        evidence,
+        result.score,
+        result.level,
+        result.confidence,
+        result.reasons,
+        result.evidence,
     )
-
-
-def baseline_action(level: str) -> str:
-    return {
-        "critical": "Prioritize field verification and maintenance action.",
-        "high": "Schedule field verification and include in near-term maintenance planning.",
-        "medium": "Monitor the section and address it through planned maintenance.",
-        "low": "Continue routine monitoring and update condition data when available.",
-    }[level]
 
 
 def generate_ai_explanation(
@@ -183,6 +75,8 @@ def generate_ranking_ai_explanations(
             "road_section_id": str(item.road_section_id),
             "rank": item.rank,
             "section_code": item.section_code,
+            "road_code": item.road_code,
+            "road_name": item.road_name,
             "priority_score": float(item.priority_score),
             "priority_level": item.priority_level,
             "condition_rating": item.condition_rating,
@@ -265,25 +159,92 @@ def analyze_road_priority(
         or []
     )
 
-    score, level, confidence, reasons, evidence = calculate_priority(
-        data, work_orders
+    plans = (
+        supabase.table("maintenance_plans")
+        .select("id,name,status,fiscal_year")
+        .limit(50)
+        .execute()
+        .data
+        or []
     )
-    action = baseline_action(level)
+
+    priority = score_road_section(data, work_orders, related_plans=plans)
+    action = baseline_action(priority.level)
+
+    road_meta = {"road_code": None, "road_name": None}
+    road_id = data.get("road_id")
+    if road_id:
+        road = (
+            supabase.table("roads")
+            .select("id,road_code,name")
+            .eq("id", str(road_id))
+            .maybe_single()
+            .execute()
+        )
+        if road.data:
+            road_meta["road_code"] = road.data.get("road_code")
+            road_meta["road_name"] = road.data.get("name")
+
+    document_evidence: list[str] = []
+    if request.include_document_evidence:
+        try:
+            org_id = resolve_organization_id(supabase, current_user["id"])
+            query_bits = [
+                data.get("section_code") or "",
+                road_meta.get("road_name") or "",
+                road_meta.get("road_code") or "",
+                "maintenance",
+            ]
+            query = " ".join(bit for bit in query_bits if bit).strip() or "road maintenance"
+            if org_id and current_user.get("access_token"):
+                matches = search_document_chunks(
+                    query,
+                    organization_id=org_id,
+                    access_token=current_user["access_token"],
+                    limit=3,
+                    minimum_similarity=0.35,
+                )
+                document_evidence = [
+                    f"{match.content[:240].strip()} (similarity {match.similarity:.2f})"
+                    for match in matches
+                ]
+                if document_evidence:
+                    evidence_list = list(priority.evidence) + [
+                        f"Related document snippets retrieved: {len(document_evidence)}."
+                    ]
+                    priority = PriorityResult(
+                        score=priority.score,
+                        level=priority.level,
+                        confidence=priority.confidence,
+                        reasons=list(priority.reasons),
+                        evidence=evidence_list,
+                        active_work_orders=priority.active_work_orders,
+                        urgent_work_orders=priority.urgent_work_orders,
+                    )
+        except Exception:
+            document_evidence = []
 
     explanation = (
-        generate_ai_explanation(data, score, level, evidence, action)
+        generate_ai_explanation(
+            data, priority.score, priority.level, priority.evidence, action
+        )
         or f"Section {data.get('section_code') or request.road_section_id} "
-        f"has a {level} maintenance priority with a score of {score}/100, "
-        "based on the recorded evidence."
+        f"has a {priority.level} maintenance priority with a score of "
+        f"{priority.score}/100, based on the recorded evidence."
     )
 
     recommendation = RoadPriorityRecommendation(
         road_section_id=request.road_section_id,
-        priority_score=score,
-        priority_level=level,
-        reasons=reasons,
-        evidence=evidence,
-        confidence=confidence,
+        section_code=data.get("section_code"),
+        road_id=UUID(str(road_id)) if road_id else None,
+        road_code=road_meta["road_code"],
+        road_name=road_meta["road_name"],
+        priority_score=priority.score,
+        priority_level=priority.level,
+        reasons=priority.reasons,
+        evidence=priority.evidence,
+        document_evidence=document_evidence,
+        confidence=priority.confidence,
         explanation=explanation,
         recommended_action=action,
     )
@@ -297,13 +258,17 @@ def analyze_road_priority(
             entity_type="road_section",
             entity_id=str(request.road_section_id),
             status="completed",
-            confidence=float(confidence),
+            confidence=float(priority.confidence),
             result={
-                "priority_score": float(score),
-                "priority_level": level,
+                "priority_score": float(priority.score),
+                "priority_level": priority.level,
                 "recommended_action": action,
             },
-            evidence={"reasons": reasons, "evidence": evidence},
+            evidence={
+                "reasons": priority.reasons,
+                "evidence": priority.evidence,
+                "document_evidence": document_evidence,
+            },
             created_by=current_user["id"],
         )
 
@@ -352,36 +317,50 @@ def rank_road_sections(
         if section_id:
             orders_by_section.setdefault(section_id, []).append(work_order)
 
+    road_ids = list({str(s["road_id"]) for s in sections if s.get("road_id")})
+    roads_by_id: dict[str, dict] = {}
+    if road_ids:
+        roads = (
+            supabase.table("roads")
+            .select("id,road_code,name")
+            .in_("id", road_ids)
+            .execute()
+            .data
+            or []
+        )
+        roads_by_id = {str(r["id"]): r for r in roads}
+
+    plans = (
+        supabase.table("maintenance_plans")
+        .select("id,name,status,fiscal_year")
+        .limit(100)
+        .execute()
+        .data
+        or []
+    )
+
     rows = []
 
     for section in sections:
         orders = orders_by_section.get(str(section["id"]), [])
-        score, level, confidence, _, _ = calculate_priority(section, orders)
-
-        active = [
-            w
-            for w in orders
-            if (w.get("status") or "").lower()
-            not in {"completed", "closed", "cancelled"}
-        ]
-        urgent = [
-            w
-            for w in active
-            if (w.get("priority") or "").lower() in {"critical", "high", "urgent"}
-        ]
+        priority = score_road_section(section, orders, related_plans=plans)
+        road = roads_by_id.get(str(section.get("road_id") or ""), {})
 
         rows.append(
             RoadRankingItem(
                 rank=0,
                 road_section_id=section["id"],
                 section_code=section.get("section_code"),
-                priority_score=score,
-                priority_level=level,
+                road_id=section.get("road_id"),
+                road_code=road.get("road_code"),
+                road_name=road.get("name"),
+                priority_score=priority.score,
+                priority_level=priority.level,
                 condition_rating=section.get("condition_rating"),
                 status=section.get("status"),
-                active_work_orders=len(active),
-                urgent_work_orders=len(urgent),
-                confidence=confidence,
+                active_work_orders=priority.active_work_orders,
+                urgent_work_orders=priority.urgent_work_orders,
+                confidence=priority.confidence,
             )
         )
 
@@ -434,9 +413,9 @@ def rank_road_sections(
         rankings=enriched_rankings,
         methodology=(
             "Sections are ranked using deterministic condition, work-order urgency, "
-            "planning, and data-quality signals. The resulting score and rank are "
-            "authoritative; AI only explains the verified evidence and suggests "
-            "advisory next actions."
+            "maintenance-plan signals, and data-quality factors. Road metadata is "
+            "joined for context. Score and rank are authoritative; AI only explains "
+            "verified evidence and suggests advisory next actions."
         ),
         ai_generated=ai_generated,
     )
@@ -493,7 +472,10 @@ def office_assistant(
     )
     work_orders = (
         supabase.table("work_orders")
-        .select("id,road_section_id,work_order_no,title,maintenance_type,priority,status,planned_cost,actual_cost")
+        .select(
+            "id,road_section_id,work_order_no,title,maintenance_type,"
+            "priority,status,planned_cost,actual_cost"
+        )
         .limit(500)
         .execute()
         .data
@@ -517,7 +499,10 @@ def office_assistant(
     )
     budgets = (
         supabase.table("budgets")
-        .select("id,fiscal_year,budget_code,category,allocated_amount,spent_amount,committed_amount,status")
+        .select(
+            "id,fiscal_year,budget_code,category,allocated_amount,"
+            "spent_amount,committed_amount,status"
+        )
         .limit(50)
         .execute()
         .data
@@ -525,7 +510,10 @@ def office_assistant(
     )
     expenses = (
         supabase.table("expenses")
-        .select("id,budget_id,work_order_id,expense_date,description,category,amount,status")
+        .select(
+            "id,budget_id,work_order_id,expense_date,description,"
+            "category,amount,status"
+        )
         .limit(200)
         .execute()
         .data
@@ -541,28 +529,37 @@ def office_assistant(
     )
 
     active_orders = [
-        item for item in work_orders
-        if (item.get("status") or "").lower() not in {"completed", "closed", "cancelled"}
+        item
+        for item in work_orders
+        if (item.get("status") or "").lower()
+        not in {"completed", "closed", "cancelled"}
     ]
     critical_sections = [
-        item for item in sections
+        item
+        for item in sections
         if item.get("condition_rating") is not None
         and float(item["condition_rating"]) >= 4
     ]
     available_machinery = [
-        item for item in machinery
-        if (item.get("status") or "").lower() in {"available", "ready", "operational"}
+        item
+        for item in machinery
+        if (item.get("status") or "").lower()
+        in {"available", "ready", "operational"}
     ]
     down_machinery = [
-        item for item in machinery
-        if (item.get("status") or "").lower() in {"down", "under_maintenance", "broken", "unavailable"}
+        item
+        for item in machinery
+        if (item.get("status") or "").lower()
+        in {"down", "under_maintenance", "broken", "unavailable"}
     ]
     active_employees = [
-        item for item in employees
+        item
+        for item in employees
         if (item.get("status") or "").lower() == "active"
     ]
     active_assets = [
-        item for item in assets
+        item
+        for item in assets
         if (item.get("status") or "").lower() == "active"
     ]
 
@@ -575,54 +572,69 @@ def office_assistant(
         f"Maintenance plans available: {len(plans)}.",
         f"Work orders available: {len(work_orders)}; active: {len(active_orders)}.",
         f"Sections with recorded condition rating >= 4: {len(critical_sections)}.",
-        f"Machinery records available: {len(machinery)}; available/operational: {len(available_machinery)}; down/under maintenance: {len(down_machinery)}.",
+        (
+            f"Machinery records available: {len(machinery)}; "
+            f"available/operational: {len(available_machinery)}; "
+            f"down/under maintenance: {len(down_machinery)}."
+        ),
         f"Employee records available: {len(employees)}; active: {len(active_employees)}.",
-        f"Budget records available: {len(budgets)}; total allocated: {total_allocated:.2f}; total spent: {total_spent:.2f}.",
+        (
+            f"Budget records available: {len(budgets)}; "
+            f"total allocated: {total_allocated:.2f}; total spent: {total_spent:.2f}."
+        ),
         f"Expense records available: {len(expenses)}.",
-        f"Asset records available: {len(assets)}; active: {len(active_assets)}.",
+        f"General asset records available: {len(assets)}; active: {len(active_assets)}.",
     ]
 
     settings = get_settings()
     if not settings.gemini_api_key:
+        answer = (
+            "Structured operational evidence was collected for this organization. "
+            "Configure GEMINI_API_KEY to enable natural-language answers. "
+            "Key counts: "
+            f"{len(roads)} roads, {len(sections)} sections, "
+            f"{len(active_orders)} active work orders, "
+            f"{len(available_machinery)} available machinery units."
+        )
         return OfficeAssistantResponse(
-            answer="The AI provider is not configured yet. The verified office data was retrieved successfully, but no AI answer was generated.",
+            query=request.query,
+            answer=answer,
             evidence=evidence,
+            ai_generated=False,
         )
 
     context = {
-        "roads": roads,
-        "road_sections": sections,
-        "maintenance_plans": plans,
-        "work_orders": work_orders,
-        "machinery": machinery,
-        "employees": employees,
-        "budgets": budgets,
-        "expenses": expenses,
-        "assets": assets,
+        "roads_sample": roads[:10],
+        "sections_sample": sections[:15],
+        "plans_sample": plans[:10],
+        "work_orders_sample": work_orders[:15],
+        "machinery_sample": machinery[:10],
+        "employees_sample": employees[:10],
+        "budgets_sample": budgets[:10],
+        "expenses_sample": expenses[:10],
+        "assets_sample": assets[:10],
         "summary": evidence,
     }
-
     prompt = (
-        "Answer the maintenance-office user's question using ONLY the supplied "
-        "organization data. If the data does not contain the answer, say that it "
-        "is not available. Never invent costs, dates, causes, quantities, traffic "
-        "conditions, site observations, or project status. Distinguish recorded "
-        "facts from recommendations. Recommendations are advisory only and must "
-        "not approve spending, contracts, payments, budget changes, or official "
-        "work-order closure. Keep the answer concise and useful for an engineering "
-        "office.\n\n"
-        f"User question: {request.question}\n\n"
-        f"Verified data:\n{json.dumps(context, default=str)}"
+        "Answer the office question using ONLY the supplied organization data. "
+        "If the data does not contain the answer, say it is not available. "
+        "Do not invent figures, road conditions, costs, or staff assignments. "
+        "Do not approve spending or contracts. Keep the answer concise.\n\n"
+        f"Question: {request.query}\n\n"
+        f"Data:\n{json.dumps(context, default=str)}"
     )
-
-    ai_result = generate_text(
+    result = generate_text(
         prompt,
-        system_instruction="You are the AI-RMMS evidence-based office assistant.",
+        system_instruction="You are the AI-RMMS office assistant for road maintenance.",
     )
-    if ai_result:
-        answer = ai_result.text
-    else:
-        answer = "I could not generate the AI answer right now. Please review the verified office data or try again."
+    answer = (
+        result.text
+        if result
+        else (
+            "I could not generate an AI answer right now. "
+            "Please review the structured evidence counts."
+        )
+    )
 
     org_id = resolve_organization_id(supabase, current_user["id"])
     if org_id:
@@ -630,11 +642,15 @@ def office_assistant(
             supabase,
             organization_id=org_id,
             analysis_type="office_assistant",
-            input_reference=request.question[:500],
-            status="completed" if ai_result else "failed",
-            result={"answer": answer[:2000]},
+            status="completed",
+            result={"ai_generated": bool(result)},
             evidence={"summary": evidence},
             created_by=current_user["id"],
         )
 
-    return OfficeAssistantResponse(answer=answer, evidence=evidence)
+    return OfficeAssistantResponse(
+        query=request.query,
+        answer=answer,
+        evidence=evidence,
+        ai_generated=bool(result),
+    )
