@@ -15,6 +15,7 @@ from app.schemas.ai import (
 from app.schemas.office_assistant import OfficeAssistantRequest, OfficeAssistantResponse
 from app.services.ai_audit import log_analysis_run, resolve_organization_id
 from app.services.ai_provider import generate_text
+from app.services.cross_module_context import collect_cross_module_context
 from app.services.road_priority import (
     PriorityResult,
     baseline_action,
@@ -444,195 +445,92 @@ def office_assistant(
     request: OfficeAssistantRequest,
     current_user=Depends(get_current_user),
 ):
+    """Cross-module assistant: RAMS + MMMS + Finance + HR + Assets + Documents."""
     supabase = current_user["client"]
+    question = (request.question or request.query or "").strip()
 
-    roads = (
-        supabase.table("roads")
-        .select("id,road_code,name,total_length_km,status")
-        .limit(100)
-        .execute()
-        .data
-        or []
-    )
-    sections = (
-        supabase.table("road_sections")
-        .select("id,road_id,section_code,condition_rating,status")
-        .limit(500)
-        .execute()
-        .data
-        or []
-    )
-    plans = (
-        supabase.table("maintenance_plans")
-        .select("id,name,fiscal_year,plan_type,status,budget_amount,start_date,end_date")
-        .limit(100)
-        .execute()
-        .data
-        or []
-    )
-    work_orders = (
-        supabase.table("work_orders")
-        .select(
-            "id,road_section_id,work_order_no,title,maintenance_type,"
-            "priority,status,planned_cost,actual_cost"
-        )
-        .limit(500)
-        .execute()
-        .data
-        or []
-    )
-    machinery = (
-        supabase.table("machinery")
-        .select("id,asset_code,name,machinery_type,status,current_hours")
-        .limit(200)
-        .execute()
-        .data
-        or []
-    )
-    employees = (
-        supabase.table("employees")
-        .select("id,employee_code,full_name,job_title,status")
-        .limit(200)
-        .execute()
-        .data
-        or []
-    )
-    budgets = (
-        supabase.table("budgets")
-        .select(
-            "id,fiscal_year,budget_code,category,allocated_amount,"
-            "spent_amount,committed_amount,status"
-        )
-        .limit(50)
-        .execute()
-        .data
-        or []
-    )
-    expenses = (
-        supabase.table("expenses")
-        .select(
-            "id,budget_id,work_order_id,expense_date,description,"
-            "category,amount,status"
-        )
-        .limit(200)
-        .execute()
-        .data
-        or []
-    )
-    assets = (
-        supabase.table("assets")
-        .select("id,asset_code,name,category,location,status,current_value")
-        .limit(200)
-        .execute()
-        .data
-        or []
-    )
+    ctx = collect_cross_module_context(supabase)
+    evidence = list(ctx.evidence)
+    modules = list(ctx.modules_consulted)
+    document_evidence: list[str] = []
 
-    active_orders = [
-        item
-        for item in work_orders
-        if (item.get("status") or "").lower()
-        not in {"completed", "closed", "cancelled"}
-    ]
-    critical_sections = [
-        item
-        for item in sections
-        if item.get("condition_rating") is not None
-        and float(item["condition_rating"]) >= 4
-    ]
-    available_machinery = [
-        item
-        for item in machinery
-        if (item.get("status") or "").lower()
-        in {"available", "ready", "operational"}
-    ]
-    down_machinery = [
-        item
-        for item in machinery
-        if (item.get("status") or "").lower()
-        in {"down", "under_maintenance", "broken", "unavailable"}
-    ]
-    active_employees = [
-        item
-        for item in employees
-        if (item.get("status") or "").lower() == "active"
-    ]
-    active_assets = [
-        item
-        for item in assets
-        if (item.get("status") or "").lower() == "active"
-    ]
-
-    total_allocated = sum(float(b.get("allocated_amount") or 0) for b in budgets)
-    total_spent = sum(float(b.get("spent_amount") or 0) for b in budgets)
-
-    evidence = [
-        f"Road records available to this organization: {len(roads)}.",
-        f"Road sections available to this organization: {len(sections)}.",
-        f"Maintenance plans available: {len(plans)}.",
-        f"Work orders available: {len(work_orders)}; active: {len(active_orders)}.",
-        f"Sections with recorded condition rating >= 4: {len(critical_sections)}.",
-        (
-            f"Machinery records available: {len(machinery)}; "
-            f"available/operational: {len(available_machinery)}; "
-            f"down/under maintenance: {len(down_machinery)}."
-        ),
-        f"Employee records available: {len(employees)}; active: {len(active_employees)}.",
-        (
-            f"Budget records available: {len(budgets)}; "
-            f"total allocated: {total_allocated:.2f}; total spent: {total_spent:.2f}."
-        ),
-        f"Expense records available: {len(expenses)}.",
-        f"General asset records available: {len(assets)}; active: {len(active_assets)}.",
-    ]
+    if request.include_documents:
+        try:
+            org_id = resolve_organization_id(supabase, current_user["id"])
+            if org_id and current_user.get("access_token"):
+                matches = search_document_chunks(
+                    question,
+                    organization_id=org_id,
+                    access_token=current_user["access_token"],
+                    limit=4,
+                    minimum_similarity=0.35,
+                )
+                document_evidence = [
+                    f"{m.content[:280].strip()} (similarity {m.similarity:.2f})"
+                    for m in matches
+                ]
+                if document_evidence:
+                    modules.append("Document Intelligence")
+                    evidence.append(
+                        f"Related document snippets retrieved: {len(document_evidence)}."
+                    )
+        except Exception:
+            document_evidence = []
 
     settings = get_settings()
     if not settings.gemini_api_key:
         answer = (
-            "Structured operational evidence was collected for this organization. "
-            "Configure GEMINI_API_KEY to enable natural-language answers. "
-            "Key counts: "
-            f"{len(roads)} roads, {len(sections)} sections, "
-            f"{len(active_orders)} active work orders, "
-            f"{len(available_machinery)} available machinery units."
+            "Cross-module operational evidence was collected. "
+            "Configure GEMINI_API_KEY for natural-language answers. "
+            f"Summary — roads: {ctx.summary.get('roads', 0)}, "
+            f"sections: {ctx.summary.get('sections', 0)}, "
+            f"active work orders: {ctx.summary.get('active_work_orders', 0)}, "
+            f"available machinery: {ctx.summary.get('available_machinery', 0)}, "
+            f"active employees: {ctx.summary.get('active_employees', 0)}, "
+            f"budget spent: {ctx.summary.get('budget_spent', 0)}."
         )
         return OfficeAssistantResponse(
-            query=request.query,
+            query=question,
             answer=answer,
             evidence=evidence,
+            modules_consulted=modules,
+            document_evidence=document_evidence,
+            advisory=True,
             ai_generated=False,
         )
 
     context = {
-        "roads_sample": roads[:10],
-        "sections_sample": sections[:15],
-        "plans_sample": plans[:10],
-        "work_orders_sample": work_orders[:15],
-        "machinery_sample": machinery[:10],
-        "employees_sample": employees[:10],
-        "budgets_sample": budgets[:10],
-        "expenses_sample": expenses[:10],
-        "assets_sample": assets[:10],
-        "summary": evidence,
+        "modules": modules,
+        "summary": ctx.summary,
+        "samples": ctx.samples,
+        "document_evidence": document_evidence,
+        "evidence_lines": evidence,
     }
     prompt = (
-        "Answer the office question using ONLY the supplied organization data. "
+        "You are the AI-RMMS cross-module office assistant. "
+        "Answer using ONLY the supplied organization data and document snippets. "
+        "Combine information across modules when the question requires it "
+        "(for example road need + machinery availability + budget + workforce). "
         "If the data does not contain the answer, say it is not available. "
-        "Do not invent figures, road conditions, costs, or staff assignments. "
-        "Do not approve spending or contracts. Keep the answer concise.\n\n"
-        f"Question: {request.query}\n\n"
+        "Do not invent figures, conditions, costs, or staff assignments. "
+        "Do not approve spending, contracts, or work closures. "
+        "Keep the answer concise and suitable for a road-maintenance office.\n\n"
+        f"Question: {question}\n\n"
         f"Data:\n{json.dumps(context, default=str)}"
     )
     result = generate_text(
         prompt,
-        system_instruction="You are the AI-RMMS office assistant for road maintenance.",
+        system_instruction=(
+            "You are the AI-RMMS cross-module decision-support assistant. "
+            "Be evidence-based and advisory only."
+        ),
     )
     answer = (
         result.text
         if result
         else (
             "I could not generate an AI answer right now. "
-            "Please review the structured evidence counts."
+            "Please review the structured cross-module evidence."
         )
     )
 
@@ -643,14 +541,24 @@ def office_assistant(
             organization_id=org_id,
             analysis_type="office_assistant",
             status="completed",
-            result={"ai_generated": bool(result)},
-            evidence={"summary": evidence},
+            result={
+                "ai_generated": bool(result),
+                "modules_consulted": modules,
+            },
+            evidence={
+                "summary": evidence,
+                "document_evidence": document_evidence,
+            },
             created_by=current_user["id"],
+            input_reference=question[:500],
         )
 
     return OfficeAssistantResponse(
-        query=request.query,
+        query=question,
         answer=answer,
         evidence=evidence,
+        modules_consulted=modules,
+        document_evidence=document_evidence,
+        advisory=True,
         ai_generated=bool(result),
     )
