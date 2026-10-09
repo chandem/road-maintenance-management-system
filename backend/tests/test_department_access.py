@@ -265,3 +265,60 @@ def test_document_department_authorization_fails_closed_on_rpc_error(monkeypatch
             {"id": "user-1", "client": client}, "road_asset"
         )
     assert exc.value.status_code == 503
+
+
+
+def test_document_department_authorization_rejects_read_only_write(monkeypatch):
+    from app.api.routes.documents import _authorize_department
+    from app.services import ai_audit
+
+    monkeypatch.setattr(ai_audit, "resolve_organization_id", lambda *_args: "org-1")
+    client = FakeClient(
+        membership={
+            "organization_id": "org-1",
+            "user_id": "user-1",
+            "is_active": True,
+            "role": "member",
+        },
+        rpc_result=False,
+    )
+    with pytest.raises(HTTPException) as exc:
+        _authorize_department(
+            {"id": "user-1", "client": client}, "finance", write=True
+        )
+    assert exc.value.status_code == 403
+
+
+def test_document_department_authorization_rejects_invalid_department(monkeypatch):
+    from app.api.routes.documents import _authorize_department
+    from app.services import ai_audit
+
+    monkeypatch.setattr(ai_audit, "resolve_organization_id", lambda *_args: "org-1")
+    client = FakeClient(
+        membership={
+            "organization_id": "org-1",
+            "user_id": "user-1",
+            "is_active": True,
+            "role": "admin",
+        }
+    )
+    with pytest.raises(HTTPException) as exc:
+        _authorize_department(
+            {"id": "user-1", "client": client}, "not-a-department"
+        )
+    assert exc.value.status_code == 422
+
+
+def test_document_department_authorization_fails_closed_on_org_resolution_error(monkeypatch):
+    from app.api.routes.documents import _authorize_department
+    from app.services import ai_audit
+
+    def broken_resolve(*_args):
+        raise RuntimeError("database unavailable")
+
+    monkeypatch.setattr(ai_audit, "resolve_organization_id", broken_resolve)
+    with pytest.raises(HTTPException) as exc:
+        _authorize_department(
+            {"id": "user-1", "client": FakeClient()}, "road_asset"
+        )
+    assert exc.value.status_code == 503
