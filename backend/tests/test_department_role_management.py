@@ -231,3 +231,33 @@ def test_cannot_revoke_assignment_from_another_organization(monkeypatch):
     assert exc.value.status_code == 404
     update = next(c for c in client.calls if c["operation"] == "update")
     assert update["filters"]["organization_id"] == ORG
+
+
+
+def test_organization_lookup_failure_returns_service_unavailable(monkeypatch):
+    def broken_resolve(*_args):
+        raise RuntimeError("database unavailable")
+
+    monkeypatch.setattr(departments, "resolve_organization_id", broken_resolve)
+    with pytest.raises(HTTPException) as exc:
+        departments.list_departments(current_user(Client()))
+
+    assert exc.value.status_code == 503
+
+
+def test_admin_membership_lookup_failure_returns_service_unavailable(monkeypatch):
+    patch_org(monkeypatch)
+
+    class BrokenClient(Client):
+        def table(self, name):
+            if name == "organization_members":
+                raise RuntimeError("database unavailable")
+            return super().table(name)
+
+    payload = departments.DepartmentRoleAssignment(
+        user_id=UUID(TARGET), department_id=UUID(DEPT), role="officer"
+    )
+    with pytest.raises(HTTPException) as exc:
+        departments.assign_department_role(payload, current_user(BrokenClient()))
+
+    assert exc.value.status_code == 503
