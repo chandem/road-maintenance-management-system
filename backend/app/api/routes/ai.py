@@ -65,6 +65,56 @@ def generate_ai_explanation(
     return result.text if result else None
 
 
+def _road_document_evidence(
+    supabase, current_user: dict, organization_id: str, query: str
+) -> list[str]:
+    """Return only verified road-department snippets for road-priority AI.
+
+    Semantic search is organization-scoped, so every result must be joined back
+    to authoritative document metadata using the caller's JWT-scoped client.
+    Unknown, unclassified, cross-organization, or other-department documents
+    are excluded. Retrieval/metadata failures fail closed with no evidence.
+    Database RLS remains the required defense-in-depth boundary.
+    """
+    access_token = current_user.get("access_token")
+    if not access_token:
+        return []
+
+    try:
+        matches = search_document_chunks(
+            query,
+            organization_id=organization_id,
+            access_token=access_token,
+            limit=3,
+            minimum_similarity=0.35,
+        )
+        if not matches:
+            return []
+
+        document_ids = list(dict.fromkeys(match.document_id for match in matches))
+        response = (
+            supabase.table("documents")
+            .select("id,organization_id,department_code")
+            .eq("organization_id", organization_id)
+            .in_("id", document_ids)
+            .execute()
+        )
+        authorized_document_ids = {
+            str(row["id"])
+            for row in (response.data or [])
+            if str(row.get("organization_id")) == str(organization_id)
+            and row.get("department_code") == "road_asset"
+        }
+        return [
+            f"{match.content[:240].strip()} (similarity {match.similarity:.2f})"
+            for match in matches
+            if str(match.document_id) in authorized_document_ids
+        ]
+    except Exception:
+        # Missing/failed metadata verification must never fall back to raw chunks.
+        return []
+
+
 def generate_ranking_ai_explanations(
     rankings: list[RoadRankingItem],
 ) -> dict[str, dict[str, str]]:
@@ -188,42 +238,31 @@ def analyze_road_priority(
 
     document_evidence: list[str] = []
     if request.include_document_evidence:
-        try:
-            org_id = resolve_organization_id(supabase, current_user["id"])
-            query_bits = [
-                data.get("section_code") or "",
-                road_meta.get("road_name") or "",
-                road_meta.get("road_code") or "",
-                "maintenance",
+        org_id = resolve_organization_id(supabase, current_user["id"])
+        query_bits = [
+            data.get("section_code") or "",
+            road_meta.get("road_name") or "",
+            road_meta.get("road_code") or "",
+            "maintenance",
+        ]
+        query = " ".join(bit for bit in query_bits if bit).strip() or "road maintenance"
+        if org_id:
+            document_evidence = _road_document_evidence(
+                supabase, current_user, str(org_id), query
+            )
+        if document_evidence:
+            evidence_list = list(priority.evidence) + [
+                f"Related road-department document snippets retrieved: {len(document_evidence)}."
             ]
-            query = " ".join(bit for bit in query_bits if bit).strip() or "road maintenance"
-            if org_id and current_user.get("access_token"):
-                matches = search_document_chunks(
-                    query,
-                    organization_id=org_id,
-                    access_token=current_user["access_token"],
-                    limit=3,
-                    minimum_similarity=0.35,
-                )
-                document_evidence = [
-                    f"{match.content[:240].strip()} (similarity {match.similarity:.2f})"
-                    for match in matches
-                ]
-                if document_evidence:
-                    evidence_list = list(priority.evidence) + [
-                        f"Related document snippets retrieved: {len(document_evidence)}."
-                    ]
-                    priority = PriorityResult(
-                        score=priority.score,
-                        level=priority.level,
-                        confidence=priority.confidence,
-                        reasons=list(priority.reasons),
-                        evidence=evidence_list,
-                        active_work_orders=priority.active_work_orders,
-                        urgent_work_orders=priority.urgent_work_orders,
-                    )
-        except Exception:
-            document_evidence = []
+            priority = PriorityResult(
+                score=priority.score,
+                level=priority.level,
+                confidence=priority.confidence,
+                reasons=list(priority.reasons),
+                evidence=evidence_list,
+                active_work_orders=priority.active_work_orders,
+                urgent_work_orders=priority.urgent_work_orders,
+            )
 
     explanation = (
         generate_ai_explanation(
