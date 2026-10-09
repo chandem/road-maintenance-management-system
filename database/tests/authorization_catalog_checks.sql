@@ -119,6 +119,21 @@ BEGIN
     RAISE EXCEPTION 'private.has_department_role SECURITY DEFINER helper is missing';
   END IF;
 
+  -- SECURITY DEFINER is not sufficient by itself: the helper must pin an empty
+  -- search_path so object resolution cannot be redirected by caller-controlled
+  -- schemas. Migration 011 relies on the helper retaining this hardening.
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_proc p
+    JOIN pg_namespace n ON n.oid = p.pronamespace
+    WHERE n.nspname = 'private'
+      AND p.proname = 'has_department_role'
+      AND p.prosecdef
+      AND p.proconfig @> ARRAY['search_path=""']
+  ) THEN
+    RAISE EXCEPTION 'private.has_department_role must be SECURITY DEFINER with search_path set to empty';
+  END IF;
+
   -- The SECURITY INVOKER public wrapper calls the private helper as the caller.
   -- Schema USAGE is therefore required for authenticated users, but not anon.
   IF NOT has_schema_privilege('authenticated', 'private', 'USAGE') THEN
