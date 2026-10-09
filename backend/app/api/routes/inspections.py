@@ -2,7 +2,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from app.api.dependencies import get_current_user
+from app.api.dependencies import get_current_user, require_department_access
 from app.schemas.inspections import (
     RoadInspection,
     RoadInspectionCreate,
@@ -30,7 +30,7 @@ def _org_id(current_user) -> str:
 
 @router.get("", response_model=list[RoadInspection])
 def list_inspections(
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_department_access("road_asset", ['department_manager', 'officer', 'read_only'])),
     road_section_id: UUID | None = Query(default=None),
     limit: int = Query(default=50, ge=1, le=200),
 ):
@@ -50,7 +50,7 @@ def list_inspections(
 @router.get("/{inspection_id}", response_model=RoadInspection)
 def get_inspection(
     inspection_id: UUID,
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_department_access("road_asset", ['department_manager', 'officer', 'read_only'])),
 ):
     response = (
         current_user["client"]
@@ -68,7 +68,7 @@ def get_inspection(
 @router.post("", response_model=RoadInspection, status_code=201)
 def create_inspection(
     payload: RoadInspectionCreate,
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_department_access("road_asset", ['department_manager', 'officer'])),
 ):
     """Record an inspection; optionally refresh section condition_rating."""
     organization_id = _org_id(current_user)
@@ -111,7 +111,7 @@ def create_inspection(
 def update_inspection(
     inspection_id: UUID,
     payload: RoadInspectionUpdate,
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_department_access("road_asset", ['department_manager', 'officer'])),
 ):
     updates = {
         k: v for k, v in payload.model_dump(mode="json", exclude_unset=True).items()
