@@ -1,31 +1,22 @@
 # Department-level RLS verification plan
 
-Do not apply `011_department_road_rls.sql` to production until the checks below pass in a staging project.
+Do not apply migrations 011, 012, or 013 to production until the checks below pass in a staging project.
 
 ## Preconditions
 
 1. Use a staging Supabase project with the same schema/migrations as production.
-2. Create or identify four real Auth users in one test organization:
+2. Create or identify real Auth users in one test organization:
    - organization owner/admin;
-   - road_asset department_manager;
-   - road_asset read_only user;
-   - user assigned only to finance (or no department role).
-3. Assign the roles through the admin API or authenticated admin UI. The target user must be an active organization member.
-4. Confirm the active assignments:
-   ```sql
-   select om.user_id, om.role as organization_role, d.code as department_code,
-          udr.role as department_role, udr.is_active
-   from public.organization_members om
-   left join public.user_department_roles udr
-     on udr.organization_id = om.organization_id
-    and udr.user_id = om.user_id
-    and udr.is_active = true
-   left join public.departments d
-     on d.id = udr.department_id
-    and d.organization_id = udr.organization_id
-   where om.organization_id = '<STAGING_ORG_UUID>'::uuid
-     and om.is_active = true;
-   ```
+   - road_asset department_manager and read_only user;
+   - machinery_maintenance department_manager;
+   - finance department_manager;
+   - human_resources department_manager;
+   - general_assets department_manager;
+   - a member with no department role;
+   - a user from another organization.
+3. Assign roles through the admin API or authenticated admin UI. Every target user must be an active organization member.
+4. Seed one document and chunks for each department, plus one legacy document with department_code NULL. Use fake/non-sensitive content only.
+5. Confirm active assignments using a read-only query joining organization_members, user_department_roles, and departments, filtered to the staging organization and active members.
 
 ## Execute through the Data API
 
@@ -42,57 +33,41 @@ Use each test user's own access token and the Supabase REST/Data API. Do not use
 | inactive org member | denied | denied | denied | inactive membership cannot access |
 | user from another organization | denied | denied | denied | tenant isolation is preserved |
 
-For a denied SELECT, PostgREST may return HTTP 200 with an empty array because RLS filters rows; assert that no protected rows are returned, not just the HTTP status. For INSERT/UPDATE, assert no row is created/changed and inspect the response/error. Use a seeded test road owned by the staging organization.
+For denied SELECT requests, PostgREST may return HTTP 200 with an empty array because RLS filters rows; assert no protected rows are returned. For INSERT/UPDATE, assert no row is created/changed and inspect the response/error. Use seeded staging records.
 
-## Additional checks
+## Document and AI retrieval matrix (migration 013)
 
-- Repeat GET/PATCH against `road_sections` and GET/INSERT/PATCH against `road_inspections`.
-- Attempt to change a row's `organization_id` to another organization; it must fail.
-- Call `/rest/v1/rpc/has_department_role` without a token; it must be rejected after the migration revokes anonymous execution.
-- Confirm an authenticated caller can only learn the boolean for their own user because the helper binds authorization to `auth.uid()`.
-- Confirm the backend endpoints enforce the same role matrix as the database policies.
+Test directly through the Data API using authenticated JWTs, not the service role.
+
+| Test identity | Department document SELECT | Keyword search | Semantic/RPC search | Insert/update/delete |
+|---|---|---|---|---|
+| Organization owner/admin | all departments + legacy NULL | all departments + legacy NULL | all departments + legacy NULL | allowed |
+| Manager/officer for the document's department | own department only | own department only | own department only | allowed |
+| Read-only for the document's department | own department only | own department only | own department only | denied |
+| User from another department | no rows for that department | no snippets/evidence | no chunks/evidence | denied |
+| Member with no department role | no department-owned rows | no snippets/evidence | no chunks/evidence | denied |
+| Any non-admin | legacy documents with NULL department are invisible | no legacy snippets/evidence | no legacy chunks/evidence | denied |
+| User from another organization | no rows | no snippets/evidence | no chunks/evidence | denied |
+
+Also verify:
+- Keyword search filters are enforced by document RLS before extracted_text is returned.
+- match_document_chunks remains SECURITY INVOKER and chunk RLS filters results inside the database before content can reach application code or an LLM prompt.
+- A user cannot insert a document under a department they do not hold a write role for.
+- A user cannot insert/update chunks linked to a document in another department or organization.
+- Read-only users cannot DELETE (test explicitly; a broad FOR ALL policy could accidentally allow this).
+- A document with NULL/invalid department classification remains admin-only.
+- The route layer stays admin-only until its upload, list, get, reindex, keyword search, semantic search, and Q&A paths all accept/resolve an authorized department and apply the same department filter.
+- Existing documents are not auto-classified from title, filename, or document_type.
+- Cross-department AI assistant and dashboards remain admin-only until their complete retrieval pipeline has equivalent authorization.
+
+## Other RLS and function checks
+
+- Repeat GET/PATCH against road_sections and GET/INSERT/PATCH against road_inspections.
+- Attempt to change organization_id to another organization; it must fail.
+- Call /rest/v1/rpc/has_department_role without a token; it must be rejected.
+- Confirm the exposed public helper is SECURITY INVOKER and the private helper has no EXECUTE for anon/PUBLIC.
 - Run the Supabase Security Advisor after applying to staging and review remaining SECURITY DEFINER warnings individually.
 
 ## Current project state
 
-The live tables `roads`, `road_sections`, and `road_inspections` currently have zero rows, and there are zero active department-role assignments. Applying the restrictive policies before assigning and verifying intended roles would deny normal users access. No production policy changes should be made until test users are assigned and the staging matrix passes.
-
-
-## Function exposure verification after migration (staging only)
-
-Run this read-only catalog query after applying the migration to staging. Expected:
-- `public.has_department_role` exists and is **not** SECURITY DEFINER (it is the RPC wrapper).
-- `private.has_department_role` exists and is SECURITY DEFINER.
-- The private helper has EXECUTE for `authenticated` and `service_role`, but not `anon` or `PUBLIC`.
-
-```sql
-select n.nspname as schema_name,
-       p.proname,
-       p.prosecdef as security_definer,
-       pg_get_function_identity_arguments(p.oid) as arguments,
-       coalesce(array_to_string(p.proacl, ', '), '(default privileges)') as grants
-from pg_proc p
-join pg_namespace n on n.oid = p.pronamespace
-where p.proname = 'has_department_role'
-order by n.nspname;
-```
-
-Then call `/rest/v1/rpc/has_department_role` with an authenticated test user's JWT and confirm it returns only the caller's own role membership result. An unauthenticated call must be rejected. Re-run Supabase Security Advisor; the exposed-schema SECURITY DEFINER warning for this helper should be gone.
-
-
-## Full department matrix for migration 012
-
-Use authenticated user JWTs and verify the direct Supabase Data API as well as the FastAPI endpoints.
-
-| Data area | Required department | Read roles | Write roles | Organization admin |
-|---|---|---|---|---|
-| Roads, sections, inspections, materials, maintenance plans, work orders | `road_asset` | manager, officer, read_only | manager, officer | full access |
-| Machinery | `machinery_maintenance` | manager, officer, read_only | manager, officer | full access |
-| General assets | `general_assets` | manager, officer, read_only | manager, officer | full access |
-| Budgets and expenses | `finance` | manager, officer, read_only | manager, officer | full access |
-| Employees | `human_resources` | manager, officer, read_only | manager, officer | full access |
-| Documents, document chunks, AI analysis runs, AI recommendations | organization admin only until document-level ACLs exist | organization admin | organization admin | full access |
-
-For each table, verify a user from a different department receives no rows on SELECT and cannot INSERT, UPDATE, or DELETE. Also test changing `organization_id` on UPDATE/INSERT, inactive memberships, missing roles, and another organization's IDs. The migration uses RESTRICTIVE policies so the pre-existing permissive organization policies cannot bypass department checks.
-
-The documents restriction is deliberately conservative. Do not open document search to department members until each document has an authoritative department classification and every keyword/semantic retrieval path enforces it before sending evidence to the model.
+The live project has zero active department-role assignments. Existing document and chunk rows must remain admin-only until explicitly classified. The proposed migrations are source-controlled only; no production schema or policy has been changed. Do not apply these policies until role assignments exist and the complete staging matrix passes.
