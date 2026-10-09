@@ -270,6 +270,10 @@ BEGIN
 
   -- These tables contain user conversations and trusted AI output. Verify that
   -- no stale grants survived a rerun against a pre-existing table definition.
+  IF has_table_privilege('authenticated', 'public.ai_conversations', 'UPDATE') THEN
+    RAISE EXCEPTION 'authenticated role unexpectedly has UPDATE privilege on ai_conversations';
+  END IF;
+
   IF has_table_privilege('authenticated', 'public.ai_conversations', 'DELETE')
      OR has_table_privilege('authenticated', 'public.ai_conversations', 'TRUNCATE')
      OR has_table_privilege('authenticated', 'public.ai_conversations', 'REFERENCES')
