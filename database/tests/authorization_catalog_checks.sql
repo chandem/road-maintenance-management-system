@@ -329,6 +329,45 @@ BEGIN
     RAISE EXCEPTION 'road-section organization integrity trigger is missing';
   END IF;
 
+  IF NOT EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'road_sections'
+      AND column_name = 'organization_id'
+      AND is_nullable = 'NO'
+  ) THEN
+    RAISE EXCEPTION 'road_sections.organization_id must be NOT NULL after migration 015';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_proc p
+    JOIN pg_namespace n ON n.oid = p.pronamespace
+    WHERE n.nspname = 'private'
+      AND p.proname = 'enforce_road_section_organization'
+      AND p.prosecdef
+      AND coalesce(array_to_string(p.proconfig, ','), '') LIKE '%search_path=%'
+  ) THEN
+    RAISE EXCEPTION 'Road-section trigger function must be SECURITY DEFINER with a fixed search_path';
+  END IF;
+
+  IF has_function_privilege(
+    'anon',
+    'private.enforce_road_section_organization()',
+    'EXECUTE'
+  ) OR has_function_privilege(
+    'authenticated',
+    'private.enforce_road_section_organization()',
+    'EXECUTE'
+  ) OR has_function_privilege(
+    'service_role',
+    'private.enforce_road_section_organization()',
+    'EXECUTE'
+  ) THEN
+    RAISE EXCEPTION 'API roles unexpectedly have direct EXECUTE on the road-section trigger function';
+  END IF;
+
   -- Semantic search must remain SECURITY INVOKER so RLS applies to chunk rows.
   SELECT p.prosecdef, pg_get_function_identity_arguments(p.oid) AS args
     INTO match_function
