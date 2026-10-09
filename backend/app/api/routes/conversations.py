@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -204,7 +205,7 @@ def post_message(
 
     # Touch conversation updated_at
     trusted_client.table("ai_conversations").update(
-        {"updated_at": "now()"}
+        {"updated_at": datetime.now(timezone.utc).isoformat()}
     ).eq("id", str(conversation_id)).execute()
 
     return assistant_msg.data[0]
