@@ -44,13 +44,10 @@ class FakeClient:
             def membership_for(filters):
                 if not self.membership:
                     return None
-                expected = {
-                    "organization_id": self.membership.get("organization_id"),
-                    "user_id": self.membership.get("user_id"),
-                    "is_active": self.membership.get("is_active"),
-                }
                 return self.membership if all(
-                    filters.get(key) == value for key, value in expected.items()
+                    key not in self.membership
+                    or filters.get(key) == self.membership[key]
+                    for key in ("organization_id", "user_id", "is_active")
                 ) else None
             return FakeQuery(membership_for)
         raise AssertionError(f"Unexpected table: {table_name}")
