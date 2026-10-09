@@ -200,21 +200,26 @@ CREATE POLICY ai_messages_department_select
 DROP POLICY IF EXISTS ai_messages_department_insert ON public.ai_messages;
 CREATE POLICY ai_messages_department_insert
   ON public.ai_messages AS RESTRICTIVE FOR INSERT TO authenticated
-  WITH CHECK (EXISTS (
-    SELECT 1 FROM public.ai_conversations c
-    WHERE c.id = ai_messages.conversation_id
-      AND (
-        private.is_org_admin(c.organization_id)
-        OR (
-          c.created_by = (SELECT auth.uid())
-          AND private.is_org_member(c.organization_id)
-          AND public.has_department_role(
-            c.organization_id, 'road_asset',
-            ARRAY['department_manager', 'officer']::text[]
+  WITH CHECK (
+    -- Direct Data API callers may submit only their own user-role messages.
+    -- Assistant/system messages are persisted by the trusted backend only.
+    role = 'user'
+    AND EXISTS (
+      SELECT 1 FROM public.ai_conversations c
+      WHERE c.id = ai_messages.conversation_id
+        AND (
+          private.is_org_admin(c.organization_id)
+          OR (
+            c.created_by = (SELECT auth.uid())
+            AND private.is_org_member(c.organization_id)
+            AND public.has_department_role(
+              c.organization_id, 'road_asset',
+              ARRAY['department_manager', 'officer']::text[]
+            )
           )
         )
-      )
-  ));
+    )
+  );
 
 DROP POLICY IF EXISTS ai_message_sources_department_select ON public.ai_message_sources;
 CREATE POLICY ai_message_sources_department_select
