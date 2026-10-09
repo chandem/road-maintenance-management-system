@@ -96,7 +96,13 @@ def _authorize_department(current_user, department_code: str | None, *, write: b
 
     client = current_user["client"]
     user_id = current_user["id"]
-    organization_id = resolve_organization_id(client, user_id)
+    try:
+        organization_id = resolve_organization_id(client, user_id)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="Document organization membership could not be verified.",
+        ) from exc
     if not organization_id:
         raise HTTPException(status_code=403, detail="Active organization membership is required.")
 
