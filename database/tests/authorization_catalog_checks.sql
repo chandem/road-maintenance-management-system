@@ -1,5 +1,5 @@
 -- AI-RMMS authorization catalog regression checks.
--- Run in an ISOLATED staging database after applying migrations 011-015.
+-- Run in an ISOLATED staging database after applying migrations 011-016.
 -- This script is read-only: it inspects catalog metadata and raises an error
 -- when required protections are missing. It does NOT prove row-level behavior;
 -- authenticated-JWT integration tests are still mandatory.
@@ -101,7 +101,7 @@ BEGIN
     'roads', 'road_sections', 'road_inspections',
     'materials', 'maintenance_plans', 'work_orders',
     'machinery', 'assets', 'budgets', 'expenses', 'employees',
-    'documents', 'document_chunks'
+    'documents', 'document_chunks', 'ai_analysis_runs', 'ai_recommendations'
   ] LOOP
     IF EXISTS (
       SELECT 1
