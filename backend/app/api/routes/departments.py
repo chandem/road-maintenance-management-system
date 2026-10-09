@@ -22,9 +22,15 @@ class DepartmentRoleAssignment(BaseModel):
 
 
 def _organization_id(current_user) -> str:
-    organization_id = resolve_organization_id(
-        current_user["client"], current_user["id"]
-    )
+    try:
+        organization_id = resolve_organization_id(
+            current_user["client"], current_user["id"]
+        )
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Unable to verify organization membership.",
+        ) from exc
     if not organization_id:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -34,16 +40,22 @@ def _organization_id(current_user) -> str:
 
 
 def _require_org_admin(current_user, organization_id: str) -> None:
-    result = (
-        current_user["client"]
-        .table("organization_members")
-        .select("role,is_active")
-        .eq("organization_id", organization_id)
-        .eq("user_id", current_user["id"])
-        .eq("is_active", True)
-        .maybe_single()
-        .execute()
-    )
+    try:
+        result = (
+            current_user["client"]
+            .table("organization_members")
+            .select("role,is_active")
+            .eq("organization_id", organization_id)
+            .eq("user_id", current_user["id"])
+            .eq("is_active", True)
+            .maybe_single()
+            .execute()
+        )
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Unable to verify organization administrator permission.",
+        ) from exc
     if not result.data or result.data.get("role") not in {"owner", "admin"}:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
