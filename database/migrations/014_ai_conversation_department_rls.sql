@@ -62,7 +62,8 @@ REVOKE ALL ON public.ai_conversations, public.ai_messages, public.ai_message_sou
   FROM anon;
 GRANT SELECT, INSERT, UPDATE ON public.ai_conversations, public.ai_messages
   TO authenticated;
-GRANT SELECT, INSERT ON public.ai_message_sources TO authenticated;
+GRANT SELECT ON public.ai_message_sources TO authenticated;
+REVOKE INSERT, UPDATE, DELETE ON public.ai_message_sources FROM authenticated;
 
 -- Keep permissive policies so restrictive policies below can narrow them.
 DROP POLICY IF EXISTS ai_conversations_select ON public.ai_conversations;
@@ -114,15 +115,9 @@ CREATE POLICY ai_message_sources_select
   ));
 
 DROP POLICY IF EXISTS ai_message_sources_insert ON public.ai_message_sources;
-CREATE POLICY ai_message_sources_insert
-  ON public.ai_message_sources FOR INSERT TO authenticated
-  WITH CHECK (EXISTS (
-    SELECT 1
-    FROM public.ai_messages m
-    JOIN public.ai_conversations c ON c.id = m.conversation_id
-    WHERE m.id = ai_message_sources.message_id
-      AND private.is_org_member(c.organization_id)
-  ));
+-- Evidence/source rows are trusted AI output, not user-authored input.
+-- Authenticated clients receive no INSERT privilege; the server-side trusted
+-- backend may persist validated sources when that feature is implemented.
 
 -- Department + ownership restrictions. Admins can support any conversation in
 -- their organization. Non-admins need an active road_asset role and can access
@@ -245,27 +240,8 @@ CREATE POLICY ai_message_sources_department_select
   ));
 
 DROP POLICY IF EXISTS ai_message_sources_department_insert ON public.ai_message_sources;
-CREATE POLICY ai_message_sources_department_insert
-  ON public.ai_message_sources AS RESTRICTIVE FOR INSERT TO authenticated
-  WITH CHECK (EXISTS (
-    SELECT 1
-    FROM public.ai_messages m
-    JOIN public.ai_conversations c ON c.id = m.conversation_id
-    WHERE m.id = ai_message_sources.message_id
-      AND (
-        private.is_org_admin(c.organization_id)
-        OR (
-          c.created_by = (SELECT auth.uid())
-          AND ai_message_sources.source_type IN (
-            'road', 'road_section', 'maintenance_plan', 'work_order'
-          )
-          AND public.has_department_role(
-            c.organization_id, 'road_asset',
-            ARRAY['department_manager', 'officer']::text[]
-          )
-        )
-      )
-  ));
+-- No authenticated INSERT policy is created: source rows must come from the
+-- trusted backend after it validates the referenced road-maintenance records.
 
 -- Do not grant DELETE through this migration. Verify existing table grants in
 -- staging; RLS policies above intentionally define no DELETE path.
