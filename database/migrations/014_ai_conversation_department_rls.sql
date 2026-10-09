@@ -73,6 +73,12 @@ GRANT SELECT, INSERT ON public.ai_conversations TO authenticated;
 GRANT SELECT, INSERT ON public.ai_messages TO authenticated;
 GRANT SELECT ON public.ai_message_sources TO authenticated;
 
+-- Explicit least-privilege grants for the trusted backend client. Do not rely
+-- on project-specific default privileges for newly created tables.
+GRANT SELECT, INSERT, UPDATE ON public.ai_conversations TO service_role;
+GRANT SELECT, INSERT ON public.ai_messages TO service_role;
+GRANT SELECT, INSERT ON public.ai_message_sources TO service_role;
+
 -- Keep permissive policies so restrictive policies below can narrow them.
 DROP POLICY IF EXISTS ai_conversations_select ON public.ai_conversations;
 CREATE POLICY ai_conversations_select
