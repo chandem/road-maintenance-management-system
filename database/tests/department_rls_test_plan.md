@@ -129,3 +129,5 @@ The live-schema preflight found that `ai_conversations`, `ai_messages`, and `ai_
 - Verify backend behavior: conversation creation and message posting require manager/officer; list and message-read routes permit read_only for the caller's own conversation.
 
 Migration 014 is a source-controlled proposal and has not been applied to production.
+
+- Non-admin road conversation source rows are restricted to road-safe source types (`road`, `road_section`, `maintenance_plan`, `work_order`, `other`). Finance, employee, asset, machinery, expense, budget, and document source types must remain unavailable to non-admin users until each source type has a matching record-level authorization check.
