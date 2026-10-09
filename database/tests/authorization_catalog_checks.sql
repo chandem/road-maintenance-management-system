@@ -89,6 +89,72 @@ BEGIN
     RAISE EXCEPTION 'No authenticated policy found on: %', array_to_string(missing_policies, ', ');
   END IF;
 
+  -- A policy existing on a table is not enough: it could be permissive-only,
+  -- leaving organization-level policies broader than intended. For each
+  -- department-protected business table, require restrictive coverage for
+  -- SELECT, INSERT, UPDATE, and DELETE (a FOR ALL policy covers each command).
+  FOREACH rel_name IN ARRAY ARRAY[
+    'roads', 'road_sections', 'road_inspections',
+    'materials', 'maintenance_plans', 'work_orders',
+    'machinery', 'assets', 'budgets', 'expenses', 'employees',
+    'documents', 'document_chunks'
+  ] LOOP
+    IF EXISTS (
+      SELECT 1
+      FROM unnest(ARRAY['SELECT', 'INSERT', 'UPDATE', 'DELETE']::text[]) AS cmd_name(cmd)
+      WHERE NOT EXISTS (
+        SELECT 1
+        FROM pg_policies p
+        WHERE p.schemaname = 'public'
+          AND p.tablename = rel_name
+          AND p.permissive = 'RESTRICTIVE'
+          AND 'authenticated' = ANY(p.roles)
+          AND p.cmd IN ('ALL', cmd_name.cmd)
+      )
+    ) THEN
+      RAISE EXCEPTION 'Missing restrictive command coverage (SELECT/INSERT/UPDATE/DELETE) for public.%', rel_name;
+    END IF;
+  END LOOP;
+
+  -- AI conversation tables intentionally expose fewer commands. Require
+  -- restrictive policies only for the commands that authenticated clients use.
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = 'public' AND tablename = 'ai_conversations'
+      AND permissive = 'RESTRICTIVE' AND cmd = 'SELECT'
+      AND 'authenticated' = ANY(roles)
+  ) OR NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = 'public' AND tablename = 'ai_conversations'
+      AND permissive = 'RESTRICTIVE' AND cmd = 'INSERT'
+      AND 'authenticated' = ANY(roles)
+  ) THEN
+    RAISE EXCEPTION 'ai_conversations missing restrictive SELECT or INSERT policy';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = 'public' AND tablename = 'ai_messages'
+      AND permissive = 'RESTRICTIVE' AND cmd = 'SELECT'
+      AND 'authenticated' = ANY(roles)
+  ) OR NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = 'public' AND tablename = 'ai_messages'
+      AND permissive = 'RESTRICTIVE' AND cmd = 'INSERT'
+      AND 'authenticated' = ANY(roles)
+  ) THEN
+    RAISE EXCEPTION 'ai_messages missing restrictive SELECT or INSERT policy';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = 'public' AND tablename = 'ai_message_sources'
+      AND permissive = 'RESTRICTIVE' AND cmd = 'SELECT'
+      AND 'authenticated' = ANY(roles)
+  ) THEN
+    RAISE EXCEPTION 'ai_message_sources missing restrictive SELECT policy';
+  END IF;
+
   -- The public RPC wrapper should be SECURITY INVOKER; the privileged helper
   -- belongs in private and must not be SECURITY INVOKER accidentally replaced.
   SELECT p.oid, p.prosecdef
