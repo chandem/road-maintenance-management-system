@@ -78,3 +78,21 @@ order by n.nspname;
 ```
 
 Then call `/rest/v1/rpc/has_department_role` with an authenticated test user's JWT and confirm it returns only the caller's own role membership result. An unauthenticated call must be rejected. Re-run Supabase Security Advisor; the exposed-schema SECURITY DEFINER warning for this helper should be gone.
+
+
+## Full department matrix for migration 012
+
+Use authenticated user JWTs and verify the direct Supabase Data API as well as the FastAPI endpoints.
+
+| Data area | Required department | Read roles | Write roles | Organization admin |
+|---|---|---|---|---|
+| Roads, sections, inspections, materials, maintenance plans, work orders | `road_asset` | manager, officer, read_only | manager, officer | full access |
+| Machinery | `machinery_maintenance` | manager, officer, read_only | manager, officer | full access |
+| General assets | `general_assets` | manager, officer, read_only | manager, officer | full access |
+| Budgets and expenses | `finance` | manager, officer, read_only | manager, officer | full access |
+| Employees | `human_resources` | manager, officer, read_only | manager, officer | full access |
+| Documents, document chunks, AI analysis runs, AI recommendations | organization admin only until document-level ACLs exist | organization admin | organization admin | full access |
+
+For each table, verify a user from a different department receives no rows on SELECT and cannot INSERT, UPDATE, or DELETE. Also test changing `organization_id` on UPDATE/INSERT, inactive memberships, missing roles, and another organization's IDs. The migration uses RESTRICTIVE policies so the pre-existing permissive organization policies cannot bypass department checks.
+
+The documents restriction is deliberately conservative. Do not open document search to department members until each document has an authoritative department classification and every keyword/semantic retrieval path enforces it before sending evidence to the model.
