@@ -180,7 +180,7 @@ def ask_document_question(
         evidence = [
             DocumentEvidence(
                 document_id=str(row["id"]),
-                title=row["title"],
+                title=row.get("title"),
                 document_type=row.get("document_type"),
                 snippet=_document_snippet(row.get("extracted_text"), question),
             )
@@ -337,7 +337,7 @@ async def classify_uploaded_document(
     )
 
 
-@router.post("/{{document_id}}/ingest", response_model=DocumentIngestionResponse)
+@router.post("/{document_id}/ingest", response_model=DocumentIngestionResponse)
 def reindex_document(
     document_id: UUID,
     current_user=Depends(get_current_user),
