@@ -200,6 +200,20 @@ BEGIN
     RAISE EXCEPTION 'private.has_department_role must be SECURITY DEFINER with search_path set to empty';
   END IF;
 
+  -- The exposed RPC wrapper is SECURITY INVOKER too; pin its path rather than
+  -- relying on ambient role/session configuration.
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_proc p
+    JOIN pg_namespace n ON n.oid = p.pronamespace
+    WHERE n.nspname = 'public'
+      AND p.proname = 'has_department_role'
+      AND NOT p.prosecdef
+      AND p.proconfig @> ARRAY['search_path=""']
+  ) THEN
+    RAISE EXCEPTION 'public.has_department_role must be SECURITY INVOKER with empty search_path';
+  END IF;
+
   -- The SECURITY INVOKER public wrapper calls the private helper as the caller.
   -- Schema USAGE is therefore required for authenticated users, but not anon.
   IF NOT has_schema_privilege('authenticated', 'private', 'USAGE') THEN
@@ -296,9 +310,9 @@ BEGIN
     WHERE n.nspname = 'private'
       AND p.proname = 'is_org_admin'
       AND p.prosecdef
-      AND coalesce(array_to_string(p.proconfig, ','), '') LIKE '%search_path=%'
+      AND p.proconfig @> ARRAY['search_path=""']
   ) THEN
-    RAISE EXCEPTION 'private.is_org_admin SECURITY DEFINER helper with fixed search_path is missing';
+    RAISE EXCEPTION 'private.is_org_admin must be SECURITY DEFINER with empty search_path';
   END IF;
 
   IF NOT has_function_privilege(
@@ -450,9 +464,9 @@ BEGIN
     WHERE n.nspname = 'private'
       AND p.proname = 'enforce_road_section_organization'
       AND p.prosecdef
-      AND coalesce(array_to_string(p.proconfig, ','), '') LIKE '%search_path=%'
+      AND p.proconfig @> ARRAY['search_path=""']
   ) THEN
-    RAISE EXCEPTION 'Road-section trigger function must be SECURITY DEFINER with a fixed search_path';
+    RAISE EXCEPTION 'Road-section trigger function must be SECURITY DEFINER with empty search_path';
   END IF;
 
   IF has_function_privilege(
