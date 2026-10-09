@@ -13,8 +13,9 @@ ALTER FUNCTION public.has_department_role(uuid, text, text[]) SET SCHEMA private
 
 REVOKE EXECUTE ON FUNCTION private.has_department_role(uuid, text, text[]) FROM PUBLIC;
 REVOKE EXECUTE ON FUNCTION private.has_department_role(uuid, text, text[]) FROM anon;
+REVOKE EXECUTE ON FUNCTION private.has_department_role(uuid, text, text[]) FROM service_role;
 GRANT EXECUTE ON FUNCTION private.has_department_role(uuid, text, text[]) TO authenticated;
-GRANT EXECUTE ON FUNCTION private.has_department_role(uuid, text, text[]) TO service_role;
+-- Do not grant service_role access: it bypasses RLS and does not need this user-role helper.
 
 CREATE OR REPLACE FUNCTION public.has_department_role(
   p_organization_id uuid,
@@ -37,7 +38,7 @@ $wrapper$;
 REVOKE EXECUTE ON FUNCTION public.has_department_role(uuid, text, text[]) FROM PUBLIC;
 REVOKE EXECUTE ON FUNCTION public.has_department_role(uuid, text, text[]) FROM anon;
 GRANT EXECUTE ON FUNCTION public.has_department_role(uuid, text, text[]) TO authenticated;
-GRANT EXECUTE ON FUNCTION public.has_department_role(uuid, text, text[]) TO service_role;
+REVOKE EXECUTE ON FUNCTION public.has_department_role(uuid, text, text[]) FROM service_role;
 
 -- ROADS: all road-asset roles may read; managers/officers may create, edit, or delete.
 DROP POLICY IF EXISTS road_asset_department_select ON public.roads;
