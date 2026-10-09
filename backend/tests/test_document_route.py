@@ -47,3 +47,61 @@ def test_document_upload_rejects_oversized_content_with_bounded_read(monkeypatch
     assert error.value.status_code == 413
     assert upload.read_size == document_routes.MAX_FILE_SIZE + 1
 
+class ReindexDocumentQuery:
+    def __init__(self, row):
+        self.row = row
+
+    def select(self, *_args, **_kwargs):
+        return self
+
+    def eq(self, *_args, **_kwargs):
+        return self
+
+    def maybe_single(self):
+        return self
+
+    def execute(self):
+        return SimpleNamespace(data=self.row)
+
+
+class ReindexDocumentClient:
+    def __init__(self, row):
+        self.row = row
+
+    def table(self, name):
+        assert name == "documents"
+        return ReindexDocumentQuery(self.row)
+
+
+def test_read_only_user_cannot_reindex_document(monkeypatch):
+    from uuid import UUID
+
+    row = {
+        "id": "00000000-0000-0000-0000-000000000001",
+        "title": "Road plan",
+        "organization_id": "org-1",
+        "department_code": "road_asset",
+        "extracted_text": "Road maintenance content",
+        "extraction_status": "completed",
+    }
+    client = ReindexDocumentClient(row)
+
+    def deny_write(_user, _row, *, write=False):
+        assert write is True
+        raise HTTPException(status_code=403, detail="Read-only role cannot reindex")
+
+    monkeypatch.setattr(document_routes, "_authorize_document_row", deny_write)
+    monkeypatch.setattr(
+        document_routes,
+        "ingest_document_chunks",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("reindex must not run")),
+    )
+
+    with pytest.raises(HTTPException) as error:
+        document_routes.reindex_document(
+            UUID(row["id"]),
+            current_user={"id": "read-only-user", "client": client},
+        )
+
+    assert error.value.status_code == 403
+
