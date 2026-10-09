@@ -149,3 +149,41 @@ Staging checks:
 - [ ] Confirm trigger behavior with authenticated JWTs because the trigger function is SECURITY DEFINER, uses an empty search_path, and is revoked from API roles for direct execution.
 
 Migration order for a full staging run: 011 (role helper and road RLS), 012 (module RLS), 013 (document ACL), 014 (conversation schema/RLS), 015 (road-section organization integrity). Validate dependencies and existing policies before executing this sequence in any environment.
+
+
+## Automated catalog regression check
+
+After applying migrations 011-015 to an isolated staging database, run
+`database/tests/authorization_catalog_checks.sql` as a database administrator.
+It is read-only and verifies that required tables exist, RLS is enabled, authenticated
+policies are present, the department-role helper has the intended security modes,
+document department classification exists, the road-section integrity trigger exists,
+and semantic search remains SECURITY INVOKER.
+
+A successful catalog check is only a structural check. It does not prove the policies
+permit or deny the correct rows. Run the JWT/Data API matrix above as well.
+
+## Additional AI message integrity gate
+
+The backend currently inserts both `role='user'` and `role='assistant'` messages
+using the caller's user-scoped JWT. Consequently, a database policy cannot safely
+distinguish a genuine backend-generated assistant reply from a direct Data API insert
+by that same authenticated user. Do not assume the RLS ownership policies prevent
+users from fabricating assistant-role messages.
+
+Before production, choose and implement one of these designs:
+- Route assistant-message writes through a narrowly scoped trusted backend operation
+  after it verifies conversation ownership and department access; or
+- Use a database RPC with a carefully constrained execution context that only the
+  backend can invoke, with explicit input validation and no general-purpose privilege
+  escalation.
+
+Then add a test that an ordinary authenticated user cannot directly insert
+`role='assistant'` or `role='system'`, while the authorized backend can persist
+the generated assistant response. Do not solve this by exposing the service-role key
+to the frontend or granting broad privileges to authenticated users.
+
+The source-type restrictions for non-admin AI evidence are limited to
+`road`, `road_section`, `maintenance_plan`, and `work_order`. Other source types
+must remain unavailable to non-admin users until record-level authorization is
+implemented for them.
