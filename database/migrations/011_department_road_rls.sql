@@ -14,8 +14,12 @@ ALTER FUNCTION public.has_department_role(uuid, text, text[]) SET SCHEMA private
 REVOKE EXECUTE ON FUNCTION private.has_department_role(uuid, text, text[]) FROM PUBLIC;
 REVOKE EXECUTE ON FUNCTION private.has_department_role(uuid, text, text[]) FROM anon;
 REVOKE EXECUTE ON FUNCTION private.has_department_role(uuid, text, text[]) FROM service_role;
+
+-- SECURITY INVOKER callers must have schema USAGE as well as function EXECUTE.
+-- The private schema remains unexposed through PostgREST; do not grant service_role
+-- access because it bypasses RLS and does not need this user-role helper.
+GRANT USAGE ON SCHEMA private TO authenticated;
 GRANT EXECUTE ON FUNCTION private.has_department_role(uuid, text, text[]) TO authenticated;
--- Do not grant service_role access: it bypasses RLS and does not need this user-role helper.
 
 CREATE OR REPLACE FUNCTION public.has_department_role(
   p_organization_id uuid,
