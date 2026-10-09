@@ -60,33 +60,30 @@ def log_analysis_run(
 def resolve_organization_id(client: Any, user_id: str) -> str | None:
     """Return the profile organization only when backed by active membership.
 
-    user_profiles.organization_id is user-editable under the current profile
-    policy, so it is a selector, not an authorization source. The active
-    organization_members row is authoritative.
+    Missing profile/membership data returns None. Database/query errors propagate
+    so authorization dependencies can distinguish an unavailable check (503)
+    from a user who is not an active organization member (403).
     """
-    try:
-        profile = (
-            client.table("user_profiles")
-            .select("organization_id")
-            .eq("id", user_id)
-            .maybe_single()
-            .execute()
-        )
-        organization_id = (profile.data or {}).get("organization_id")
-        if not organization_id:
-            return None
-
-        membership = (
-            client.table("organization_members")
-            .select("organization_id")
-            .eq("organization_id", organization_id)
-            .eq("user_id", user_id)
-            .eq("is_active", True)
-            .maybe_single()
-            .execute()
-        )
-        if not membership.data:
-            return None
-        return str(membership.data["organization_id"])
-    except Exception:
+    profile = (
+        client.table("user_profiles")
+        .select("organization_id")
+        .eq("id", user_id)
+        .maybe_single()
+        .execute()
+    )
+    organization_id = (profile.data or {}).get("organization_id")
+    if not organization_id:
         return None
+
+    membership = (
+        client.table("organization_members")
+        .select("organization_id")
+        .eq("organization_id", organization_id)
+        .eq("user_id", user_id)
+        .eq("is_active", True)
+        .maybe_single()
+        .execute()
+    )
+    if not membership.data:
+        return None
+    return str(membership.data["organization_id"])
