@@ -138,6 +138,9 @@ BEGIN
   IF has_table_privilege('authenticated', 'public.ai_messages', 'UPDATE') THEN
     RAISE EXCEPTION 'authenticated role unexpectedly has UPDATE privilege on ai_messages';
   END IF;
+  IF has_table_privilege('authenticated', 'public.ai_messages', 'DELETE') THEN
+    RAISE EXCEPTION 'authenticated role unexpectedly has DELETE privilege on ai_messages';
+  END IF;
 
   -- Authenticated users must not be able to fabricate AI evidence/source rows.
   IF has_table_privilege('authenticated', 'public.ai_message_sources', 'INSERT') THEN
