@@ -2,7 +2,7 @@ import json
 from pathlib import Path
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 
 from app.api.dependencies import get_current_user
 from app.core.config import get_settings
@@ -16,6 +16,10 @@ from app.schemas.documents import (
     DocumentSearchRequest,
     DocumentSearchResponse,
     DocumentSearchResult,
+    DocumentSummary,
+    SemanticSearchMatch,
+    SemanticSearchRequest,
+    SemanticSearchResponse,
 )
 from app.services.ai_provider import generate_text
 from app.services.document_extraction import extract_text
@@ -50,7 +54,7 @@ def _document_snippet(text: str | None, query: str, max_length: int = 240) -> st
     if end < len(normalized_text):
         snippet += "…"
     if len(snippet) > max_length:
-        snippet = snippet[:max_length - 1].rstrip() + "…"
+        snippet = snippet[: max_length - 1].rstrip() + "…"
     return snippet
 
 
@@ -67,6 +71,83 @@ def _organization_id(current_user) -> str:
     if not organization_id:
         raise HTTPException(status_code=409, detail="User is not assigned to an organization.")
     return str(organization_id)
+
+
+@router.get("", response_model=list[DocumentSummary])
+def list_documents(
+    current_user=Depends(get_current_user),
+    limit: int = Query(default=50, ge=1, le=200),
+    document_type: str | None = Query(default=None, max_length=100),
+):
+    """List documents for the caller's organization."""
+    query = (
+        current_user["client"]
+        .table("documents")
+        .select(
+            "id,title,document_type,status,extraction_status,document_date,"
+            "file_size_bytes,classification_confidence,created_at"
+        )
+        .order("created_at", desc=True)
+        .limit(limit)
+    )
+    if document_type:
+        query = query.eq("document_type", document_type)
+    rows = query.execute().data or []
+    return [
+        DocumentSummary(
+            id=str(row["id"]),
+            title=row["title"],
+            document_type=row.get("document_type"),
+            status=row["status"],
+            extraction_status=row["extraction_status"],
+            document_date=str(row["document_date"]) if row.get("document_date") else None,
+            file_size_bytes=row.get("file_size_bytes"),
+            classification_confidence=(
+                float(row["classification_confidence"])
+                if row.get("classification_confidence") is not None
+                else None
+            ),
+            created_at=row.get("created_at"),
+        )
+        for row in rows
+    ]
+
+
+@router.get("/{document_id}", response_model=DocumentSummary)
+def get_document(
+    document_id: UUID,
+    current_user=Depends(get_current_user),
+):
+    """Get one document summary by ID."""
+    row = (
+        current_user["client"]
+        .table("documents")
+        .select(
+            "id,title,document_type,status,extraction_status,document_date,"
+            "file_size_bytes,classification_confidence,created_at"
+        )
+        .eq("id", str(document_id))
+        .maybe_single()
+        .execute()
+    )
+    if not row.data:
+        raise HTTPException(status_code=404, detail="Document not found")
+    data = row.data
+    return DocumentSummary(
+        id=str(data["id"]),
+        title=data["title"],
+        document_type=data.get("document_type"),
+        status=data["status"],
+        extraction_status=data["extraction_status"],
+        document_date=str(data["document_date"]) if data.get("document_date") else None,
+        file_size_bytes=data.get("file_size_bytes"),
+        classification_confidence=(
+            float(data["classification_confidence"])
+            if data.get("classification_confidence") is not None
+            else None
+        ),
+        created_at=data.get("created_at"),
+    )
 
 
 @router.post("/classify", response_model=DocumentClassificationResponse)
@@ -88,6 +169,7 @@ def search_documents(
     request: DocumentSearchRequest,
     current_user=Depends(get_current_user),
 ):
+    """Keyword search over document titles and extracted text."""
     query = request.query.strip()
     escaped_query = query.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
     pattern = f"%{escaped_query}%"
@@ -117,14 +199,62 @@ def search_documents(
     return DocumentSearchResponse(query=query, results=results)
 
 
+@router.post("/semantic-search", response_model=SemanticSearchResponse)
+def semantic_search_documents(
+    request: SemanticSearchRequest,
+    current_user=Depends(get_current_user),
+):
+    """Vector search over organization document chunks (Step 4)."""
+    organization_id = _organization_id(current_user)
+    matches = search_document_chunks(
+        request.query,
+        organization_id=organization_id,
+        access_token=current_user["access_token"],
+        limit=request.limit,
+        minimum_similarity=request.minimum_similarity,
+    )
+    if not matches:
+        return SemanticSearchResponse(query=request.query, match_count=0, matches=[])
+
+    document_ids = list(dict.fromkeys(m.document_id for m in matches))
+    documents = (
+        current_user["client"]
+        .table("documents")
+        .select("id,title,document_type")
+        .in_("id", document_ids)
+        .execute()
+        .data
+        or []
+    )
+    metadata = {str(row["id"]): row for row in documents}
+
+    enriched = [
+        SemanticSearchMatch(
+            chunk_id=m.chunk_id,
+            document_id=m.document_id,
+            title=(metadata.get(m.document_id) or {}).get("title"),
+            document_type=(metadata.get(m.document_id) or {}).get("document_type"),
+            content=m.content,
+            similarity=m.similarity,
+        )
+        for m in matches
+    ]
+    return SemanticSearchResponse(
+        query=request.query,
+        match_count=len(enriched),
+        matches=enriched,
+    )
+
+
 @router.post("/question", response_model=DocumentQuestionResponse)
 def ask_document_question(
     request: DocumentQuestionRequest,
     current_user=Depends(get_current_user),
 ):
-    """Answer using semantic document evidence, with keyword retrieval as fallback."""
+    """Evidence-based Q&A: semantic retrieval first, keyword fallback."""
     question = request.question.strip()
     evidence: list[DocumentEvidence] = []
+    retrieval_method = "none"
 
     if not request.document_type:
         try:
@@ -151,13 +281,20 @@ def ask_document_question(
                 evidence = [
                     DocumentEvidence(
                         document_id=match.document_id,
-                        title=metadata[match.document_id]["title"],
-                        document_type=metadata[match.document_id].get("document_type"),
+                        title=str(
+                            (metadata.get(match.document_id) or {}).get("title")
+                            or match.document_id
+                        ),
+                        document_type=(metadata.get(match.document_id) or {}).get(
+                            "document_type"
+                        ),
                         snippet=match.content[:500].strip(),
                     )
                     for match in matches
                     if match.document_id in metadata
                 ]
+                if evidence:
+                    retrieval_method = "semantic"
         except Exception:
             evidence = []
 
@@ -180,12 +317,14 @@ def ask_document_question(
         evidence = [
             DocumentEvidence(
                 document_id=str(row["id"]),
-                title=row.get("title"),
+                title=str(row.get("title") or row["id"]),
                 document_type=row.get("document_type"),
                 snippet=_document_snippet(row.get("extracted_text"), question),
             )
             for row in rows
         ]
+        if evidence:
+            retrieval_method = "keyword"
 
     if not evidence:
         return DocumentQuestionResponse(
@@ -196,6 +335,7 @@ def ask_document_question(
             ),
             evidence=[],
             ai_generated=False,
+            retrieval_method="none",
         )
 
     settings = get_settings()
@@ -208,6 +348,7 @@ def ask_document_question(
             ),
             evidence=evidence,
             ai_generated=False,
+            retrieval_method=retrieval_method,
         )
 
     context = [
@@ -243,6 +384,7 @@ def ask_document_question(
         answer=answer,
         evidence=evidence,
         ai_generated=bool(ai_result),
+        retrieval_method=retrieval_method,
     )
 
 
@@ -251,7 +393,7 @@ async def classify_uploaded_document(
     file: UploadFile = File(...),
     current_user=Depends(get_current_user),
 ):
-    """Upload → extract → classify → store → chunk → embed (Step 3 pipeline)."""
+    """Upload → extract → classify → store → chunk → embed."""
     filename = Path(file.filename or "").name
     suffix = Path(filename).suffix.lower()
     if not filename or suffix not in ALLOWED_EXTENSIONS:
@@ -342,7 +484,7 @@ def reindex_document(
     document_id: UUID,
     current_user=Depends(get_current_user),
 ):
-    """Re-run chunk + embed for an existing document (Step 3 re-index)."""
+    """Re-run chunk + embed for an existing document."""
     organization_id = _organization_id(current_user)
     supabase = current_user["client"]
 
