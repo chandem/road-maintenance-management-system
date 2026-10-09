@@ -4,8 +4,36 @@
 -- Existing permissive organization-membership policies remain in place and are narrowed
 -- by these RESTRICTIVE policies (Postgres combines restrictive policies with AND).
 
--- has_department_role is SECURITY DEFINER and only needs to be callable by signed-in
--- users for RLS checks. Remove the default PUBLIC and anonymous execution grants.
+-- Move the privileged lookup into the non-exposed private schema. Keep a
+-- SECURITY INVOKER wrapper in public so the backend can continue using PostgREST
+-- RPC without exposing a SECURITY DEFINER function through the Data API.
+REVOKE EXECUTE ON FUNCTION public.has_department_role(uuid, text, text[]) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.has_department_role(uuid, text, text[]) FROM anon;
+ALTER FUNCTION public.has_department_role(uuid, text, text[]) SET SCHEMA private;
+
+REVOKE EXECUTE ON FUNCTION private.has_department_role(uuid, text, text[]) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION private.has_department_role(uuid, text, text[]) FROM anon;
+GRANT EXECUTE ON FUNCTION private.has_department_role(uuid, text, text[]) TO authenticated;
+GRANT EXECUTE ON FUNCTION private.has_department_role(uuid, text, text[]) TO service_role;
+
+CREATE OR REPLACE FUNCTION public.has_department_role(
+  p_organization_id uuid,
+  p_department_code text,
+  p_allowed_roles text[] DEFAULT NULL::text[]
+)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY INVOKER
+SET search_path = ''
+AS $wrapper$
+  SELECT private.has_department_role(
+    p_organization_id,
+    p_department_code,
+    p_allowed_roles
+  );
+$wrapper$;
+
 REVOKE EXECUTE ON FUNCTION public.has_department_role(uuid, text, text[]) FROM PUBLIC;
 REVOKE EXECUTE ON FUNCTION public.has_department_role(uuid, text, text[]) FROM anon;
 GRANT EXECUTE ON FUNCTION public.has_department_role(uuid, text, text[]) TO authenticated;
@@ -167,6 +195,10 @@ CREATE POLICY road_asset_department_delete
     )
   );
 
+-- This migration changes the function's schema while preserving the public RPC
+-- signature. Verify PostgREST can still resolve public.has_department_role after
+-- applying to a non-production database.
+--
 -- Before applying in production, verify section organization_id coverage and test:
 -- 1) org admin retains access; 2) road_asset manager/officer can read/write;
 -- 3) road_asset read_only can read but cannot write; 4) other departments and
