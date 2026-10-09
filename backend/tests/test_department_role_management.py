@@ -79,7 +79,7 @@ class Query:
 
 
 class Client:
-    def __init__(self, *, role="admin", active_member=True, department=True, target_member=True):
+    def __init__(self, *, role="admin", active_member=True, department=True, target_member=True, target_active=True):
         self.rows = {
             "organization_members": ([{
                 "organization_id": ORG,
@@ -90,7 +90,7 @@ class Client:
                 "organization_id": ORG,
                 "user_id": TARGET,
                 "role": "member",
-                "is_active": True,
+                "is_active": target_active,
             }] if target_member else [])),
             "departments": ([{"id": DEPT, "organization_id": ORG}] if department else []),
             "user_department_roles": ([{
@@ -177,9 +177,10 @@ def test_cannot_assign_role_for_department_outside_organization(monkeypatch):
     assert client.upserted is None
 
 
-def test_cannot_assign_role_to_inactive_or_nonmember_user(monkeypatch):
+@pytest.mark.parametrize("target_member,target_active", [(False, True), (True, False)])
+def test_cannot_assign_role_to_inactive_or_nonmember_user(monkeypatch, target_member, target_active):
     patch_org(monkeypatch)
-    client = Client(target_member=False)
+    client = Client(target_member=target_member, target_active=target_active)
     payload = departments.DepartmentRoleAssignment(
         user_id=UUID(TARGET), department_id=UUID(DEPT), role="officer"
     )
