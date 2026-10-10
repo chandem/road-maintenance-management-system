@@ -77,3 +77,46 @@ EXECUTE FUNCTION private.enforce_road_section_organization();
 
 COMMENT ON FUNCTION private.enforce_road_section_organization() IS
   'Derives road_sections.organization_id from the parent road and rejects cross-organization references.';
+
+
+-- Prevent a parent road from changing organizations while it has sections.
+-- The section trigger alone cannot protect against a parent-row organization
+-- change, because that update does not fire a trigger on road_sections.
+CREATE OR REPLACE FUNCTION private.prevent_road_organization_change_with_sections()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $function$
+BEGIN
+  IF NEW.organization_id IS DISTINCT FROM OLD.organization_id
+     AND EXISTS (
+       SELECT 1
+       FROM public.road_sections AS s
+       WHERE s.road_id = OLD.id
+     ) THEN
+    RAISE EXCEPTION
+      'Cannot change a road organization while road sections exist; use an explicit, validated transfer workflow'
+      USING ERRCODE = '23514';
+  END IF;
+
+  RETURN NEW;
+END;
+$function$;
+
+REVOKE ALL ON FUNCTION private.prevent_road_organization_change_with_sections() FROM PUBLIC;
+REVOKE ALL ON FUNCTION private.prevent_road_organization_change_with_sections() FROM anon;
+REVOKE ALL ON FUNCTION private.prevent_road_organization_change_with_sections() FROM authenticated;
+REVOKE ALL ON FUNCTION private.prevent_road_organization_change_with_sections() FROM service_role;
+
+DROP TRIGGER IF EXISTS prevent_road_organization_change_with_sections
+  ON public.roads;
+
+CREATE TRIGGER prevent_road_organization_change_with_sections
+BEFORE UPDATE OF organization_id
+ON public.roads
+FOR EACH ROW
+EXECUTE FUNCTION private.prevent_road_organization_change_with_sections();
+
+COMMENT ON FUNCTION private.prevent_road_organization_change_with_sections() IS
+  'Blocks road organization changes while sections exist; requires a separate validated transfer workflow.';
