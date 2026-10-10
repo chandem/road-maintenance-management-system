@@ -497,7 +497,9 @@ BEGIN
      OR has_column_privilege('authenticated', 'public.user_profiles', 'department_id', 'INSERT')
      OR has_column_privilege('authenticated', 'public.user_profiles', 'employee_code', 'INSERT')
      OR has_column_privilege('authenticated', 'public.user_profiles', 'is_active', 'INSERT')
-     OR has_column_privilege('authenticated', 'public.user_profiles', 'job_title', 'INSERT') THEN
+     OR has_column_privilege('authenticated', 'public.user_profiles', 'job_title', 'INSERT')
+     OR has_column_privilege('authenticated', 'public.user_profiles', 'created_at', 'INSERT')
+     OR has_column_privilege('authenticated', 'public.user_profiles', 'updated_at', 'INSERT') THEN
     RAISE EXCEPTION 'authenticated retains INSERT privilege on protected user_profiles columns';
   END IF;
 
@@ -510,7 +512,9 @@ BEGIN
      OR has_column_privilege('authenticated', 'public.user_profiles', 'employee_code', 'UPDATE')
      OR has_column_privilege('authenticated', 'public.user_profiles', 'is_active', 'UPDATE')
      OR has_column_privilege('authenticated', 'public.user_profiles', 'job_title', 'UPDATE')
-     OR has_column_privilege('authenticated', 'public.user_profiles', 'id', 'UPDATE') THEN
+     OR has_column_privilege('authenticated', 'public.user_profiles', 'id', 'UPDATE')
+     OR has_column_privilege('authenticated', 'public.user_profiles', 'created_at', 'UPDATE')
+     OR has_column_privilege('authenticated', 'public.user_profiles', 'updated_at', 'UPDATE') THEN
     RAISE EXCEPTION 'authenticated retains UPDATE privilege on protected user_profiles columns';
   END IF;
 END;
