@@ -310,3 +310,36 @@ def test_target_membership_lookup_failure_returns_service_unavailable(monkeypatc
 
     assert exc.value.status_code == 503
     assert client.upserted is None
+
+
+def test_assignment_write_failure_returns_service_unavailable(monkeypatch):
+    patch_org(monkeypatch)
+
+    class BrokenRoleWriteClient(Client):
+        def table(self, name):
+            if name == "user_department_roles":
+                return BrokenQuery(self, name)
+            return super().table(name)
+
+    payload = departments.DepartmentRoleAssignment(
+        user_id=UUID(TARGET), department_id=UUID(DEPT), role="officer"
+    )
+    with pytest.raises(HTTPException) as exc:
+        departments.assign_department_role(payload, current_user(BrokenRoleWriteClient()))
+
+    assert exc.value.status_code == 503
+
+
+def test_revoke_write_failure_returns_service_unavailable(monkeypatch):
+    patch_org(monkeypatch)
+
+    class BrokenRoleWriteClient(Client):
+        def table(self, name):
+            if name == "user_department_roles":
+                return BrokenQuery(self, name)
+            return super().table(name)
+
+    with pytest.raises(HTTPException) as exc:
+        departments.revoke_department_role(UUID(ASSIGNMENT), current_user(BrokenRoleWriteClient()))
+
+    assert exc.value.status_code == 503
