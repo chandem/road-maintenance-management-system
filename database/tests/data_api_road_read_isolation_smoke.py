@@ -10,8 +10,10 @@ Required environment variables:
   STAGING_ROAD_ID            ID of one seeded road in the test organization
   TOKEN_ORG_ADMIN            access token for active org owner/admin
   TOKEN_ROAD_MANAGER         access token for active road_asset manager/officer
+  TOKEN_ROAD_READ_ONLY       access token for active road_asset read_only member
   TOKEN_FINANCE_MANAGER      access token for finance-only member
   TOKEN_NO_DEPARTMENT_ROLE   access token for active member with no department role
+  TOKEN_INACTIVE_MEMBER      valid token for user with inactive organization membership
   TOKEN_OTHER_ORG            access token for member of a different organization
 
 The script expects the admin and road manager to see STAGING_ROAD_ID and the
@@ -54,8 +56,10 @@ def main() -> int:
     identities = {
         "org_admin": (required("TOKEN_ORG_ADMIN"), True),
         "road_manager": (required("TOKEN_ROAD_MANAGER"), True),
+        "road_read_only": (required("TOKEN_ROAD_READ_ONLY"), True),
         "finance_only": (required("TOKEN_FINANCE_MANAGER"), False),
         "no_department_role": (required("TOKEN_NO_DEPARTMENT_ROLE"), False),
+        "inactive_org_member": (required("TOKEN_INACTIVE_MEMBER"), False),
         "other_organization": (required("TOKEN_OTHER_ORG"), False),
     }
 
@@ -107,8 +111,50 @@ def main() -> int:
             print(f"- {failure}", file=sys.stderr)
         return 1
 
-    print("\nRead-only road SELECT smoke test passed.")
-    print("Note: this checks one row and SELECT visibility only; run the full JWT/RLS matrix.")
+    # Verify the exposed helper RPC rejects anonymous callers. A successful HTTP
+    # response is a failure even if the function returns false: the release
+    # requirement is that the anon role cannot execute this SECURITY DEFINER helper.
+    rpc_endpoint = base_url + "/rest/v1/rpc/has_department_role"
+    rpc_body = json.dumps({
+        "p_organization_id": "00000000-0000-0000-0000-000000000000",
+        "p_department_code": "road_asset",
+        "p_allowed_roles": ["department_manager"],
+    }).encode("utf-8")
+    rpc_request = Request(
+        rpc_endpoint,
+        data=rpc_body,
+        headers={
+            "apikey": anon_key,
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+        },
+        method="POST",
+    )
+    try:
+        with urlopen(rpc_request, timeout=20) as response:
+            failures.append(
+                "anonymous_rpc: expected execution to be denied, "
+                f"but RPC returned HTTP {response.status}"
+            )
+    except HTTPError as exc:
+        if exc.code in (401, 403, 404):
+            print(f"PASS anonymous_rpc: helper execution denied with HTTP {exc.code}")
+        else:
+            failures.append(
+                f"anonymous_rpc: expected HTTP 401/403/404, got HTTP {exc.code}"
+            )
+    except (URLError, TimeoutError) as exc:
+        failures.append(f"anonymous_rpc: request error: {exc}")
+
+    if failures:
+        print("\nFAILURES:", file=sys.stderr)
+        for failure in failures:
+            print(f"- {failure}", file=sys.stderr)
+        return 1
+
+    print("\nRead-only road SELECT + anonymous helper RPC smoke test passed.")
+    print("Note: this checks one row and SELECT visibility plus anonymous RPC denial; "
+          "run the full JWT/RLS CRUD matrix.")
     return 0
 
 
