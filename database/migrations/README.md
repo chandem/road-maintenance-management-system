@@ -173,3 +173,38 @@ This is a defensive source change, not a production fix already executed.
 Validate the dynamic `REVOKE` block on an isolated staging project and rerun
 the catalog test there. The migration remains unapproved for production until
 the full staging JWT/API test matrix passes.
+
+## Step 36 — static consistency review of release gates
+
+A source-only cross-check was completed for migrations 014–018, the authorization
+catalog checks, the read-only release preflight, and the staging runbook.
+
+- Migration 016's 23-table revoke list matches the catalog test's structural
+  privilege-check list. It intentionally removes only `TRUNCATE`,
+  `REFERENCES`, and `TRIGGER`; ordinary DML grants remain subject to RLS.
+- Migration 014 creates the three AI conversation tables before 016 references
+  them, resets authenticated grants, and gives the backend service role only
+  the documented conversation/message/source operations.
+- Migration 015's triggers derive section organization from the parent road and
+  prevent changing a road's organization while sections exist. Its preflight
+  still needs non-empty valid and invalid test fixtures; the empty production
+  table is not a meaningful behavior test.
+- Migration 017 changes the onboarding RPC's search path and removes direct
+  `service_role` execution. The deployed onboarding body and all backend call
+  paths must be confirmed in staging before accepting these changes; the live
+  production function differs from the repository proposal.
+- Migration 018's dynamic column-level `REVOKE` and the corresponding
+  `has_column_privilege` checks are structurally aligned. Neither has been
+  executed against PostgreSQL in this workflow, so parser/runtime validity is
+  still unverified.
+- The catalog test deliberately checks policy names/expressions as well as
+  grants, but catalog checks cannot prove actual row visibility, PostgREST
+  behavior, service-role parent authorization, or frontend compatibility.
+
+**Gate result: source consistency review only; staging gate remains BLOCKED.**
+There is no isolated staging database available in the current workflow, and
+the user previously declined a billable Supabase development branch. No paid
+resource was created. Do not apply these proposals to production, merge the PR,
+or create paid infrastructure without explicit approval. The next real gate is
+to obtain an approved isolated staging database, run the SQL scripts and
+migrations there, and complete the authenticated-JWT/API matrix.
