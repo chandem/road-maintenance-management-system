@@ -69,6 +69,13 @@ The backend conversation route reads conversations and messages with the caller'
 
 The catalog regression script has now been strengthened to explicitly verify that `authenticated` can execute `private.is_org_member(uuid)`, which is used by the migration 014 conversation policies. This is a source change only; the SQL script has not been run against production or an isolated staging database. The grant's presence and actual policy behavior still require a controlled database test.
 
+
+### 10. AI message insertion must enforce conversation ownership for administrators too
+
+A static review of migration 014 found that the restrictive authenticated INSERT policy for `ai_messages` allowed the organization-admin branch to bypass the `created_by = auth.uid()` check. That meant an administrator could directly insert a `role='user'` message into another user's conversation, despite the policy comment promising that callers can submit only their own user-role messages.
+
+The source proposal was corrected so every authenticated user-message insert must target a conversation they created; organization-admin status or an active road-asset writer role is checked in addition to that ownership condition. This prevents direct Data API impersonation at the policy level. It is a source-only fix and has not been applied to production or verified with live JWTs. Add an authenticated integration case proving that an administrator cannot post into another user's conversation before approving the migration.
+
 ## Safe next steps
 
 1. Reconcile the repository migration files with the applied production migration ledger; assign unique ordered identifiers to new migrations.
