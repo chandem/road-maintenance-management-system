@@ -22,9 +22,11 @@ Supabase reports these applied migration names at the latest version:
 
 ## Findings and blockers
 
-### 1. Migration naming/sequence needs reconciliation
+### 1. Migration history and source-control ledger need reconciliation
 
-The repository contains `011_department_road_rls.sql` and `014_ai_conversation_department_rls.sql`, but production already records migrations labelled `011` and `014` with different purposes. These files must not be treated as a straightforward continuation of the production history. Reconcile the repo migration ledger with the live Supabase migration history and give any new migrations unique, properly ordered migration identifiers before applying them.
+The live Supabase migration ledger uses timestamp versions (for example, `20261009115651` through `20261009115736`) with descriptive names such as `seed_core_departments_011` and `department_role_policies_014`. The repository also contains proposal files named `011_department_road_rls.sql` and `014_ai_conversation_department_rls.sql`.
+
+This is a **source-control naming/ledger reconciliation issue, not proof of a duplicate live migration version**: the live versions are timestamps, while the repository filenames use descriptive numeric prefixes. Before deployment, map each proposal to a unique timestamped migration version and verify the repository contains the SQL that corresponds to the migrations already applied. Do not rename or replay already-applied production migrations, and do not assume the numbered filenames match the live ledger entries.
 
 ### 2. The live security advisor reports exposed SECURITY DEFINER functions
 
