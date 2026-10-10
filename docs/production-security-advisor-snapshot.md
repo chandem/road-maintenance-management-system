@@ -51,7 +51,6 @@ Do not assume proposed repository migrations with similar numbering or functiona
 - Advisor findings are warnings requiring review; they are not proof that a specific exploit was exercised.
 - CI success does not establish database authorization correctness.
 
-
 ## Additional live catalog inspection (read-only)
 
 A follow-up read-only query through `information_schema.routines` and `information_schema.routine_privileges` returned these live observations:
@@ -72,11 +71,11 @@ A fresh read-only Supabase security-advisor query at 09:25:13 UTC returned the s
 
 The migration ledger was also re-read and still reports 13 applied migrations; the five department/role entries remain without recovered exact source SQL. Searches of repository commit history for their migration labels and helper names did not recover matching commits. No production changes were made. These findings remain open until the exact applied SQL is reconciled and a reviewed remediation is tested outside production. The onboarding RPC may be intentionally callable by authenticated users, but its grants and guard must be validated against the recovered source and application flow.
 
-## CI status
+## CI and deployment status — latest checked commit
 
-GitHub Actions completed successfully for the preceding code/documentation head `40a025bb2b6e156054e7d01f6df59662d2eec079`:
+The latest documentation commit checked was `c4a9283214e026b1a0ebab3f967ed8c08d03f039` (`docs: keep advisor CI note commit-agnostic`). GitHub Actions workflow-run lookup returned successful completed runs for both workflows:
 
-- [Backend Tests](https://github.com/chandem/road-maintenance-management-system/actions/runs/38040120480)
-- [Frontend Build](https://github.com/chandem/road-maintenance-management-system/actions/runs/38040120380)
+- [Backend Tests](https://github.com/chandem/road-maintenance-management-system/actions/runs/38041372092)
+- [Frontend Build](https://github.com/chandem/road-maintenance-management-system/actions/runs/38041372083)
 
-The latest snapshot commits update documentation only. The workflow-run lookup returned no runs for the documentation update, so its GitHub Actions status is not yet confirmed. Vercel status checks report a build-rate-limit failure. This is separate from the successful prior GitHub Actions backend and frontend checks. CI success does not validate production RLS or database migration correctness.
+The combined commit status still reports Vercel status-check failures due to the free-plan daily deployment limit (`api-deployments-free-per-day`). PR comments also show earlier preview deployments as Ready, so this limit failure should not be described as proof that all previews are unavailable. GitHub Actions success does not validate production RLS or database migration correctness.
