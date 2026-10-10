@@ -95,3 +95,45 @@ Record the HTTP status and a redacted result for each test. Never record JWTs, A
 - [ ] A production-specific migration reconciliation, backup plan, and recovery plan are reviewed separately.
 
 If any item fails, stop, fix the proposal, and repeat staging from a clean baseline. Passing staging does not itself authorize production changes; production rollout requires a separate explicit decision.
+
+## Gate 8 — backup, failure handling, and recovery
+
+This is a preparation checklist, not evidence that a backup or restore has been performed. Complete it separately for staging and again for production.
+
+### Before each migration batch
+
+- [ ] Record the exact project ref, database version, current migration ledger, current branch/commit, and the migration file checksum or reviewed commit.
+- [ ] Confirm a recoverable database backup or provider-supported restore point exists and record its timestamp. Confirm the responsible operator has permission to restore it.
+- [ ] Export or capture the relevant pre-change catalog state: affected table columns, constraints, indexes, RLS flags/policies, grants, function definitions/owners/configuration, and trigger definitions.
+- [ ] Record baseline row counts and stable identifiers for affected tables; do not export real document contents or secrets into the repository.
+- [ ] Agree on a stop condition and recovery owner. Do not begin if a restore path is unverified.
+
+### If a migration errors or a verification fails
+
+1. Stop immediately. Do not run the remaining migrations and do not blindly rerun the failed file.
+2. Save the exact error, migration name, SQL editor output, migration ledger, and a redacted catalog snapshot.
+3. Determine whether the statement or earlier statements in that file committed. Do not assume the whole file was atomic unless it was explicitly executed in a transaction and PostgreSQL confirms rollback.
+4. Compare actual catalog/data state with the pre-migration snapshot. Identify completed statements, partial DDL, backfills, and any changed grants or policies.
+5. Prefer a reviewed, forward-only corrective migration when it is safe and data-preserving. If the state cannot be safely reconciled, restore to the approved recovery point under the recovery owner's direction.
+6. After recovery, rerun the read-only preflight, catalog checks, and affected JWT/Data API tests. Record the outcome before resuming.
+
+### Rollback limitations and data safety
+
+- Do not treat deleting a migration-ledger row as rollback; it does not reverse schema or data changes.
+- Do not use `DROP`, broad `REVOKE`, policy replacement, or table recreation as an improvised rollback.
+- A schema rollback may not restore data changed by backfills, triggers, or application writes. Review data-loss risk and application compatibility before any reverse operation.
+- For production, use the provider's approved point-in-time recovery/restore procedure if required; confirm the impact on writes made after the restore point before proceeding.
+- Do not restore production over staging or use staging fixtures in production.
+- No recovery action is authorized by a CI pass. Production recovery and migration application require an explicit, separately reviewed decision.
+
+### Recovery evidence to retain
+
+- [ ] Start/end timestamps and operator.
+- [ ] Project ref and database version (never keys or tokens).
+- [ ] Backup/restore-point identifier and restore verification result.
+- [ ] Failed migration and exact error, with secrets and personal data redacted.
+- [ ] Before/after migration ledger and catalog checks.
+- [ ] Corrective migration or restore reference, if any.
+- [ ] Results of preflight, catalog checks, JWT/Data API tests, and UI smoke tests.
+- [ ] Explicit go/no-go decision and outstanding risks.
+
