@@ -32,3 +32,12 @@ Current tests use fakes/test doubles; they do not prove PostgreSQL RLS or actual
 - Migrations applied: none
 - Real-user RLS validation claimed: no
 - PR #1 merged: no
+
+
+## Follow-up: cross-module office-assistant document evidence
+
+A follow-up source review found that the organization-admin-only `/ai/office-assistant` route passed semantic-search snippets directly into its prompt after supplying an organization filter, without independently checking each match's parent document metadata. This was weaker than the road-priority evidence path.
+
+The route now resolves matched document IDs through the caller's JWT-scoped `documents` query and includes snippets only when the parent document is verified to belong to the same organization. If the metadata query fails, document evidence is omitted (fail closed).
+
+Regression tests were added in `backend/tests/test_office_assistant_document_isolation.py` for cross-organization and missing-parent results, and for metadata lookup failure. These tests have been committed but have **not yet been executed** in this environment. They use test doubles and do not replace authenticated-JWT/RLS testing in isolated staging.
