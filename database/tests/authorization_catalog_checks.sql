@@ -644,6 +644,48 @@ BEGIN
     RAISE EXCEPTION 'road_sections.organization_id must be NOT NULL after migration 015';
   END IF;
 
+  -- A section trigger cannot catch a parent road's organization_id change.
+  -- Require the complementary road trigger to prevent cross-organization drift.
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_trigger t
+    WHERE t.tgrelid = 'public.roads'::regclass
+      AND t.tgname = 'prevent_road_organization_change_with_sections'
+      AND NOT t.tgisinternal
+  ) THEN
+    RAISE EXCEPTION 'road organization-change guard trigger is missing';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_proc p
+    JOIN pg_namespace n ON n.oid = p.pronamespace
+    WHERE n.nspname = 'private'
+      AND p.proname = 'prevent_road_organization_change_with_sections'
+      AND p.prosecdef
+      AND p.proconfig @> ARRAY['search_path=""']
+  ) THEN
+    RAISE EXCEPTION 'road organization-change guard must be SECURITY DEFINER with empty search_path';
+  END IF;
+
+  IF has_function_privilege(
+       'anon',
+       'private.prevent_road_organization_change_with_sections()',
+       'EXECUTE'
+     )
+     OR has_function_privilege(
+       'authenticated',
+       'private.prevent_road_organization_change_with_sections()',
+       'EXECUTE'
+     )
+     OR has_function_privilege(
+       'service_role',
+       'private.prevent_road_organization_change_with_sections()',
+       'EXECUTE'
+     ) THEN
+    RAISE EXCEPTION 'API roles unexpectedly have direct EXECUTE on road organization-change guard';
+  END IF;
+
   IF NOT EXISTS (
     SELECT 1
     FROM pg_proc p
