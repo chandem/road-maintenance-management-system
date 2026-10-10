@@ -17,7 +17,7 @@ replay an already-applied production migration.
 
 ## Proposed dependency order (not approved for production)
 
-The following order describes dependencies in the feature branch only:
+The following order describes dependencies in this feature branch only:
 
 1. `011_department_road_rls.sql` — moves the existing department-role helper
    into `private`, installs a SECURITY INVOKER public wrapper, and adds road
@@ -25,8 +25,8 @@ The following order describes dependencies in the feature branch only:
 2. `012_department_module_rls.sql` — adds department restrictions to module
    tables; depends on the helper/wrapper and existing organization RLS.
 3. `013_department_aware_document_access.sql` — adds
-   `documents.department_code` and parent-aware chunk policies; depends on
-   011–012.
+   `documents.department_code` and replaces the interim admin-only document
+   policies from 012; depends on 011–012.
 4. `014_ai_conversation_department_rls.sql` — creates missing conversation
    tables and their policies.
 5. `015_road_section_organization_integrity.sql` — preflights/backfills
@@ -48,6 +48,9 @@ policies, backend service-role paths, and frontend signup/profile flows.
   should be created without explicit approval.
 - Reconcile the source migration files with the timestamped production ledger
   and inspect actual function bodies, table grants, policies, and schema.
+- Run `database/tests/migration_release_preflight.sql` against the target
+  staging database. Resolve every BLOCKER before continuing. It is read-only;
+  it reports schema/catalog observations and does not modify data.
 - Run `database/tests/road_section_organization_preflight.sql` before 015.
 - Apply the proposal sequence only in staging; run
   `database/tests/authorization_catalog_checks.sql` after the schema changes.
@@ -65,9 +68,54 @@ policies, backend service-role paths, and frontend signup/profile flows.
   rollback/recovery steps. Do not merge or apply production migrations merely
   because source changes or frontend CI pass.
 
+## Findings from the latest read-only production reconciliation
+
+The production catalog was queried read-only. Current observations:
+
+- Live migration history contains 13 entries through
+  `20261009115736`; proposals 011–018 are not recorded under those repository
+  filenames.
+- `public.documents.department_code` is absent, so 013 is required before
+  department-aware document policies can be installed.
+- `public.ai_conversations`, `public.ai_messages`, and
+  `public.ai_message_sources` are absent. Migration 014 must precede 016.
+- `public.road_sections.organization_id` exists but is nullable. The previous
+  production count showed zero road sections, so the current integrity
+  preflight is vacuous; test non-empty parent/section cases in staging.
+- Existing profile policies allow users to create/update their own profile by
+  row identity. Migration 018's column grants should limit which fields can be
+  written, but signup/profile bootstrap must be tested through the real Data API.
+- The production onboarding function is owned by `postgres`, is
+  `SECURITY DEFINER`, and currently uses `search_path=public, pg_catalog`.
+  The proposed 017 change to an empty search path must be checked against the
+  exact function body and tested; do not replace its production definition
+  with the repository version without explicit reconciliation.
+- The current production `public.has_department_role` is
+  `SECURITY DEFINER` and has an empty search path. The 011 schema move and
+  invoker wrapper must be tested for PostgREST resolution and all policy callers.
+- The current production `user_profiles` INSERT policy checks
+  `id = auth.uid()`; migration 018 grants INSERT only on `id, full_name`.
+  That is structurally compatible with the policy but still needs a signup test.
+- Existing organization/member/department RLS policies are permissive. The new
+  policies are restrictive and therefore must be tested in combination with
+  existing policies, not in isolation.
+- Supabase Storage buckets were empty in the last audit and no object policies
+  were found. If document binaries will use Storage, add and test object
+  authorization; if downloads are server-mediated, verify every endpoint checks
+  the parent document before using a service-role client.
+- Production has no active department-role assignments. Real role tests must
+  use fake users and assignments in staging; do not seed test assignments into
+  production for this audit.
+
 ## Current status
 
-The live production migration ledger has been inspected read-only and contains
-13 timestamped entries. The feature branch's proposed migrations 011–018 have
-not been applied to production. No staging database is available in the current
-workflow, and no production DDL was executed during this review.
+The new read-only release preflight is committed at
+`database/tests/migration_release_preflight.sql`. It checks required relations,
+functions, columns, road-section integrity, and lists key function/policy
+catalog state. It has **not** been run against a separate staging project because
+no staging database is available in the current workflow.
+
+The feature branch's proposed migrations 011–018 have not been applied to
+production. No production DDL/DML was executed during this review. The Vercel
+status currently reports build-rate-limit failures; these do not establish
+whether the SQL migrations are correct.
