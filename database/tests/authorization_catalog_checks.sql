@@ -411,6 +411,18 @@ BEGIN
     RAISE EXCEPTION 'anon or service_role unexpectedly has EXECUTE on private.is_org_admin';
   END IF;
 
+  -- Migration 014 uses private.is_org_member in permissive and restrictive
+  -- conversation policies. The private schema USAGE grant alone is insufficient:
+  -- authenticated must also be able to execute this exact helper signature.
+  IF NOT has_function_privilege(
+    'authenticated',
+    'private.is_org_member(uuid)',
+    'EXECUTE'
+  ) THEN
+    RAISE EXCEPTION
+      'authenticated role cannot execute private.is_org_member required by AI conversation policies';
+  END IF;
+
   -- Direct authenticated inserts must be limited to user-role messages.
   -- Assistant/system replies are written only by the server-side trusted client.
   IF NOT EXISTS (
