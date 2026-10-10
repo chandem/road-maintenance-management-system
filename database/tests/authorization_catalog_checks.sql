@@ -1,5 +1,5 @@
 -- AI-RMMS authorization catalog regression checks.
--- Run in an ISOLATED staging database after applying migrations 011-016.
+-- Run in an ISOLATED staging database after applying migrations 011-017.
 -- This script is read-only: it inspects catalog metadata and raises an error
 -- when required protections are missing. It does NOT prove row-level behavior;
 -- authenticated-JWT integration tests are still mandatory.
@@ -522,6 +522,41 @@ BEGIN
 
   IF match_function.prosecdef THEN
     RAISE EXCEPTION 'public.match_document_chunks must remain SECURITY INVOKER';
+  END IF;
+
+  -- Privileged organization creation must be callable only by authenticated users
+  -- and the SECURITY DEFINER function must not depend on a caller-controlled path.
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_proc p
+    JOIN pg_namespace n ON n.oid = p.pronamespace
+    WHERE n.nspname = 'public'
+      AND p.proname = 'create_organization_for_current_user'
+      AND p.prosecdef
+      AND p.proconfig @> ARRAY['search_path=""']
+  ) THEN
+    RAISE EXCEPTION 'create_organization_for_current_user must be SECURITY DEFINER with empty search_path';
+  END IF;
+
+  IF has_function_privilege(
+       'anon',
+       'public.create_organization_for_current_user(text,text)',
+       'EXECUTE'
+     )
+     OR has_function_privilege(
+       'public',
+       'public.create_organization_for_current_user(text,text)',
+       'EXECUTE'
+     ) THEN
+    RAISE EXCEPTION 'anonymous/public execution is unexpectedly allowed on organization creation';
+  END IF;
+
+  IF NOT has_function_privilege(
+    'authenticated',
+    'public.create_organization_for_current_user(text,text)',
+    'EXECUTE'
+  ) THEN
+    RAISE EXCEPTION 'authenticated role cannot execute organization creation function';
   END IF;
 
   RAISE NOTICE 'Authorization catalog checks passed. Runtime JWT/RLS tests are still required.';
