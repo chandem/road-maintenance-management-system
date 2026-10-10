@@ -1,7 +1,7 @@
 # Production Security Advisor Snapshot
 
 **Project:** `firzbqzbezuecvplsibi`  
-**Observed:** 2026-10-10 (latest Supabase advisor observations timestamped 09:19:04 UTC)  
+**Observed:** 2026-10-10 (latest Supabase advisor observations timestamped 09:25:13 UTC)  
 **Branch:** `feature/department-role-management`  
 **Purpose:** Record read-only security findings for follow-up; not an authorization validation report.
 
@@ -62,15 +62,15 @@ A follow-up read-only query through `information_schema.routines` and `informati
 
 These are observations of the current live definitions and grants, not proof that the original migration source has been recovered. The catalog query did not verify function-level `search_path` configuration, inherited PUBLIC privileges, or behavior under real authenticated JWT requests. Do not change grants based only on this snapshot; reconcile them with the exact applied migration SQL and intended backend flows first.
 
-## Latest advisor recheck — 2026-10-10 09:19:04 UTC
+## Latest advisor recheck — 2026-10-10 09:25:13 UTC
 
-A fresh read-only Supabase security-advisor query returned the same three warning categories:
+A fresh read-only Supabase security-advisor query at 09:25:13 UTC returned the same three warning categories:
 
 - `public.has_department_role(uuid, text, text[])` is flagged as executable by `anon` and `authenticated` while SECURITY DEFINER.
 - `public.create_organization_for_current_user(text, text)` is flagged as executable by `authenticated` while SECURITY DEFINER.
 - Leaked-password protection remains disabled.
 
-No production changes were made. These findings remain open until the exact applied SQL is reconciled and a reviewed remediation is tested outside production. The onboarding RPC may be intentionally callable by authenticated users, but its grants and guard must be validated against the recovered source and application flow.
+The migration ledger was also re-read and still reports 13 applied migrations; the five department/role entries remain without recovered exact source SQL. Searches of repository commit history for their migration labels and helper names did not recover matching commits. No production changes were made. These findings remain open until the exact applied SQL is reconciled and a reviewed remediation is tested outside production. The onboarding RPC may be intentionally callable by authenticated users, but its grants and guard must be validated against the recovered source and application flow.
 
 ## CI status for current branch head
 
