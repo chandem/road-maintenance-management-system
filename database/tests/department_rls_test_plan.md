@@ -235,3 +235,23 @@ Migrations 016–017 are source-controlled proposals only. Validate in isolated 
 - [ ] Run the catalog test after the migration sequence, then run authenticated-JWT integration tests. GitHub CI does not execute this SQL catalog script unless a dedicated database test job is configured.
 
 Do not apply migrations 016–017 to production based solely on CI success or catalog review. Record the staging database version, migration order, test identities, and observed outcomes first.
+
+
+## Profile and role privilege hardening (migration 018)
+
+Migration 018 is a source-controlled proposal and has not been applied to production. It revokes direct authenticated table-level mutation privileges on `user_profiles`, then grants only SELECT, INSERT(id, full_name), and UPDATE(full_name). It removes anonymous DML/structural privileges on `user_department_roles` and removes unnecessary TRUNCATE/REFERENCES/TRIGGER privileges on organization administration tables.
+
+The frontend currently reads `user_profiles.organization_id` and invokes `create_organization_for_current_user` to create an organization. The onboarding RPC is SECURITY DEFINER and inserts/updates `user_profiles.organization_id` itself, so it must be tested after migration 018 to verify its owner privileges and empty search_path still permit the operation. Do not change the RPC's authenticated EXECUTE grant without a replacement onboarding flow.
+
+Staging checks using real JWTs:
+- [ ] An authenticated user can SELECT their own profile and their organization ID remains readable.
+- [ ] An authenticated user can INSERT only a profile with their own `id` and permitted `full_name`; attempts to set `organization_id`, `department_id`, `employee_code`, `is_active`, `job_title`, or timestamps directly must fail due to column grants.
+- [ ] An authenticated user can update `full_name` only; direct updates to `organization_id`, `department_id`, `employee_code`, `is_active`, `job_title`, `id`, or timestamps must fail.
+- [ ] The onboarding RPC still creates an organization, creates the owner membership, and sets the caller's profile organization ID in one transaction.
+- [ ] Calling the onboarding RPC a second time for the same user fails and does not create a second organization.
+- [ ] Organization admins can still manage memberships and department-role assignments through the intended RLS-protected workflow.
+- [ ] Anonymous requests cannot SELECT or mutate `user_department_roles`; check both effective table privileges and direct Data API responses.
+- [ ] Verify ordinary SELECT/INSERT/UPDATE/DELETE application paths still work for permitted roles after migrations 016 and 018; do not assume the privilege revokes preserve every existing client write.
+- [ ] Confirm backend trusted service-role workflows still function and that no service-role credential is present in the frontend bundle.
+
+Run the catalog regression script after incorporating migration 018. Extend that script to assert the expected column-level privileges on `user_profiles`, and verify anon has no effective table privileges on `user_department_roles`. A successful catalog test remains structural; JWT tests are still mandatory.
