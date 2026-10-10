@@ -155,6 +155,24 @@ BEGIN
     NULL;
   END;
 
+  -- A road manager must not re-parent an authorized chunk to a finance document
+  -- or move the chunk into another organization.
+  BEGIN
+    UPDATE public.document_chunks SET document_id = 'e1000000-0000-4000-8000-000000000002'
+    WHERE id = 'f1000000-0000-4000-8000-000000000001';
+    RAISE EXCEPTION 'RLS FAIL: road manager unexpectedly re-parented a road chunk to a finance document';
+  EXCEPTION WHEN insufficient_privilege THEN
+    NULL;
+  END;
+
+  BEGIN
+    UPDATE public.document_chunks SET organization_id = 'b1000000-0000-4000-8000-000000000002'
+    WHERE id = 'f1000000-0000-4000-8000-000000000001';
+    RAISE EXCEPTION 'RLS FAIL: road manager unexpectedly moved a document chunk to another organization';
+  EXCEPTION WHEN insufficient_privilege THEN
+    NULL;
+  END;
+
   -- A road manager must not attach a chunk to a finance document.
   BEGIN
     INSERT INTO public.document_chunks
