@@ -119,3 +119,42 @@ The feature branch's proposed migrations 011–018 have not been applied to
 production. No production DDL/DML was executed during this review. The Vercel
 status currently reports build-rate-limit failures; these do not establish
 whether the SQL migrations are correct.
+
+## Step 34 — backend/frontend compatibility audit
+
+Read-only source review of the feature branch found:
+
+- The frontend currently reads `user_profiles.organization_id` and calls
+  `create_organization_for_current_user`; it does not directly insert or
+  update profile rows in the reviewed `App.tsx`. The UI's onboarding path must
+  still be tested against the **live** RPC signature/body, because production
+  uses an `admin` membership role while the repository proposal has differed.
+- Document upload is currently server-mediated: the API extracts text and
+  stores document metadata plus `extracted_text` in `public.documents`, then
+  writes chunks through the caller-JWT client. The reviewed endpoint does not
+  upload a binary to Supabase Storage, and no document-binary download endpoint
+  was found in the reviewed route file. Do not assume Storage policies solve
+  access to this current flow; RLS on documents/chunks and authorization before
+  returning extracted text/snippets are the relevant gates.
+- Document list/get/search/question/reindex endpoints use the authenticated
+  caller's JWT-scoped Supabase client. Department checks in the API complement
+  RLS but do not replace it. Keyword and semantic retrieval must continue to
+  filter document metadata under the same caller JWT before snippets reach an
+  LLM.
+- Conversation list/create/read and user-message insert use the caller's
+  JWT-scoped client. The backend service-role client is used to persist assistant
+  messages and best-effort update the conversation timestamp. This is an
+  intentional privileged path that needs tests proving the caller was authorized
+  for the parent conversation before any service-role write and that the service
+  key is server-only.
+- The current frontend provides sign-in and organization creation, but no
+  self-service sign-up form was found in the reviewed `App.tsx`. Migration 018
+  should not be assumed to have passed signup/profile compatibility merely
+  because this frontend has no profile INSERT call; test the actual account
+  provisioning flow used for the deployed environment.
+- The code audit does not establish runtime authorization correctness. The
+  migration preflight and catalog checks still need to run on isolated staging,
+  followed by real user JWT tests for each role.
+
+These are source-review findings only. No SQL was applied and no production
+data was changed during Step 34.
