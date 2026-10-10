@@ -108,3 +108,46 @@ A read-only query of `information_schema.role_table_grants` found that the `auth
 Checked-in proposal `database/migrations/016_revoke_excess_authenticated_table_privileges.sql` revokes TRUNCATE, REFERENCES, and TRIGGER from PUBLIC, anon, and authenticated on a list of application tables. It is not recorded as applied in the production migration ledger query. It is explicitly marked source-controlled proposal only; do not execute it against production yet. First test the exact proposal in an isolated non-production database, confirm all listed tables exist there, review service/trigger workflows and grants, and verify application behavior after revocation. The companion `017_harden_function_execution_privileges.sql` is also a proposal and is not confirmed applied.
 
 No production mutation was performed. Keep PR #1 and production migrations on hold until the proposed privilege changes and authenticated JWT tests are validated in non-production.
+
+
+
+### Static review of proposed privilege migrations 016–017 — 2026-10-10
+
+This is a source-only review. Neither proposal was executed, and production remains unchanged.
+
+#### Migration 016 — table privilege revocation
+
+The broad read-only grant audit identified these affected tables: `ai_analysis_runs`, `ai_recommendations`, `assets`, `budgets`, `departments`, `document_chunks`, `documents`, `employees`, `expenses`, `machinery`, `maintenance_plans`, `materials`, `organization_members`, `organizations`, `road_inspections`, `road_sections`, `roads`, `user_department_roles`, `user_profiles`, and `work_orders`.
+
+The current proposal does not list `departments`, `organization_members`, `organizations`, `user_department_roles`, or `user_profiles`, despite their presence in the grant audit. It does list `ai_conversations`, `ai_messages`, and `ai_message_sources`, which were absent from the production catalog during the earlier audit. Because a plain `REVOKE ... ON TABLE` list requires each named relation to exist, those absent tables may cause the statement to fail before the other revocations complete. Confirm exact current existence and use a tested, transaction-safe approach that targets only verified relations. Do not simply add every audited name to the static list without checking existence first.
+
+Before approving the proposal, verify:
+- the exact list covers every audited table that should lose these privileges;
+- all referenced relations exist in the target database;
+- service-role, backend, trigger, and migration workflows still function;
+- only the intended roles lose `TRUNCATE`, `REFERENCES`, and `TRIGGER`;
+- ordinary CRUD grants remain intact and RLS behavior is unchanged;
+- before/after role grants are captured for comparison.
+
+#### Migration 017 — function execution hardening
+
+This proposal assumes `private.has_department_role(uuid,text,text[])` exists. The production catalog checks documented so far establish `public.has_department_role`, but do not establish that the private function exists. An `ALTER FUNCTION` or `REVOKE` against a missing function will fail. Verify the exact signature and existence of every target function in non-production before running this proposal.
+
+The proposal also removes `service_role` execution from several helpers. Validate the backend's actual call paths first; service-role clients can invoke database functions, and a grant change may break trusted server-side workflows even if end-user authorization remains correct. For each helper, document intended callers and verify effective privileges rather than assuming that all service-role execution is unnecessary.
+
+#### Required non-production acceptance matrix
+
+Do not mark the migration work complete until an isolated non-production database has passed all of these checks using real test users/JWTs from at least two organizations:
+
+1. Anonymous requests cannot call organization-onboarding or department-role RPCs.
+2. An authenticated user can create an organization only under the intended onboarding rules; a second organization, duplicate code, blank name, and unauthenticated request are rejected.
+3. Organization A cannot read or modify Organization B's rows through table APIs or RPCs.
+4. A department read-only user can read only the authorized department data and cannot insert, update, delete, truncate, or grant roles.
+5. An officer can perform only the approved CRUD operations in their assigned department.
+6. A department manager can manage only the permitted departmental records and cannot grant themselves or others elevated organization-level privileges.
+7. An organization admin can manage role assignments only within their organization; cross-organization assignments fail.
+8. Semantic document search returns no chunks from another organization and follows the same authorization rules as direct document access.
+9. Backend service workflows, including migrations, document ingestion/embeddings, background jobs, and any trigger-driven operations, still work after privilege changes.
+10. Before/after table grants, function execute ACLs, RLS policies, and migration status are captured and reviewed.
+
+There is currently no confirmed isolated AI-RMMS staging database or development branch available in the connected Supabase account. This matrix is therefore a test plan, not a claim that tests have passed. Do not substitute another application's database, and do not run the proposed migrations against production as a shortcut.
