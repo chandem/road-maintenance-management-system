@@ -167,6 +167,25 @@ BEGIN
     RAISE EXCEPTION 'ai_messages missing restrictive SELECT or INSERT policy';
   END IF;
 
+  -- Ensure the restrictive INSERT policy still prevents authenticated clients
+  -- from forging assistant/system messages. Policy presence alone is insufficient.
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_policies
+    WHERE schemaname = 'public'
+      AND tablename = 'ai_messages'
+      AND policyname = 'ai_messages_department_insert'
+      AND permissive = 'RESTRICTIVE'
+      AND cmd = 'INSERT'
+      AND 'authenticated' = ANY(roles)
+      AND coalesce(with_check, '') ILIKE '%role%'
+      AND coalesce(with_check, '') ILIKE '%user%'
+      AND coalesce(with_check, '') ILIKE '%has_department_role%'
+  ) THEN
+    RAISE EXCEPTION
+      'ai_messages restrictive INSERT policy must enforce user-role messages and department authorization';
+  END IF;
+
   IF NOT EXISTS (
     SELECT 1 FROM pg_policies
     WHERE schemaname = 'public' AND tablename = 'ai_message_sources'
