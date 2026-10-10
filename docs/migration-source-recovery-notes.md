@@ -66,6 +66,12 @@ The five applied SQL bodies were recovered and archived as documented above. The
 Do not rerun, reapply, or edit production migrations to recover their source. Source recovery is an inspection task, not a database change. Keep production read-only until source mapping, schema reconciliation, and authenticated authorization tests are complete.
 
 
+### Document intelligence and embeddings catalog review — 2026-10-10
+
+The migration ledger confirms entries `20261008123128` (`document_intelligence`) and `20261008123135` (`document_embeddings`). A read-only live catalog inspection found `public.documents` with the document-intelligence fields `extracted_text`, `file_size_bytes`, `extraction_status` (default `pending`), and `classification_confidence`. It also found `public.document_chunks` with `document_id`, `organization_id`, `chunk_index`, `content`, a nullable `vector` embedding, `embedding_model`, `embedding_provider`, `embedding_dimension`, and `embedding_status` (default `pending`). RLS is enabled on both tables. These observations establish that the key objects/columns are present, but do not prove that every policy, index, grant, vector dimension, or function matches the intended migration source.
+
+The exact repository paths for the two source migrations have not yet been identified from the attempted path lookups; do not infer that absence from those failed lookups means the source files are absent. A direct ledger-statement retrieval attempt was blocked by the tool safety layer in this step, so no exact SQL archive or source-to-ledger equivalence claim is made for these two migrations.
+
 ### Initial schema comparison — 2026-10-10
 
 The exact statement recorded for ledger version `20261008122917` (`initial_ai_rmms_schema`) was inspected read-only. Its table and index definitions match the core domain model in `database/migrations/001_initial_schema.sql` in substance: organizations, departments, profiles, roads/sections, plans, work orders, machinery, assets, employees, budgets, expenses, documents, AI analysis runs, AI recommendations, and their listed indexes. The ledger SQL is compactly formatted and omits the source file's explanatory comments, so this is a semantic comparison rather than a byte-for-byte identity claim. No additional archive was created because the source file already represents the same core schema. This does not establish that later migrations or live objects are fully reconciled.
