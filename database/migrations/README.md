@@ -158,3 +158,18 @@ Read-only source review of the feature branch found:
 
 These are source-review findings only. No SQL was applied and no production
 data was changed during Step 34.
+
+## Step 35 — column-level ACL hardening
+
+A further static review found that PostgreSQL table-level `REVOKE ALL` does not
+remove separately granted column-level privileges. Migration 018 now also
+loops over every current column in `public.user_department_roles` and revokes
+legacy `SELECT`, `INSERT`, `UPDATE`, and `REFERENCES` column grants from
+`PUBLIC` and `anon`. The authorization catalog test now checks each current
+column for those effective anonymous privileges, including privileges inherited
+from `PUBLIC`.
+
+This is a defensive source change, not a production fix already executed.
+Validate the dynamic `REVOKE` block on an isolated staging project and rerun
+the catalog test there. The migration remains unapproved for production until
+the full staging JWT/API test matrix passes.
