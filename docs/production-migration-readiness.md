@@ -127,3 +127,8 @@ This ordering is only a proposed staging order, not an approved production migra
 ### Outcome
 
 No definite migration-order contradiction was found in the documented 011–017 staging sequence. However, the applied helper-function definitions/grants, timestamp mapping, and actual SQL execution remain unverified. The sequence therefore remains **blocked from production** pending source reconciliation and isolated staging tests. No production writes or migrations were performed for this review.
+
+
+## 13. Organization-member helper security regression coverage (Step 60)
+
+The catalog regression script now checks that `private.is_org_member(uuid)`, used by migration 014 conversation policies, is a SECURITY DEFINER function with an empty `search_path`; authenticated has EXECUTE for policy evaluation; and anon/service_role do not have direct EXECUTE. This is a source-level regression check only. It has not been run against staging or production, and it does not establish actual-user row-level behavior.
