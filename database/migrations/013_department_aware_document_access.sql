@@ -103,8 +103,10 @@ CREATE POLICY documents_department_delete
     )
   );
 
--- Chunk visibility inherits the authoritative department from the parent
--- document. Do not trust a caller-supplied department code on a chunk.
+-- Chunk access must always resolve to a real parent document in the same
+-- organization, including for administrators. Do not let the admin branch
+-- bypass the parent/organization integrity check or permit orphan/cross-org chunks.
+-- The department is inherited from the parent; never trust a caller-supplied code.
 DROP POLICY IF EXISTS department_scope_access ON public.document_chunks;
 DROP POLICY IF EXISTS document_chunks_department_select ON public.document_chunks;
 DROP POLICY IF EXISTS document_chunks_department_insert ON public.document_chunks;
@@ -114,17 +116,21 @@ DROP POLICY IF EXISTS document_chunks_department_delete ON public.document_chunk
 CREATE POLICY document_chunks_department_select
   ON public.document_chunks AS RESTRICTIVE FOR SELECT TO authenticated
   USING (
-    private.is_org_admin(organization_id)
-    OR EXISTS (
+    EXISTS (
       SELECT 1
       FROM public.documents d
       WHERE d.id = document_chunks.document_id
         AND d.organization_id = document_chunks.organization_id
-        AND d.department_code IS NOT NULL
-        AND public.has_department_role(
-          d.organization_id,
-          d.department_code,
-          ARRAY['department_manager', 'officer', 'read_only']::text[]
+        AND (
+          private.is_org_admin(document_chunks.organization_id)
+          OR (
+            d.department_code IS NOT NULL
+            AND public.has_department_role(
+              d.organization_id,
+              d.department_code,
+              ARRAY['department_manager', 'officer', 'read_only']::text[]
+            )
+          )
         )
     )
   );
@@ -132,17 +138,21 @@ CREATE POLICY document_chunks_department_select
 CREATE POLICY document_chunks_department_insert
   ON public.document_chunks AS RESTRICTIVE FOR INSERT TO authenticated
   WITH CHECK (
-    private.is_org_admin(organization_id)
-    OR EXISTS (
+    EXISTS (
       SELECT 1
       FROM public.documents d
       WHERE d.id = document_chunks.document_id
         AND d.organization_id = document_chunks.organization_id
-        AND d.department_code IS NOT NULL
-        AND public.has_department_role(
-          d.organization_id,
-          d.department_code,
-          ARRAY['department_manager', 'officer']::text[]
+        AND (
+          private.is_org_admin(document_chunks.organization_id)
+          OR (
+            d.department_code IS NOT NULL
+            AND public.has_department_role(
+              d.organization_id,
+              d.department_code,
+              ARRAY['department_manager', 'officer']::text[]
+            )
+          )
         )
     )
   );
@@ -150,32 +160,40 @@ CREATE POLICY document_chunks_department_insert
 CREATE POLICY document_chunks_department_update
   ON public.document_chunks AS RESTRICTIVE FOR UPDATE TO authenticated
   USING (
-    private.is_org_admin(organization_id)
-    OR EXISTS (
+    EXISTS (
       SELECT 1
       FROM public.documents d
       WHERE d.id = document_chunks.document_id
         AND d.organization_id = document_chunks.organization_id
-        AND d.department_code IS NOT NULL
-        AND public.has_department_role(
-          d.organization_id,
-          d.department_code,
-          ARRAY['department_manager', 'officer']::text[]
+        AND (
+          private.is_org_admin(document_chunks.organization_id)
+          OR (
+            d.department_code IS NOT NULL
+            AND public.has_department_role(
+              d.organization_id,
+              d.department_code,
+              ARRAY['department_manager', 'officer']::text[]
+            )
+          )
         )
     )
   )
   WITH CHECK (
-    private.is_org_admin(organization_id)
-    OR EXISTS (
+    EXISTS (
       SELECT 1
       FROM public.documents d
       WHERE d.id = document_chunks.document_id
         AND d.organization_id = document_chunks.organization_id
-        AND d.department_code IS NOT NULL
-        AND public.has_department_role(
-          d.organization_id,
-          d.department_code,
-          ARRAY['department_manager', 'officer']::text[]
+        AND (
+          private.is_org_admin(document_chunks.organization_id)
+          OR (
+            d.department_code IS NOT NULL
+            AND public.has_department_role(
+              d.organization_id,
+              d.department_code,
+              ARRAY['department_manager', 'officer']::text[]
+            )
+          )
         )
     )
   );
@@ -183,17 +201,21 @@ CREATE POLICY document_chunks_department_update
 CREATE POLICY document_chunks_department_delete
   ON public.document_chunks AS RESTRICTIVE FOR DELETE TO authenticated
   USING (
-    private.is_org_admin(organization_id)
-    OR EXISTS (
+    EXISTS (
       SELECT 1
       FROM public.documents d
       WHERE d.id = document_chunks.document_id
         AND d.organization_id = document_chunks.organization_id
-        AND d.department_code IS NOT NULL
-        AND public.has_department_role(
-          d.organization_id,
-          d.department_code,
-          ARRAY['department_manager', 'officer']::text[]
+        AND (
+          private.is_org_admin(document_chunks.organization_id)
+          OR (
+            d.department_code IS NOT NULL
+            AND public.has_department_role(
+              d.organization_id,
+              d.department_code,
+              ARRAY['department_manager', 'officer']::text[]
+            )
+          )
         )
     )
   );
