@@ -343,3 +343,49 @@ def test_revoke_write_failure_returns_service_unavailable(monkeypatch):
         departments.revoke_department_role(UUID(ASSIGNMENT), current_user(BrokenRoleWriteClient()))
 
     assert exc.value.status_code == 503
+
+
+
+def test_list_departments_query_failure_returns_service_unavailable(monkeypatch):
+    patch_org(monkeypatch)
+
+    class BrokenDepartmentListClient(Client):
+        def table(self, name):
+            if name == "departments":
+                return BrokenQuery(self, name)
+            return super().table(name)
+
+    with pytest.raises(HTTPException) as exc:
+        departments.list_departments(current_user(BrokenDepartmentListClient()))
+
+    assert exc.value.status_code == 503
+
+
+def test_list_my_department_roles_query_failure_returns_service_unavailable(monkeypatch):
+    patch_org(monkeypatch)
+
+    class BrokenRoleListClient(Client):
+        def table(self, name):
+            if name == "user_department_roles":
+                return BrokenQuery(self, name)
+            return super().table(name)
+
+    with pytest.raises(HTTPException) as exc:
+        departments.list_my_department_roles(current_user(BrokenRoleListClient()))
+
+    assert exc.value.status_code == 503
+
+
+def test_admin_list_department_roles_query_failure_returns_service_unavailable(monkeypatch):
+    patch_org(monkeypatch)
+
+    class BrokenRoleListClient(Client):
+        def table(self, name):
+            if name == "user_department_roles":
+                return BrokenQuery(self, name)
+            return super().table(name)
+
+    with pytest.raises(HTTPException) as exc:
+        departments.list_department_roles(current_user(BrokenRoleListClient()))
+
+    assert exc.value.status_code == 503
