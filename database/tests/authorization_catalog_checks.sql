@@ -432,10 +432,12 @@ BEGIN
     RAISE EXCEPTION 'authenticated role has an unexpected privilege on ai_conversations';
   END IF;
 
-  IF has_table_privilege('authenticated', 'public.ai_messages', 'TRUNCATE')
+  IF has_table_privilege('authenticated', 'public.ai_messages', 'UPDATE')
+     OR has_table_privilege('authenticated', 'public.ai_messages', 'DELETE')
+     OR has_table_privilege('authenticated', 'public.ai_messages', 'TRUNCATE')
      OR has_table_privilege('authenticated', 'public.ai_messages', 'REFERENCES')
      OR has_table_privilege('authenticated', 'public.ai_messages', 'TRIGGER') THEN
-    RAISE EXCEPTION 'authenticated role has an unexpected non-DML privilege on ai_messages';
+    RAISE EXCEPTION 'authenticated role has an unexpected UPDATE/DELETE/non-DML privilege on ai_messages';
   END IF;
 
   IF has_table_privilege('authenticated', 'public.ai_message_sources', 'UPDATE')
