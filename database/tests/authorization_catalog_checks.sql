@@ -542,11 +542,6 @@ BEGIN
        'anon',
        'public.create_organization_for_current_user(text,text)',
        'EXECUTE'
-     )
-     OR has_function_privilege(
-       'public',
-       'public.create_organization_for_current_user(text,text)',
-       'EXECUTE'
      ) THEN
     RAISE EXCEPTION 'anonymous/public execution is unexpectedly allowed on organization creation';
   END IF;
