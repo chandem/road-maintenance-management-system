@@ -186,6 +186,20 @@ BEGIN
     RAISE EXCEPTION 'RLS FAIL: read-only user updated % road row(s)', changed_count;
   END IF;
 
+  UPDATE public.documents SET title = 'SHOULD NOT CHANGE'
+  WHERE id = 'e1000000-0000-4000-8000-000000000001';
+  GET DIAGNOSTICS changed_count = ROW_COUNT;
+  IF changed_count <> 0 THEN
+    RAISE EXCEPTION 'RLS FAIL: read-only user updated % road document row(s)', changed_count;
+  END IF;
+
+  UPDATE public.document_chunks SET content = 'SHOULD NOT CHANGE'
+  WHERE id = 'f1000000-0000-4000-8000-000000000001';
+  GET DIAGNOSTICS changed_count = ROW_COUNT;
+  IF changed_count <> 0 THEN
+    RAISE EXCEPTION 'RLS FAIL: read-only user updated % road document chunk row(s)', changed_count;
+  END IF;
+
   DELETE FROM public.roads
   WHERE id = 'd1000000-0000-4000-8000-000000000001';
   GET DIAGNOSTICS changed_count = ROW_COUNT;
