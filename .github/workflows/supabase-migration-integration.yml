@@ -16,6 +16,7 @@ on:
     paths:
       - "database/migrations/**/*.sql"
       - "database/tests/**/*.sql"
+      - "database/tests/**/*.py"
       - ".github/workflows/supabase-migration-integration.yml"
   workflow_dispatch:
 
