@@ -84,6 +84,18 @@ BEGIN
   IF visible_count <> 4 THEN
     RAISE EXCEPTION 'RLS FAIL: org admin expected 4 document chunks, saw %', visible_count;
   END IF;
+
+  -- Even an organization admin cannot attach a chunk to a different
+  -- organization than its parent document.
+  BEGIN
+    INSERT INTO public.document_chunks
+      (document_id, organization_id, chunk_index, content, embedding_status)
+    VALUES
+      ('e1000000-0000-4000-8000-000000000001', 'b1000000-0000-4000-8000-000000000002', 9, 'Cross-organization parent mismatch must be denied', 'pending');
+    RAISE EXCEPTION 'RLS FAIL: org admin unexpectedly inserted a cross-organization document chunk';
+  EXCEPTION WHEN insufficient_privilege THEN
+    NULL;
+  END;
 END
 $test$;
 RESET ROLE;
