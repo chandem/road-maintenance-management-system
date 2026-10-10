@@ -261,3 +261,52 @@ def test_admin_membership_lookup_failure_returns_service_unavailable(monkeypatch
         departments.assign_department_role(payload, current_user(BrokenClient()))
 
     assert exc.value.status_code == 503
+
+
+class BrokenQuery(Query):
+    def execute(self):
+        raise RuntimeError("database unavailable")
+
+
+def test_department_lookup_failure_returns_service_unavailable(monkeypatch):
+    patch_org(monkeypatch)
+
+    class BrokenDepartmentClient(Client):
+        def table(self, name):
+            if name == "departments":
+                return BrokenQuery(self, name)
+            return super().table(name)
+
+    payload = departments.DepartmentRoleAssignment(
+        user_id=UUID(TARGET), department_id=UUID(DEPT), role="officer"
+    )
+    with pytest.raises(HTTPException) as exc:
+        departments.assign_department_role(payload, current_user(BrokenDepartmentClient()))
+
+    assert exc.value.status_code == 503
+
+
+def test_target_membership_lookup_failure_returns_service_unavailable(monkeypatch):
+    patch_org(monkeypatch)
+
+    class BrokenTargetMembershipClient(Client):
+        def __init__(self):
+            super().__init__()
+            self.organization_member_queries = 0
+
+        def table(self, name):
+            if name == "organization_members":
+                self.organization_member_queries += 1
+                if self.organization_member_queries == 2:
+                    return BrokenQuery(self, name)
+            return super().table(name)
+
+    payload = departments.DepartmentRoleAssignment(
+        user_id=UUID(TARGET), department_id=UUID(DEPT), role="officer"
+    )
+    client = BrokenTargetMembershipClient()
+    with pytest.raises(HTTPException) as exc:
+        departments.assign_department_role(payload, current_user(client))
+
+    assert exc.value.status_code == 503
+    assert client.upserted is None
