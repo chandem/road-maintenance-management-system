@@ -53,6 +53,20 @@ Migration 016 revokes TRUNCATE, REFERENCES, and TRIGGER privileges from broad ro
 
 Migration 017 changes grants for both public and private helper functions and hardens the organization-creation RPC. It depends on the private helper being present and on the expected function signatures. Apply only after the function migration has been validated and the sequence reconciled.
 
+### 7. Static dependency review found grant checks that need to be explicit
+
+The source-controlled proposals 011, 012, 013, and 014 call private helper functions from authenticated RLS policy expressions. In particular, policies call `private.is_org_admin(uuid)`; migration 014 also calls `private.is_org_member(uuid)`. Migration 011 explicitly grants authenticated access to `private.has_department_role`, but does not itself grant execute on the organization helper functions.
+
+This may work if the earlier authorization foundation migration already grants the necessary execute privileges, but that has not been confirmed from the applied SQL source. Do not add grants blindly: inspect the exact function signatures and intended role grants from the applied authorization migration first. The catalog regression script checks `private.is_org_admin(uuid)` but does not currently assert that authenticated can execute `private.is_org_member(uuid)`; add that assertion before relying on the script as a complete check for migration 014.
+
+### 8. Migration 015 is data-changing, not just a policy change
+
+Migration 015 runs a preflight, backfills NULL `road_sections.organization_id` values from parent roads, changes the column to NOT NULL, and installs a trigger. It intentionally aborts if orphaned sections, missing parent organizations, or organization mismatches exist. Run the read-only preflight and record its counts in a non-production environment first; then validate the backfill and trigger behavior. The live production table currently has zero road-section rows, but that does not replace staging validation or production approval.
+
+### 9. Migration 014 needs route-to-policy integration validation
+
+The backend conversation route reads conversations and messages with the caller's JWT, inserts user messages with that client, and saves assistant replies using the server-only service client. The SQL proposal is aligned with that separation at a high level. Still, verify the complete role/ownership matrix with JWTs, including that a road read-only user can list/read only their own conversations but cannot create or post, and that direct Data API inserts cannot forge assistant/system messages or evidence-source rows. Catalog checks alone cannot prove these row-level outcomes.
+
 ## Safe next steps
 
 1. Reconcile the repository migration files with the applied production migration ledger; assign unique ordered identifiers to new migrations.
