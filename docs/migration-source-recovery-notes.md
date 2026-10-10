@@ -36,6 +36,18 @@ The production ledger includes these versions:
 
 The repository's `011_department_road_rls.sql` through `015_road_section_organization_integrity.sql` are proposals with different names and purposes; they must not be treated as exact copies of the five applied ledger entries without evidence. The source history search did not recover the exact applied SQL. Mark all five as **unresolved source mapping** until SQL/deployment artifacts are recovered.
 
+## Owner-assisted recovery procedure
+
+The remaining source is not present in the checked repository history or the available PR comments. The project owner needs to retrieve the SQL from the original execution/deployment source:
+
+1. Open the Supabase Dashboard for project `firzbqzbezuecvplsibi`, then inspect SQL Editor query history (if available for the original user/session) around **2026-10-09 11:56–11:58 UTC**. These timestamps correspond to the five department/role ledger entries.
+2. Locate each exact script using the migration name or distinctive SQL object names. Save the full SQL text alongside its ledger version/name; a migration ledger entry alone records the version/name, not necessarily the SQL body.
+3. If SQL Editor history is unavailable, inspect the original deployment terminal/CI logs, local working copy, editor history, or backups used when those migrations were applied.
+4. Do not paste API keys, database passwords, access tokens, or connection strings into chat. The SQL DDL itself is what is needed; redact any credentials or sensitive literal data if present.
+5. Share the recovered scripts or attach them to the repository as **unverified recovery artifacts** on this feature branch. Do not label them authoritative until each script can be tied to a ledger entry and compared with live catalog evidence.
+
+**Important:** do not rerun, reapply, or edit production migrations to recover their source. Source recovery is an inspection task, not a database change.
+
 ## Required recovery checklist
 
 1. Export or locate the exact SQL submitted for each production migration-ledger version and retain its version/name metadata.
