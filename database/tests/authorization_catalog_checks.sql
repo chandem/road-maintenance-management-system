@@ -181,6 +181,8 @@ BEGIN
       AND coalesce(with_check, '') ILIKE '%role%'
       AND coalesce(with_check, '') ILIKE '%user%'
       AND coalesce(with_check, '') ILIKE '%has_department_role%'
+      AND coalesce(with_check, '') ILIKE '%status%'
+      AND coalesce(with_check, '') ILIKE '%active%'
   ) THEN
     RAISE EXCEPTION
       'ai_messages restrictive INSERT policy must enforce user-role messages and department authorization';
