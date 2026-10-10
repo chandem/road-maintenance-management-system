@@ -101,7 +101,7 @@ Use each test user's own authenticated JWT against the Data API and the API endp
 
 | Test identity | Read own conversation/messages | Read another user's conversation | Create conversation | Insert message |
 |---|---|---|---|---|
-| Organization owner/admin | allowed | allowed within their organization | allowed | allowed within their organization |
+| Organization owner/admin | allowed | allowed within their organization | allowed | allowed only in a conversation they created |
 | Road department manager/officer | allowed | denied | allowed | allowed only in own active conversation |
 | Road department read-only | allowed | denied | denied | denied |
 | Other department only | denied | denied | denied | denied |
@@ -122,7 +122,7 @@ The live-schema preflight found that `ai_conversations`, `ai_messages`, and `ai_
 - A road department manager/officer can create and update their own conversations and post messages.
 - A road department read-only user can read their own conversation and messages but cannot create a conversation, post a message, or update conversation state.
 - A non-admin cannot read another user's conversation or messages, even when both users belong to the same organization.
-- An organization owner/admin can read and manage conversations in their organization, subject to the explicit grants in migration 014.
+- An organization owner/admin can read conversations and messages across their organization, and can create their own conversations. Even admins may insert user-role messages only into conversations they created; this prevents them from impersonating another conversation owner. Assistant/system messages remain trusted-backend-only.
 - A finance-only, unassigned, inactive, or cross-organization user cannot read road conversations, messages, or message sources.
 - A caller cannot attach a message or source to another user's conversation.
 - The Data API must reject anonymous access. Authenticated users may SELECT/INSERT/UPDATE conversations subject to RLS, but messages are SELECT/INSERT only (append-only) and `ai_message_sources` is SELECT-only. Trusted backend source insertion is not implemented yet.
