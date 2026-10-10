@@ -61,8 +61,9 @@ INSERT INTO public.document_chunks
   (id, document_id, organization_id, chunk_index, content, embedding_status)
 VALUES
   ('f1000000-0000-4000-8000-000000000001', 'e1000000-0000-4000-8000-000000000001', 'b1000000-0000-4000-8000-000000000001', 0, 'Road-only chunk test content', 'pending'),
-  ('f1000000-0000-4000-8000-000000000002', 'e1000000-0000-4000-8000-000000000002', 'b1000000-0000-4000-8000-000000000001', 0, 'Finance-only chunk test content', 'pending'),
-  ('f1000000-0000-4000-8000-000000000003', 'e1000000-0000-4000-8000-000000000003', 'b1000000-0000-4000-8000-000000000001', 0, 'Unclassified legacy chunk test content', 'pending')
+  ('f1000000-0000-4000-8000-000000000002', 'e1000000-0000-4000-8000-000000000001', 'b1000000-0000-4000-8000-000000000001', 1, 'Second road-only chunk test content', 'pending'),
+  ('f1000000-0000-4000-8000-000000000003', 'e1000000-0000-4000-8000-000000000002', 'b1000000-0000-4000-8000-000000000001', 0, 'Finance-only chunk test content', 'pending'),
+  ('f1000000-0000-4000-8000-000000000004', 'e1000000-0000-4000-8000-000000000003', 'b1000000-0000-4000-8000-000000000001', 0, 'Unclassified legacy chunk test content', 'pending')
 ON CONFLICT (id) DO NOTHING;
 
 -- Organization admin: sees its organization's road, not another tenant's road.
@@ -80,8 +81,8 @@ BEGIN
     RAISE EXCEPTION 'RLS FAIL: org admin expected 3 documents, saw %', visible_count;
   END IF;
   SELECT count(*) INTO visible_count FROM public.document_chunks;
-  IF visible_count <> 3 THEN
-    RAISE EXCEPTION 'RLS FAIL: org admin expected 3 document chunks, saw %', visible_count;
+  IF visible_count <> 4 THEN
+    RAISE EXCEPTION 'RLS FAIL: org admin expected 4 document chunks, saw %', visible_count;
   END IF;
 END
 $test$;
@@ -114,7 +115,7 @@ BEGIN
   INSERT INTO public.document_chunks
     (document_id, organization_id, chunk_index, content, embedding_status)
   VALUES
-    ('e1000000-0000-4000-8000-000000000001', 'b1000000-0000-4000-8000-000000000001', 1, 'Manager-added road chunk', 'pending');
+    ('e1000000-0000-4000-8000-000000000001', 'b1000000-0000-4000-8000-000000000001', 2, 'Manager-added road chunk', 'pending');
 
   -- A road manager must not attach a chunk to a finance document.
   BEGIN
@@ -146,14 +147,14 @@ BEGIN
     RAISE EXCEPTION 'RLS FAIL: road read-only user should see 2 road_asset documents, saw %', visible_count;
   END IF;
   SELECT count(*) INTO visible_count FROM public.document_chunks;
-  IF visible_count <> 2 THEN
-    RAISE EXCEPTION 'RLS FAIL: road read-only user should see 2 road-document chunks, saw %', visible_count;
+  IF visible_count <> 3 THEN
+    RAISE EXCEPTION 'RLS FAIL: road read-only user should see 3 road-document chunks, saw %', visible_count;
   END IF;
   BEGIN
     INSERT INTO public.document_chunks
       (document_id, organization_id, chunk_index, content, embedding_status)
     VALUES
-      ('e1000000-0000-4000-8000-000000000001', 'b1000000-0000-4000-8000-000000000001', 2, 'Read-only must not add a chunk', 'pending');
+      ('e1000000-0000-4000-8000-000000000001', 'b1000000-0000-4000-8000-000000000001', 3, 'Read-only must not add a chunk', 'pending');
     RAISE EXCEPTION 'RLS FAIL: read-only user unexpectedly inserted a document chunk';
   EXCEPTION WHEN insufficient_privilege THEN
     NULL;
@@ -215,6 +216,14 @@ BEGIN
   IF visible_count <> 0 THEN
     RAISE EXCEPTION 'RLS FAIL: unassigned user saw % road row(s)', visible_count;
   END IF;
+  SELECT count(*) INTO visible_count FROM public.documents;
+  IF visible_count <> 0 THEN
+    RAISE EXCEPTION 'RLS FAIL: unassigned user saw % document row(s)', visible_count;
+  END IF;
+  SELECT count(*) INTO visible_count FROM public.document_chunks;
+  IF visible_count <> 0 THEN
+    RAISE EXCEPTION 'RLS FAIL: unassigned user saw % document chunk row(s)', visible_count;
+  END IF;
 END
 $test$;
 RESET ROLE;
@@ -227,6 +236,14 @@ BEGIN
   SELECT count(*) INTO visible_count FROM public.roads;
   IF visible_count <> 0 THEN
     RAISE EXCEPTION 'RLS FAIL: cross-organization user without road role saw % road row(s)', visible_count;
+  END IF;
+  SELECT count(*) INTO visible_count FROM public.documents;
+  IF visible_count <> 0 THEN
+    RAISE EXCEPTION 'RLS FAIL: cross-organization user saw % document row(s)', visible_count;
+  END IF;
+  SELECT count(*) INTO visible_count FROM public.document_chunks;
+  IF visible_count <> 0 THEN
+    RAISE EXCEPTION 'RLS FAIL: cross-organization user saw % document chunk row(s)', visible_count;
   END IF;
 END
 $test$;
