@@ -185,6 +185,27 @@ BEGIN
   IF changed_count <> 0 THEN
     RAISE EXCEPTION 'RLS FAIL: read-only user updated % road row(s)', changed_count;
   END IF;
+
+  DELETE FROM public.roads
+  WHERE id = 'd1000000-0000-4000-8000-000000000001';
+  GET DIAGNOSTICS changed_count = ROW_COUNT;
+  IF changed_count <> 0 THEN
+    RAISE EXCEPTION 'RLS FAIL: read-only user deleted % road row(s)', changed_count;
+  END IF;
+
+  DELETE FROM public.documents
+  WHERE id = 'e1000000-0000-4000-8000-000000000001';
+  GET DIAGNOSTICS changed_count = ROW_COUNT;
+  IF changed_count <> 0 THEN
+    RAISE EXCEPTION 'RLS FAIL: read-only user deleted % road document row(s)', changed_count;
+  END IF;
+
+  DELETE FROM public.document_chunks
+  WHERE id = 'f1000000-0000-4000-8000-000000000001';
+  GET DIAGNOSTICS changed_count = ROW_COUNT;
+  IF changed_count <> 0 THEN
+    RAISE EXCEPTION 'RLS FAIL: read-only user deleted % road document chunk row(s)', changed_count;
+  END IF;
   BEGIN
     INSERT INTO public.roads (organization_id, road_code, name)
     VALUES ('b1000000-0000-4000-8000-000000000001', 'RLS-READONLY-INSERT', 'Must be denied');
