@@ -187,16 +187,17 @@ CREATE POLICY ai_messages_department_insert
   ON public.ai_messages AS RESTRICTIVE FOR INSERT TO authenticated
   WITH CHECK (
     -- Direct Data API callers may submit only their own user-role messages.
+    -- Even organization admins must not impersonate another conversation owner.
     -- Assistant/system messages are persisted by the trusted backend only.
     role = 'user'
     AND EXISTS (
       SELECT 1 FROM public.ai_conversations c
       WHERE c.id = ai_messages.conversation_id
+        AND c.created_by = (SELECT auth.uid())
         AND (
           private.is_org_admin(c.organization_id)
           OR (
-            c.created_by = (SELECT auth.uid())
-            AND private.is_org_member(c.organization_id)
+            private.is_org_member(c.organization_id)
             AND public.has_department_role(
               c.organization_id, 'road_asset',
               ARRAY['department_manager', 'officer']::text[]
