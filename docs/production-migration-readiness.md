@@ -76,6 +76,12 @@ A static review of migration 014 found that the restrictive authenticated INSERT
 
 The source proposal was corrected so every authenticated user-message insert must target a conversation they created; organization-admin status or an active road-asset writer role is checked in addition to that ownership condition. This prevents direct Data API impersonation at the policy level. The catalog regression script now also checks that the authenticated INSERT policy references conversation ownership and `auth.uid()`. This source-level assertion is a guard against removing the ownership predicate, not a substitute for an authenticated integration test. The policy change and assertion have not been applied to production or verified with live JWTs. Add an authenticated integration case proving that an administrator cannot post into another user's conversation before approving the migration.
 
+### 11. Document-chunk policies must enforce parent organization consistency for admins too
+
+A further static review of migration 013 found that its original document-chunk SELECT/INSERT/UPDATE/DELETE policies put `private.is_org_admin(organization_id)` outside the parent-document `EXISTS` condition. That meant an organization admin could bypass the parent lookup for chunk rows, allowing orphaned or cross-organization `document_id` references to be created or updated. The SELECT path could also expose inconsistent chunk records within an organization.
+
+The source proposal was corrected so every chunk operation first requires a parent document whose ID matches `document_chunks.document_id` and whose organization matches `document_chunks.organization_id`; the admin/department authorization check is now inside that parent-match condition. The authorization catalog regression script now checks the parent/organization predicates in all four chunk policies. These are source-level changes only and have not been run against a database. The SQL policy text checks are useful regression guards but do not replace JWT integration tests or prove all policy semantics.
+
 ## Safe next steps
 
 1. Reconcile the repository migration files with the applied production migration ledger; assign unique ordered identifiers to new migrations.
