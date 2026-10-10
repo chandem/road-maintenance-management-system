@@ -3,25 +3,26 @@
 **Branch:** `feature/department-role-management`  
 **Repository:** `chandem/road-maintenance-management-system`  
 **Review date:** 2026-10-10  
-**Status:** Source recovery succeeded for migrations 011–015. Production remains read-only during reconciliation.
+**Status:** SQL source recovered and archived for migrations 011–015. Production remains read-only during reconciliation.
 
 ## Latest recovery update — 2026-10-10
 
-The exact SQL bodies for all five department/role migrations were recovered from the production project's PostgreSQL logs and the `supabase_migrations.schema_migrations.statements` records. The migration names and versions match:
+The exact SQL bodies for all five department/role migrations were recovered from the production project's PostgreSQL logs and the `supabase_migrations.schema_migrations.statements` records. They are archived under `docs/recovered-migrations/` on this feature branch, intentionally outside the automatic migration directory.
 
-| Version | Name | Recovery result |
+| Version | Name | Archive |
 |---|---|---|
-| `20261009115651` | `seed_core_departments_011` | Exact SQL recovered |
-| `20261009115706` | `create_department_role_assignments_012` | Exact SQL recovered |
-| `20261009115713` | `secure_department_role_assignments_013` | Exact SQL recovered |
-| `20261009115721` | `department_role_policies_014` | Exact SQL recovered |
-| `20261009115736` | `department_access_helper_015` | Exact SQL recovered |
+| `20261009115651` | `seed_core_departments_011` | `docs/recovered-migrations/20261009115651_seed_core_departments_011.sql` |
+| `20261009115706` | `create_department_role_assignments_012` | `docs/recovered-migrations/20261009115706_create_department_role_assignments_012.sql` |
+| `20261009115713` | `secure_department_role_assignments_013` | `docs/recovered-migrations/20261009115713_secure_department_role_assignments_013.sql` |
+| `20261009115721` | `department_role_policies_014` | `docs/recovered-migrations/20261009115721_department_role_policies_014.sql` |
+| `20261009115736` | `department_access_helper_015` | `docs/recovered-migrations/20261009115736_department_access_helper_015.sql` |
 
 The log records show these statements were submitted through the Supabase management API on 2026-10-09. This resolves the earlier uncertainty about where the SQL came from. It does **not** make the draft PR's proposed migration files equivalent to the applied SQL.
 
 ### Read-only catalog reconciliation performed
 
 - `public.departments` exists; the partial unique index `departments_org_code_unique` exists.
+- The `GRMB` organization has all five department seed rows expected by migration 011: Road Asset Management, Machinery Maintenance Management, Finance, Human Resources, and General Asset Management.
 - `public.user_department_roles` exists with the expected primary key, organization/user/department foreign keys, role check constraint, unique organization/user/department constraint, and both indexes introduced by migration 013.
 - RLS is enabled on `public.user_department_roles`.
 - The two policies from migration 014 exist: `users_can_view_own_department_roles` and `org_admins_manage_department_roles`.
@@ -50,16 +51,15 @@ The production ledger label `add_organization_onboarding_rpc` is not sufficient 
 
 ### Department and role migration history
 
-The five applied SQL bodies were recovered as documented above. The repository's `011_department_road_rls.sql` through `015_road_section_organization_integrity.sql` are proposals with different names and purposes; they must not be treated as exact copies of the five applied ledger entries.
+The five applied SQL bodies were recovered and archived as documented above. The repository's `011_department_road_rls.sql` through `015_road_section_organization_integrity.sql` are proposals with different names and purposes; they must not be treated as exact copies of the five applied ledger entries.
 
 ## Remaining work
 
-1. Preserve the recovered SQL as clearly labeled recovery artifacts in Git, separate from any automatically replayed migration directory until the repository's migration conventions and current branch history are reconciled.
-2. Compare the recovered SQL to the live catalog and classify each object as matching, partially matching, or divergent. The checks above are a first pass, not the full audit.
-3. Inspect the organization-specific seed result for organization code `GRMB`; the seed SQL only targets organizations with that code.
-4. Recover/reconcile the exact source for earlier ledger entries, especially onboarding, and explain the missing AI assistant tables before preparing a complete baseline.
-5. Use an already available isolated non-production database only if one is confirmed; do not create a paid Supabase branch/resource.
-6. Run integration tests with real authenticated JWTs in non-production before considering a production change or merging PR #1.
+1. Reconcile the exact source for earlier ledger entries, especially organization onboarding, and investigate why the AI assistant tables are absent.
+2. Compare the full live schema with all ledger/source migrations and classify each source mapping as matching, partially matching, divergent, superseded, or missing.
+3. Use an already available isolated non-production database only if one is confirmed; do not create a paid Supabase branch/resource.
+4. Run integration tests with real authenticated JWTs in non-production before considering a production change or merging PR #1.
+5. Only after the baseline and authorization tests are reconciled, plan any remaining production migrations with an explicit review of the exact SQL and rollback strategy.
 
 ## Safety boundary
 
