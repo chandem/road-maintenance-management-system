@@ -45,7 +45,9 @@ INSERT INTO public.user_department_roles (organization_id, user_id, department_i
   ('b1000000-0000-4000-8000-000000000001', 'a1000000-0000-4000-8000-000000000002', 'c1000000-0000-4000-8000-000000000001', 'department_manager', true),
   ('b1000000-0000-4000-8000-000000000001', 'a1000000-0000-4000-8000-000000000003', 'c1000000-0000-4000-8000-000000000001', 'read_only', true),
   ('b1000000-0000-4000-8000-000000000001', 'a1000000-0000-4000-8000-000000000004', 'c1000000-0000-4000-8000-000000000002', 'department_manager', true),
-  ('b1000000-0000-4000-8000-000000000002', 'a1000000-0000-4000-8000-000000000006', 'c1000000-0000-4000-8000-000000000003', 'department_manager', true)
+  ('b1000000-0000-4000-8000-000000000002', 'a1000000-0000-4000-8000-000000000006', 'c1000000-0000-4000-8000-000000000003', 'department_manager', true),
+  -- Deliberately grant a role to an inactive organization member: membership must still gate access.
+  ('b1000000-0000-4000-8000-000000000001', 'a1000000-0000-4000-8000-000000000007', 'c1000000-0000-4000-8000-000000000001', 'department_manager', true)
 ON CONFLICT (organization_id, user_id, department_id) DO NOTHING;
 
 INSERT INTO public.roads (id, organization_id, road_code, name) VALUES
@@ -267,8 +269,8 @@ END
 $test$;
 RESET ROLE;
 
--- Inactive organization membership must not retain access even if the user
--- has no active department assignment.
+-- Inactive organization membership must deny access even when a department
+-- manager assignment is active; active organization membership is also required.
 SET LOCAL request.jwt.claim.sub = 'a1000000-0000-4000-8000-000000000007';
 SET LOCAL ROLE authenticated;
 DO $test$
