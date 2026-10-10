@@ -67,14 +67,20 @@ def _require_org_admin(current_user, organization_id: str) -> None:
 def list_departments(current_user=Depends(get_current_user)):
     """List departments in the caller's organization."""
     organization_id = _organization_id(current_user)
-    response = (
-        current_user["client"]
-        .table("departments")
-        .select("id,organization_id,name,code")
-        .eq("organization_id", organization_id)
-        .order("name")
-        .execute()
-    )
+    try:
+        response = (
+            current_user["client"]
+            .table("departments")
+            .select("id,organization_id,name,code")
+            .eq("organization_id", organization_id)
+            .order("name")
+            .execute()
+        )
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Unable to load departments.",
+        ) from exc
     return response.data or []
 
 
@@ -82,15 +88,21 @@ def list_departments(current_user=Depends(get_current_user)):
 def list_my_department_roles(current_user=Depends(get_current_user)):
     """Return only the signed-in user's active department assignments."""
     organization_id = _organization_id(current_user)
-    response = (
-        current_user["client"]
-        .table("user_department_roles")
-        .select("id,department_id,role,is_active,created_at,departments(name,code)")
-        .eq("organization_id", organization_id)
-        .eq("user_id", current_user["id"])
-        .eq("is_active", True)
-        .execute()
-    )
+    try:
+        response = (
+            current_user["client"]
+            .table("user_department_roles")
+            .select("id,department_id,role,is_active,created_at,departments(name,code)")
+            .eq("organization_id", organization_id)
+            .eq("user_id", current_user["id"])
+            .eq("is_active", True)
+            .execute()
+        )
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Unable to load your department roles.",
+        ) from exc
     return response.data or []
 
 
@@ -99,17 +111,23 @@ def list_department_roles(current_user=Depends(get_current_user)):
     """Organization-admin view of active and inactive department assignments."""
     organization_id = _organization_id(current_user)
     _require_org_admin(current_user, organization_id)
-    response = (
-        current_user["client"]
-        .table("user_department_roles")
-        .select(
-            "id,user_id,department_id,role,is_active,assigned_by,created_at,updated_at,"
-            "departments(name,code)"
+    try:
+        response = (
+            current_user["client"]
+            .table("user_department_roles")
+            .select(
+                "id,user_id,department_id,role,is_active,assigned_by,created_at,updated_at,"
+                "departments(name,code)"
+            )
+            .eq("organization_id", organization_id)
+            .order("created_at", desc=True)
+            .execute()
         )
-        .eq("organization_id", organization_id)
-        .order("created_at", desc=True)
-        .execute()
-    )
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Unable to load department role assignments.",
+        ) from exc
     return response.data or []
 
 
