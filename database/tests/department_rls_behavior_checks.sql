@@ -35,13 +35,15 @@ ON CONFLICT (organization_id, user_id) DO NOTHING;
 
 INSERT INTO public.departments (id, organization_id, name, code) VALUES
   ('c1000000-0000-4000-8000-000000000001', 'b1000000-0000-4000-8000-000000000001', 'RLS Road Asset', 'road_asset'),
-  ('c1000000-0000-4000-8000-000000000002', 'b1000000-0000-4000-8000-000000000001', 'RLS Finance', 'finance')
+  ('c1000000-0000-4000-8000-000000000002', 'b1000000-0000-4000-8000-000000000001', 'RLS Finance', 'finance'),
+  ('c1000000-0000-4000-8000-000000000003', 'b1000000-0000-4000-8000-000000000002', 'RLS Organization B Finance', 'finance')
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO public.user_department_roles (organization_id, user_id, department_id, role, is_active) VALUES
   ('b1000000-0000-4000-8000-000000000001', 'a1000000-0000-4000-8000-000000000002', 'c1000000-0000-4000-8000-000000000001', 'department_manager', true),
   ('b1000000-0000-4000-8000-000000000001', 'a1000000-0000-4000-8000-000000000003', 'c1000000-0000-4000-8000-000000000001', 'read_only', true),
-  ('b1000000-0000-4000-8000-000000000001', 'a1000000-0000-4000-8000-000000000004', 'c1000000-0000-4000-8000-000000000002', 'department_manager', true)
+  ('b1000000-0000-4000-8000-000000000001', 'a1000000-0000-4000-8000-000000000004', 'c1000000-0000-4000-8000-000000000002', 'department_manager', true),
+  ('b1000000-0000-4000-8000-000000000002', 'a1000000-0000-4000-8000-000000000006', 'c1000000-0000-4000-8000-000000000003', 'department_manager', true)
 ON CONFLICT (organization_id, user_id, department_id) DO NOTHING;
 
 INSERT INTO public.roads (id, organization_id, road_code, name) VALUES
@@ -53,7 +55,8 @@ ON CONFLICT (id) DO NOTHING;
 INSERT INTO public.documents (id, organization_id, title, department_code, uploaded_by) VALUES
   ('e1000000-0000-4000-8000-000000000001', 'b1000000-0000-4000-8000-000000000001', 'Road department document', 'road_asset', 'a1000000-0000-4000-8000-000000000002'),
   ('e1000000-0000-4000-8000-000000000002', 'b1000000-0000-4000-8000-000000000001', 'Finance department document', 'finance', 'a1000000-0000-4000-8000-000000000004'),
-  ('e1000000-0000-4000-8000-000000000003', 'b1000000-0000-4000-8000-000000000001', 'Unclassified legacy document', NULL, 'a1000000-0000-4000-8000-000000000001')
+  ('e1000000-0000-4000-8000-000000000003', 'b1000000-0000-4000-8000-000000000001', 'Unclassified legacy document', NULL, 'a1000000-0000-4000-8000-000000000001'),
+  ('e1000000-0000-4000-8000-000000000004', 'b1000000-0000-4000-8000-000000000002', 'Organization B finance document', 'finance', 'a1000000-0000-4000-8000-000000000006')
 ON CONFLICT (id) DO NOTHING;
 
 -- Seed chunks whose permissions must be inherited from the parent document.
@@ -63,7 +66,8 @@ VALUES
   ('f1000000-0000-4000-8000-000000000001', 'e1000000-0000-4000-8000-000000000001', 'b1000000-0000-4000-8000-000000000001', 0, 'Road-only chunk test content', 'pending'),
   ('f1000000-0000-4000-8000-000000000002', 'e1000000-0000-4000-8000-000000000001', 'b1000000-0000-4000-8000-000000000001', 1, 'Second road-only chunk test content', 'pending'),
   ('f1000000-0000-4000-8000-000000000003', 'e1000000-0000-4000-8000-000000000002', 'b1000000-0000-4000-8000-000000000001', 0, 'Finance-only chunk test content', 'pending'),
-  ('f1000000-0000-4000-8000-000000000004', 'e1000000-0000-4000-8000-000000000003', 'b1000000-0000-4000-8000-000000000001', 0, 'Unclassified legacy chunk test content', 'pending')
+  ('f1000000-0000-4000-8000-000000000004', 'e1000000-0000-4000-8000-000000000003', 'b1000000-0000-4000-8000-000000000001', 0, 'Unclassified legacy chunk test content', 'pending'),
+  ('f1000000-0000-4000-8000-000000000005', 'e1000000-0000-4000-8000-000000000004', 'b1000000-0000-4000-8000-000000000002', 0, 'Organization B finance chunk test content', 'pending')
 ON CONFLICT (id) DO NOTHING;
 
 -- Organization admin: sees its organization's road, not another tenant's road.
@@ -250,12 +254,12 @@ BEGIN
     RAISE EXCEPTION 'RLS FAIL: cross-organization user without road role saw % road row(s)', visible_count;
   END IF;
   SELECT count(*) INTO visible_count FROM public.documents;
-  IF visible_count <> 0 THEN
-    RAISE EXCEPTION 'RLS FAIL: cross-organization user saw % document row(s)', visible_count;
+  IF visible_count <> 1 THEN
+    RAISE EXCEPTION 'RLS FAIL: organization B user should see only its own finance document, saw %', visible_count;
   END IF;
   SELECT count(*) INTO visible_count FROM public.document_chunks;
-  IF visible_count <> 0 THEN
-    RAISE EXCEPTION 'RLS FAIL: cross-organization user saw % document chunk row(s)', visible_count;
+  IF visible_count <> 1 THEN
+    RAISE EXCEPTION 'RLS FAIL: organization B user should see only its own finance chunk, saw %', visible_count;
   END IF;
 END
 $test$;
