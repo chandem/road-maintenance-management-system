@@ -1,7 +1,7 @@
 # Production Security Advisor Snapshot
 
 **Project:** `firzbqzbezuecvplsibi`  
-**Observed:** 2026-10-10 (Supabase advisor observations timestamped 09:01:14 UTC)  
+**Observed:** 2026-10-10 (latest Supabase advisor observations timestamped 09:19:04 UTC)  
 **Branch:** `feature/department-role-management`  
 **Purpose:** Record read-only security findings for follow-up; not an authorization validation report.
 
@@ -62,11 +62,21 @@ A follow-up read-only query through `information_schema.routines` and `informati
 
 These are observations of the current live definitions and grants, not proof that the original migration source has been recovered. The catalog query did not verify function-level `search_path` configuration, inherited PUBLIC privileges, or behavior under real authenticated JWT requests. Do not change grants based only on this snapshot; reconcile them with the exact applied migration SQL and intended backend flows first.
 
-## CI status for this snapshot
+## Latest advisor recheck — 2026-10-10 09:19:04 UTC
 
-GitHub Actions completed successfully for the current head commit `07f484c5ce5e2b14bfb6d85e3fb7a344ce61515f`:
+A fresh read-only Supabase security-advisor query returned the same three warning categories:
 
-- [Backend Tests](https://github.com/chandem/road-maintenance-management-system/actions/runs/38039927625)
-- [Frontend Build](https://github.com/chandem/road-maintenance-management-system/actions/runs/38039927646)
+- `public.has_department_role(uuid, text, text[])` is flagged as executable by `anon` and `authenticated` while SECURITY DEFINER.
+- `public.create_organization_for_current_user(text, text)` is flagged as executable by `authenticated` while SECURITY DEFINER.
+- Leaked-password protection remains disabled.
 
-This verifies the repository's configured CI workflows for that commit only; it does not validate production RLS or database migration correctness.
+No production changes were made. These findings remain open until the exact applied SQL is reconciled and a reviewed remediation is tested outside production. The onboarding RPC may be intentionally callable by authenticated users, but its grants and guard must be validated against the recovered source and application flow.
+
+## CI status for current branch head
+
+GitHub Actions completed successfully for current head commit `40a025bb2b6e156054e7d01f6df59662d2eec079`:
+
+- [Backend Tests](https://github.com/chandem/road-maintenance-management-system/actions/runs/38040120480)
+- [Frontend Build](https://github.com/chandem/road-maintenance-management-system/actions/runs/38040120380)
+
+Vercel status checks report a build-rate-limit failure. This is separate from the successful GitHub Actions backend and frontend checks. CI success does not validate production RLS or database migration correctness.
