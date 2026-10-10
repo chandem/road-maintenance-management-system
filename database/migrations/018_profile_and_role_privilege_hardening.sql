@@ -18,6 +18,17 @@ REVOKE INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER
   ON TABLE public.user_profiles
   FROM PUBLIC, anon, authenticated;
 
+-- Also clear any legacy column-level ACLs: revoking table-level grants alone
+-- does not remove separately granted column privileges.
+REVOKE INSERT (
+  id, organization_id, department_id, full_name, employee_code,
+  job_title, is_active, created_at, updated_at
+) ON TABLE public.user_profiles FROM PUBLIC, anon, authenticated;
+REVOKE UPDATE (
+  id, organization_id, department_id, full_name, employee_code,
+  job_title, is_active, created_at, updated_at
+) ON TABLE public.user_profiles FROM PUBLIC, anon, authenticated;
+
 GRANT SELECT ON TABLE public.user_profiles TO authenticated;
 GRANT INSERT (id, full_name) ON TABLE public.user_profiles TO authenticated;
 GRANT UPDATE (full_name) ON TABLE public.user_profiles TO authenticated;
