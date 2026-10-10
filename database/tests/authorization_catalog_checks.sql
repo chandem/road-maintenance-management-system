@@ -183,9 +183,11 @@ BEGIN
       AND coalesce(with_check, '') ILIKE '%has_department_role%'
       AND coalesce(with_check, '') ILIKE '%status%'
       AND coalesce(with_check, '') ILIKE '%active%'
+      AND coalesce(with_check, '') ILIKE '%created_by%'
+      AND coalesce(with_check, '') ILIKE '%auth.uid%'
   ) THEN
     RAISE EXCEPTION
-      'ai_messages restrictive INSERT policy must enforce user-role messages and department authorization';
+      'ai_messages restrictive INSERT policy must enforce user-role messages, active-conversation status, caller ownership, and department authorization';
   END IF;
 
   IF NOT EXISTS (
