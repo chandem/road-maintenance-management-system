@@ -75,6 +75,11 @@ BEGIN
   END IF;
   INSERT INTO public.roads (organization_id, road_code, name)
   VALUES ('b1000000-0000-4000-8000-000000000001', 'RLS-MANAGER-INSERT', 'Manager test insert');
+
+  SELECT count(*) INTO visible_count FROM public.roads;
+  IF visible_count <> 2 THEN
+    RAISE EXCEPTION 'RLS FAIL: road manager expected to see its inserted road (2 total), saw %', visible_count;
+  END IF;
 END
 $test$;
 RESET ROLE;
