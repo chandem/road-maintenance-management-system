@@ -208,3 +208,23 @@ before applying migration 015, then verify section IDs/counts remain unchanged
 and the backfilled rows match their parent roads afterward. The preflight itself
 does not update data and is not a substitute for the authenticated-JWT trigger
 tests listed above.
+
+
+## Function execution and excess table privilege checks (migrations 016–017)
+
+Migrations 016–017 are source-controlled proposals only. Validate in isolated staging after the prerequisite migrations and before any production deployment.
+
+### Migration 016 — table grants
+- [ ] As an administrator, run `database/tests/authorization_catalog_checks.sql`; confirm authenticated has no TRUNCATE, REFERENCES, or TRIGGER privilege on each protected table.
+- [ ] Confirm normal SELECT/INSERT/UPDATE/DELETE grants remain as designed; migration 016 must not be treated as a replacement for RLS.
+- [ ] Confirm service-role backend operations still work in the trusted server environment; never use the service-role key in browser tests.
+
+### Migration 017 — function grants and name resolution
+- [ ] Confirm `public.has_department_role(uuid,text,text[])` is SECURITY INVOKER with an empty search_path.
+- [ ] Confirm `private.has_department_role(uuid,text,text[])` is SECURITY DEFINER with an empty search_path, executable by authenticated only (not anon or service_role).
+- [ ] Confirm `public.create_organization_for_current_user(text,text)` is SECURITY DEFINER with an empty search_path and executable by authenticated, but not anon or service_role.
+- [ ] Verify organization creation succeeds for a valid authenticated caller and fails for an anonymous caller.
+- [ ] Confirm function bodies schema-qualify application tables and remain functional with an empty search_path; built-ins should resolve through pg_catalog.
+- [ ] Run the catalog test after the migration sequence, then run authenticated-JWT integration tests. GitHub CI does not execute this SQL catalog script unless a dedicated database test job is configured.
+
+Do not apply migrations 016–017 to production based solely on CI success or catalog review. Record the staging database version, migration order, test identities, and observed outcomes first.
