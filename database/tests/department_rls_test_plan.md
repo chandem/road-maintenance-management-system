@@ -132,6 +132,13 @@ Migration 014 is a source-controlled proposal and has not been applied to produc
 
 - Non-admin road conversation source rows are restricted to `road`, `road_section`, `maintenance_plan`, and `work_order`. `other`, finance, employee, asset, machinery, expense, budget, and document source types must remain unavailable to non-admin users until each type has a matching record-level authorization check.
 
+### Archived conversation message-write check
+
+- [ ] Through the authenticated Data API, attempt to insert a `role='user'` message into an archived conversation owned by the caller; it must be rejected by RLS.
+- [ ] Repeat with an active conversation owned by the caller; a valid road manager/officer may insert a user-role message.
+- [ ] Confirm direct assistant/system message inserts fail for active and archived conversations.
+- [ ] The restrictive `ai_messages_department_insert` policy must require `c.status = 'active'` as well as caller ownership and role authorization. The FastAPI status check is defense in depth, not a replacement for this database condition.
+- [ ] The service-role path must be tested separately; it intentionally bypasses RLS and must only be reachable after the API validates the caller and active conversation.
 
 ## Road-section organization integrity (migration 015)
 
