@@ -56,6 +56,15 @@ INSERT INTO public.documents (id, organization_id, title, department_code, uploa
   ('e1000000-0000-4000-8000-000000000003', 'b1000000-0000-4000-8000-000000000001', 'Unclassified legacy document', NULL, 'a1000000-0000-4000-8000-000000000001')
 ON CONFLICT (id) DO NOTHING;
 
+-- Seed chunks whose permissions must be inherited from the parent document.
+INSERT INTO public.document_chunks
+  (id, document_id, organization_id, chunk_index, content, embedding_status)
+VALUES
+  ('f1000000-0000-4000-8000-000000000001', 'e1000000-0000-4000-8000-000000000001', 'b1000000-0000-4000-8000-000000000001', 0, 'Road-only chunk test content', 'pending'),
+  ('f1000000-0000-4000-8000-000000000002', 'e1000000-0000-4000-8000-000000000002', 'b1000000-0000-4000-8000-000000000001', 0, 'Finance-only chunk test content', 'pending'),
+  ('f1000000-0000-4000-8000-000000000003', 'e1000000-0000-4000-8000-000000000003', 'b1000000-0000-4000-8000-000000000001', 0, 'Unclassified legacy chunk test content', 'pending')
+ON CONFLICT (id) DO NOTHING;
+
 -- Organization admin: sees its organization's road, not another tenant's road.
 SET LOCAL request.jwt.claim.sub = 'a1000000-0000-4000-8000-000000000001';
 SET LOCAL ROLE authenticated;
@@ -69,6 +78,10 @@ BEGIN
   SELECT count(*) INTO visible_count FROM public.documents;
   IF visible_count <> 3 THEN
     RAISE EXCEPTION 'RLS FAIL: org admin expected 3 documents, saw %', visible_count;
+  END IF;
+  SELECT count(*) INTO visible_count FROM public.document_chunks;
+  IF visible_count <> 3 THEN
+    RAISE EXCEPTION 'RLS FAIL: org admin expected 3 document chunks, saw %', visible_count;
   END IF;
 END
 $test$;
@@ -98,6 +111,21 @@ BEGIN
   END IF;
   INSERT INTO public.documents (organization_id, title, department_code, uploaded_by)
   VALUES ('b1000000-0000-4000-8000-000000000001', 'Manager road document', 'road_asset', 'a1000000-0000-4000-8000-000000000002');
+  INSERT INTO public.document_chunks
+    (document_id, organization_id, chunk_index, content, embedding_status)
+  VALUES
+    ('e1000000-0000-4000-8000-000000000001', 'b1000000-0000-4000-8000-000000000001', 1, 'Manager-added road chunk', 'pending');
+
+  -- A road manager must not attach a chunk to a finance document.
+  BEGIN
+    INSERT INTO public.document_chunks
+      (document_id, organization_id, chunk_index, content, embedding_status)
+    VALUES
+      ('e1000000-0000-4000-8000-000000000002', 'b1000000-0000-4000-8000-000000000001', 1, 'Must be denied across departments', 'pending');
+    RAISE EXCEPTION 'RLS FAIL: road manager unexpectedly inserted a finance-document chunk';
+  EXCEPTION WHEN insufficient_privilege THEN
+    NULL;
+  END;
 END
 $test$;
 RESET ROLE;
@@ -117,6 +145,19 @@ BEGIN
   IF visible_count <> 2 THEN
     RAISE EXCEPTION 'RLS FAIL: road read-only user should see 2 road_asset documents, saw %', visible_count;
   END IF;
+  SELECT count(*) INTO visible_count FROM public.document_chunks;
+  IF visible_count <> 2 THEN
+    RAISE EXCEPTION 'RLS FAIL: road read-only user should see 2 road-document chunks, saw %', visible_count;
+  END IF;
+  BEGIN
+    INSERT INTO public.document_chunks
+      (document_id, organization_id, chunk_index, content, embedding_status)
+    VALUES
+      ('e1000000-0000-4000-8000-000000000001', 'b1000000-0000-4000-8000-000000000001', 2, 'Read-only must not add a chunk', 'pending');
+    RAISE EXCEPTION 'RLS FAIL: read-only user unexpectedly inserted a document chunk';
+  EXCEPTION WHEN insufficient_privilege THEN
+    NULL;
+  END;
   UPDATE public.roads SET name = 'SHOULD NOT CHANGE'
   WHERE id = 'd1000000-0000-4000-8000-000000000001';
   GET DIAGNOSTICS changed_count = ROW_COUNT;
@@ -156,6 +197,10 @@ BEGIN
   SELECT count(*) INTO visible_count FROM public.documents;
   IF visible_count <> 1 THEN
     RAISE EXCEPTION 'RLS FAIL: finance-only user should see only finance document, saw %', visible_count;
+  END IF;
+  SELECT count(*) INTO visible_count FROM public.document_chunks;
+  IF visible_count <> 1 THEN
+    RAISE EXCEPTION 'RLS FAIL: finance-only user should see only finance-document chunk, saw %', visible_count;
   END IF;
 END
 $test$;
