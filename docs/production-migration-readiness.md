@@ -141,3 +141,32 @@ Static review found that migration 015's trigger on `road_sections` did not prev
 The authorization catalog checks now require this parent-road guard trigger and verify its helper is SECURITY DEFINER with an empty `search_path`, with direct EXECUTE revoked from API roles. Migration 017 now explicitly pins `search_path` and grants execution on `private.is_org_admin(uuid)` and `private.is_org_member(uuid)` to authenticated only, revoking PUBLIC/anon/service_role execution.
 
 These are source-only changes. They have not been run in a database. Confirm the helper signatures and behavior in an isolated staging database, then test that a road with sections cannot change organizations, while a road with no sections follows the intended policy. Do not apply to production until the migration ledger and full JWT matrix are reconciled and pass.
+
+
+## 15. Archived-conversation insert guard and current CI verification (Step 65)
+
+The proposed restrictive INSERT policy for `public.ai_messages` now requires all authenticated user-message inserts to reference a parent conversation whose `status = 'active'`, in addition to requiring `role = 'user'`, caller ownership, and the applicable organization/department authorization. This closes the direct-Data-API gap where a caller might otherwise insert into an archived conversation despite the API route's status check.
+
+The catalog regression check now requires the INSERT policy expression to mention both status and active. The JWT integration test plan includes archived-versus-active direct inserts and assistant/system forgery attempts. These checks are still source-level only; neither the catalog script nor the JWT matrix has been run against an isolated database.
+
+GitHub Actions for the latest branch commit `a29b9423fd26153f27735e8b03731179750b673a` completed successfully:
+- Backend Tests: success (run 38038690408).
+- Frontend Build: success (run 38038690404).
+
+This verifies the repository CI workflows for that commit only. It does not verify SQL execution, catalog checks against a database, actual RLS behavior with JWTs, or production readiness.
+
+## 16. Explicit migration ledger mapping rule (Step 66)
+
+The read-only production ledger currently ends with these applied timestamped versions:
+
+| Applied version | Applied migration name | Treatment |
+| --- | --- | --- |
+| `20261009115651` | `seed_core_departments_011` | Already applied; do not replay or rename |
+| `20261009115706` | `create_department_role_assignments_012` | Already applied; do not replay or rename |
+| `20261009115713` | `secure_department_role_assignments_013` | Already applied; do not replay or rename |
+| `20261009115721` | `department_role_policies_014` | Already applied; do not replay or rename |
+| `20261009115736` | `department_access_helper_015` | Already applied; do not replay or rename |
+
+The repository proposals `011_department_road_rls.sql` through `017_harden_function_execution_privileges.sql` are additional, distinct SQL proposals. Their numeric filename prefixes must **not** be treated as the live timestamped versions above. Before any deployment, create a reviewed release mapping that assigns each proposal a unique new timestamped version after the current ledger, preserves dependency order, and proves that the SQL already recorded in production is represented accurately in source control. Do not alter the production ledger to make filenames look aligned, and do not apply the proposed SQL directly through an ad hoc production query.
+
+Current blockers remain: `public.documents.department_code` is absent in production; applied helper-function source/grants and proposed migration signatures still need reconciliation; the migrations have not been tested in an isolated database with authenticated JWTs; and no rollback/recovery rehearsal has been performed.
