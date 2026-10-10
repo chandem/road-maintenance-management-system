@@ -6,8 +6,8 @@
 -- RLS remains necessary. These grants only restrict which operations/columns
 -- an API role can attempt; existing policies still decide which rows are visible.
 
--- Anonymous clients must never mutate or truncate department-role assignments.
-REVOKE INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER
+-- Anonymous clients must have no direct privileges on department-role assignments.
+REVOKE ALL PRIVILEGES
   ON TABLE public.user_department_roles
   FROM PUBLIC, anon;
 
