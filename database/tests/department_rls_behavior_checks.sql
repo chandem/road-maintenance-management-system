@@ -80,14 +80,15 @@ $test$;
 RESET ROLE;
 
 -- Read-only road user: can read but cannot insert or update.
+-- The manager test above successfully inserted a second road in organization A.
 SET LOCAL request.jwt.claim.sub = 'a1000000-0000-4000-8000-000000000003';
 SET LOCAL ROLE authenticated;
 DO $test$
 DECLARE visible_count integer; changed_count integer;
 BEGIN
   SELECT count(*) INTO visible_count FROM public.roads;
-  IF visible_count <> 1 THEN
-    RAISE EXCEPTION 'RLS FAIL: road read-only user expected 1 road, saw %', visible_count;
+  IF visible_count <> 2 THEN
+    RAISE EXCEPTION 'RLS FAIL: road read-only user expected 2 roads after manager insert, saw %', visible_count;
   END IF;
   UPDATE public.roads SET name = 'SHOULD NOT CHANGE'
   WHERE id = 'd1000000-0000-4000-8000-000000000001';
