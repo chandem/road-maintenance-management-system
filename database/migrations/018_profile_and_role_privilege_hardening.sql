@@ -11,6 +11,29 @@ REVOKE ALL PRIVILEGES
   ON TABLE public.user_department_roles
   FROM PUBLIC, anon;
 
+-- REVOKE on the table does not clear independently granted column ACLs.
+-- Clear any legacy column-level privileges for PUBLIC/anon as well, regardless
+-- of the current table definition. This is idempotent and preserves
+-- authenticated admin workflows.
+DO $revoke_role_column_acl$
+DECLARE
+  column_name text;
+BEGIN
+  FOR column_name IN
+    SELECT a.attname
+    FROM pg_attribute a
+    WHERE a.attrelid = 'public.user_department_roles'::regclass
+      AND a.attnum > 0
+      AND NOT a.attisdropped
+  LOOP
+    EXECUTE format(
+      'REVOKE SELECT (%1$I), INSERT (%1$I), UPDATE (%1$I), REFERENCES (%1$I) ON TABLE public.user_department_roles FROM PUBLIC, anon',
+      column_name
+    );
+  END LOOP;
+END
+$revoke_role_column_acl$;
+
 -- Authenticated users may read their own profile under RLS and create a minimal
 -- profile for themselves. Organization, department, employee code, and active
 -- status must be populated by a trusted/admin workflow.
