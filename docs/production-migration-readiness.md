@@ -170,3 +170,32 @@ The read-only production ledger currently ends with these applied timestamped ve
 The repository proposals `011_department_road_rls.sql` through `017_harden_function_execution_privileges.sql` are additional, distinct SQL proposals. Their numeric filename prefixes must **not** be treated as the live timestamped versions above. Before any deployment, create a reviewed release mapping that assigns each proposal a unique new timestamped version after the current ledger, preserves dependency order, and proves that the SQL already recorded in production is represented accurately in source control. Do not alter the production ledger to make filenames look aligned, and do not apply the proposed SQL directly through an ad hoc production query.
 
 Current blockers remain: `public.documents.department_code` is absent in production; applied helper-function source/grants and proposed migration signatures still need reconciliation; the migrations have not been tested in an isolated database with authenticated JWTs; and no rollback/recovery rehearsal has been performed.
+
+
+## 17. Source-file-to-production-ledger reconciliation findings (Step 67)
+
+A read-only comparison of the production migration ledger with the current `database/migrations/` directory reveals that the repository cannot yet serve as a complete, authoritative replay ledger for the live database.
+
+| Production ledger entry | Candidate source file | Confidence / action |
+| --- | --- | --- |
+| `initial_ai_rmms_schema` (`20261008122917`) | `001_initial_schema.sql` | Likely correspondence by purpose; verify the full SQL against the applied migration source before release. |
+| `authorization_foundation` (`20261008140938`) | `002_authorization.sql` | Likely correspondence by purpose; verify exact function definitions and grants. |
+| `document_intelligence` (`20261008123128`) | `005_document_intelligence.sql` | Likely correspondence by purpose; verify applied SQL. |
+| `document_embeddings` (`20261008123135`) | `006_document_embeddings.sql` | Likely correspondence by purpose; verify applied SQL. |
+| `secure_semantic_search` (`20261008141032`) | `008_secure_semantic_search.sql` | Likely correspondence by purpose; determine whether `007_semantic_document_search.sql` was superseded, manually applied, or omitted from the ledger. |
+| `add_organization_onboarding_rpc` (`20261008183919`) | `004_frontend_onboarding_rpc.sql` and possibly `003_onboarding_hardening.sql` | Ambiguous. The repository has both a private-schema onboarding function proposal and a public RPC proposal. Verify exact live function definitions/grants; do not infer that both files ran. |
+| `materials_inventory_009` (`20261009092658`) | `009_materials.sql` | Likely correspondence by purpose; verify applied SQL. |
+| `road_inspections_010` (`20261009092727`) | `010_road_inspections.sql` | Likely correspondence by purpose; verify applied SQL. |
+| `seed_core_departments_011` through `department_access_helper_015` | No clearly corresponding timestamped source files in the current migration directory | **Unresolved source gap.** Recover and commit the exact SQL that was applied, or otherwise document and verify it before constructing a baseline. Do not substitute proposal files 011–015, which have different purposes. |
+
+Additional finding: `003_ai_assistant.sql` creates the AI conversation tables in source control, but the read-only production review found `ai_conversations`, `ai_messages`, and `ai_message_sources` absent. It is therefore not safe to assume that source file was applied merely because it exists in the repository. Migration 014 is a new proposal to create and secure those tables; its DDL must be reconciled with the older `003_ai_assistant.sql` before staging to avoid divergent table definitions or duplicated policy assumptions.
+
+### Required baseline-recovery work
+
+1. Obtain the exact SQL text corresponding to every production ledger version, especially the five department/role migrations.
+2. Compare each applied SQL body with the candidate source file, including function definitions, grants, policies, constraints, and triggers.
+3. Mark each source file as exact match, partial match, superseded, not applied, or missing; record evidence rather than relying on similar names.
+4. Establish a clean baseline in an isolated non-production database from the recovered applied history, then apply only the reviewed new proposals in dependency order.
+5. Do not generate final timestamped release filenames or apply any production changes until this reconciliation is complete.
+
+This step is **in progress and is a blocking issue**. It cannot be resolved from migration names alone, and production remains read-only.
