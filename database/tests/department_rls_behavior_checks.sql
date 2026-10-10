@@ -49,6 +49,13 @@ INSERT INTO public.roads (id, organization_id, road_code, name) VALUES
   ('d1000000-0000-4000-8000-000000000002', 'b1000000-0000-4000-8000-000000000002', 'RLS-B-ROAD', 'RLS Test Road B')
 ON CONFLICT (id) DO NOTHING;
 
+-- Department-aware documents: NULL classification remains admin-only.
+INSERT INTO public.documents (id, organization_id, title, department_code, uploaded_by) VALUES
+  ('e1000000-0000-4000-8000-000000000001', 'b1000000-0000-4000-8000-000000000001', 'Road department document', 'road_asset', 'a1000000-0000-4000-8000-000000000002'),
+  ('e1000000-0000-4000-8000-000000000002', 'b1000000-0000-4000-8000-000000000001', 'Finance department document', 'finance', 'a1000000-0000-4000-8000-000000000004'),
+  ('e1000000-0000-4000-8000-000000000003', 'b1000000-0000-4000-8000-000000000001', 'Unclassified legacy document', NULL, 'a1000000-0000-4000-8000-000000000001')
+ON CONFLICT (id) DO NOTHING;
+
 -- Organization admin: sees its organization's road, not another tenant's road.
 SET LOCAL request.jwt.claim.sub = 'a1000000-0000-4000-8000-000000000001';
 SET LOCAL ROLE authenticated;
@@ -58,6 +65,10 @@ BEGIN
   SELECT count(*) INTO visible_count FROM public.roads;
   IF visible_count <> 1 THEN
     RAISE EXCEPTION 'RLS FAIL: org admin expected 1 road, saw %', visible_count;
+  END IF;
+  SELECT count(*) INTO visible_count FROM public.documents;
+  IF visible_count <> 3 THEN
+    RAISE EXCEPTION 'RLS FAIL: org admin expected 3 documents, saw %', visible_count;
   END IF;
 END
 $test$;
@@ -80,6 +91,13 @@ BEGIN
   IF visible_count <> 2 THEN
     RAISE EXCEPTION 'RLS FAIL: road manager expected to see its inserted road (2 total), saw %', visible_count;
   END IF;
+
+  SELECT count(*) INTO visible_count FROM public.documents;
+  IF visible_count <> 1 THEN
+    RAISE EXCEPTION 'RLS FAIL: road manager should see only road_asset document, saw %', visible_count;
+  END IF;
+  INSERT INTO public.documents (organization_id, title, department_code, uploaded_by)
+  VALUES ('b1000000-0000-4000-8000-000000000001', 'Manager road document', 'road_asset', 'a1000000-0000-4000-8000-000000000002');
 END
 $test$;
 RESET ROLE;
@@ -95,6 +113,10 @@ BEGIN
   IF visible_count <> 2 THEN
     RAISE EXCEPTION 'RLS FAIL: road read-only user expected 2 roads after manager insert, saw %', visible_count;
   END IF;
+  SELECT count(*) INTO visible_count FROM public.documents;
+  IF visible_count <> 2 THEN
+    RAISE EXCEPTION 'RLS FAIL: road read-only user should see 2 road_asset documents, saw %', visible_count;
+  END IF;
   UPDATE public.roads SET name = 'SHOULD NOT CHANGE'
   WHERE id = 'd1000000-0000-4000-8000-000000000001';
   GET DIAGNOSTICS changed_count = ROW_COUNT;
@@ -105,6 +127,13 @@ BEGIN
     INSERT INTO public.roads (organization_id, road_code, name)
     VALUES ('b1000000-0000-4000-8000-000000000001', 'RLS-READONLY-INSERT', 'Must be denied');
     RAISE EXCEPTION 'RLS FAIL: read-only user unexpectedly inserted a road';
+  EXCEPTION WHEN insufficient_privilege THEN
+    NULL;
+  END;
+  BEGIN
+    INSERT INTO public.documents (organization_id, title, department_code, uploaded_by)
+    VALUES ('b1000000-0000-4000-8000-000000000001', 'Read-only must not upload', 'road_asset', 'a1000000-0000-4000-8000-000000000003');
+    RAISE EXCEPTION 'RLS FAIL: read-only user unexpectedly inserted a document';
   EXCEPTION WHEN insufficient_privilege THEN
     NULL;
   END;
@@ -123,6 +152,10 @@ BEGIN
   SELECT count(*) INTO visible_count FROM public.roads;
   IF visible_count <> 0 THEN
     RAISE EXCEPTION 'RLS FAIL: finance-only user saw % road row(s)', visible_count;
+  END IF;
+  SELECT count(*) INTO visible_count FROM public.documents;
+  IF visible_count <> 1 THEN
+    RAISE EXCEPTION 'RLS FAIL: finance-only user should see only finance document, saw %', visible_count;
   END IF;
 END
 $test$;
