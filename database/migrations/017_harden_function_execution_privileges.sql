@@ -28,3 +28,21 @@ REVOKE EXECUTE ON FUNCTION public.create_organization_for_current_user(text, tex
   FROM PUBLIC, anon, service_role;
 GRANT EXECUTE ON FUNCTION public.create_organization_for_current_user(text, text)
   TO authenticated;
+
+
+-- The department and conversation RLS policies also call these private
+-- organization helpers. Harden their execution grants explicitly instead of
+-- relying on grants inherited from the authorization foundation migration.
+ALTER FUNCTION private.is_org_admin(uuid)
+  SET search_path = '';
+REVOKE EXECUTE ON FUNCTION private.is_org_admin(uuid)
+  FROM PUBLIC, anon, service_role;
+GRANT EXECUTE ON FUNCTION private.is_org_admin(uuid)
+  TO authenticated;
+
+ALTER FUNCTION private.is_org_member(uuid)
+  SET search_path = '';
+REVOKE EXECUTE ON FUNCTION private.is_org_member(uuid)
+  FROM PUBLIC, anon, service_role;
+GRANT EXECUTE ON FUNCTION private.is_org_member(uuid)
+  TO authenticated;
