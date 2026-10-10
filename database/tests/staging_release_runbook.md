@@ -137,3 +137,26 @@ This is a preparation checklist, not evidence that a backup or restore has been 
 - [ ] Results of preflight, catalog checks, JWT/Data API tests, and UI smoke tests.
 - [ ] Explicit go/no-go decision and outstanding risks.
 
+## Automated real-JWT smoke workflow (manual, read-only)
+
+The GitHub Actions workflow `.github/workflows/supabase-migration-integration.yml` now has an opt-in `workflow_dispatch` input named `run_staging_jwt_smoke`. It defaults to false. The real-JWT job runs only when manually requested with that input set to true; it does not run on ordinary pull requests or pushes.
+
+Before enabling the input, configure these repository Actions secrets with values from a verified disposable staging project only:
+
+- `STAGING_SUPABASE_URL`
+- `STAGING_SUPABASE_ANON_KEY` (publishable/anon key for staging; never the service-role key)
+- `STAGING_ROAD_ID` (a seeded road that should be visible to admin, road manager, and road read-only identities)
+- `TOKEN_ORG_ADMIN`
+- `TOKEN_ROAD_MANAGER`
+- `TOKEN_ROAD_READ_ONLY`
+- `TOKEN_FINANCE_MANAGER`
+- `TOKEN_NO_DEPARTMENT_ROLE`
+- `TOKEN_INACTIVE_MEMBER`
+- `TOKEN_OTHER_ORG`
+
+Use short-lived, staging-only user access tokens and rotate/reissue them when expired. Do not commit tokens, put them in workflow logs, or use production tokens. The job refuses the known production project ref and fails if any required value is missing.
+
+To run: open GitHub Actions, select **Isolated Supabase migration integration test**, choose **Run workflow**, select the feature branch, set `run_staging_jwt_smoke=true`, and start the run. Review the job result and ensure the staging URL and seeded identities are correct before running it.
+
+**Coverage boundary:** this automated real-JWT smoke test currently checks road-row SELECT visibility for seven identities and denial of anonymous execution of `has_department_role`. It does not yet cover writes, document/chunk policies, AI conversations, profile column grants, onboarding, or road-section triggers. Those remain separate staging release gates in this runbook. A skipped or unconfigured job is not a passing real-JWT test.
+
