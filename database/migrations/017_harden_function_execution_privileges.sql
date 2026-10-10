@@ -1,5 +1,5 @@
 -- Harden execution privileges and name resolution for privileged public RPCs.
--- Source-controlled proposal only: test after migrations 011-016 in an
+-- Source-controlled proposal only: test after migrations 011-017 in an
 -- isolated staging database. Do not apply directly to production.
 --
 -- Migration 011 converts has_department_role into a SECURITY INVOKER wrapper.
@@ -25,6 +25,6 @@ ALTER FUNCTION public.create_organization_for_current_user(text, text)
 
 -- Organization creation is an authenticated-user operation, never anonymous.
 REVOKE EXECUTE ON FUNCTION public.create_organization_for_current_user(text, text)
-  FROM PUBLIC, anon;
+  FROM PUBLIC, anon, service_role;
 GRANT EXECUTE ON FUNCTION public.create_organization_for_current_user(text, text)
-  TO authenticated, service_role;
+  TO authenticated;
