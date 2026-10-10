@@ -169,11 +169,17 @@ def assign_department_role(
         "is_active": True,
         "assigned_by": current_user["id"],
     }
-    response = (
-        supabase.table("user_department_roles")
-        .upsert(row, on_conflict="organization_id,user_id,department_id")
-        .execute()
-    )
+    try:
+        response = (
+            supabase.table("user_department_roles")
+            .upsert(row, on_conflict="organization_id,user_id,department_id")
+            .execute()
+        )
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Unable to save department role assignment.",
+        ) from exc
     if not response.data:
         raise HTTPException(status_code=500, detail="Department role assignment failed.")
     return response.data[0]
@@ -187,14 +193,20 @@ def revoke_department_role(
     """Deactivate an assignment without deleting its audit history."""
     organization_id = _organization_id(current_user)
     _require_org_admin(current_user, organization_id)
-    response = (
-        current_user["client"]
-        .table("user_department_roles")
-        .update({"is_active": False})
-        .eq("id", str(assignment_id))
-        .eq("organization_id", organization_id)
-        .execute()
-    )
+    try:
+        response = (
+            current_user["client"]
+            .table("user_department_roles")
+            .update({"is_active": False})
+            .eq("id", str(assignment_id))
+            .eq("organization_id", organization_id)
+            .execute()
+        )
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Unable to revoke department role assignment.",
+        ) from exc
     if not response.data:
         raise HTTPException(status_code=404, detail="Department role assignment not found.")
     return {"ok": True, "assignment": response.data[0]}
