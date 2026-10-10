@@ -3,7 +3,31 @@
 **Branch:** `feature/department-role-management`  
 **Repository:** `chandem/road-maintenance-management-system`  
 **Review date:** 2026-10-10  
-**Status:** Investigative notes only; no production SQL executed.
+**Status:** Source recovery succeeded for migrations 011–015. Production remains read-only during reconciliation.
+
+## Latest recovery update — 2026-10-10
+
+The exact SQL bodies for all five department/role migrations were recovered from the production project's PostgreSQL logs and the `supabase_migrations.schema_migrations.statements` records. The migration names and versions match:
+
+| Version | Name | Recovery result |
+|---|---|---|
+| `20261009115651` | `seed_core_departments_011` | Exact SQL recovered |
+| `20261009115706` | `create_department_role_assignments_012` | Exact SQL recovered |
+| `20261009115713` | `secure_department_role_assignments_013` | Exact SQL recovered |
+| `20261009115721` | `department_role_policies_014` | Exact SQL recovered |
+| `20261009115736` | `department_access_helper_015` | Exact SQL recovered |
+
+The log records show these statements were submitted through the Supabase management API on 2026-10-09. This resolves the earlier uncertainty about where the SQL came from. It does **not** make the draft PR's proposed migration files equivalent to the applied SQL.
+
+### Read-only catalog reconciliation performed
+
+- `public.departments` exists; the partial unique index `departments_org_code_unique` exists.
+- `public.user_department_roles` exists with the expected primary key, organization/user/department foreign keys, role check constraint, unique organization/user/department constraint, and both indexes introduced by migration 013.
+- RLS is enabled on `public.user_department_roles`.
+- The two policies from migration 014 exist: `users_can_view_own_department_roles` and `org_admins_manage_department_roles`.
+- `public.has_department_role(uuid,text,text[])` exists with the security-definer SQL body and authenticated-only execute grant described by migration 015.
+- These catalog checks verify object presence and configuration, **not** authorization behavior under real authenticated JWTs.
+- No new production SQL was executed during this recovery.
 
 ## Evidence reviewed
 
@@ -26,37 +50,17 @@ The production ledger label `add_organization_onboarding_rpc` is not sufficient 
 
 ### Department and role migration history
 
-The production ledger includes these versions:
+The five applied SQL bodies were recovered as documented above. The repository's `011_department_road_rls.sql` through `015_road_section_organization_integrity.sql` are proposals with different names and purposes; they must not be treated as exact copies of the five applied ledger entries.
 
-- `seed_core_departments_011`
-- `create_department_role_assignments_012`
-- `secure_department_role_assignments_013`
-- `department_role_policies_014`
-- `department_access_helper_015`
+## Remaining work
 
-The repository's `011_department_road_rls.sql` through `015_road_section_organization_integrity.sql` are proposals with different names and purposes; they must not be treated as exact copies of the five applied ledger entries without evidence. The source history search did not recover the exact applied SQL. Mark all five as **unresolved source mapping** until SQL/deployment artifacts are recovered.
-
-## Owner-assisted recovery procedure
-
-The remaining source is not present in the checked repository history or the available PR comments. The project owner needs to retrieve the SQL from the original execution/deployment source:
-
-1. Open the Supabase Dashboard for project `firzbqzbezuecvplsibi`, then inspect SQL Editor query history (if available for the original user/session) around **2026-10-09 11:56–11:58 UTC**. These timestamps correspond to the five department/role ledger entries.
-2. Locate each exact script using the migration name or distinctive SQL object names. Save the full SQL text alongside its ledger version/name; a migration ledger entry alone records the version/name, not necessarily the SQL body.
-3. If SQL Editor history is unavailable, inspect the original deployment terminal/CI logs, local working copy, editor history, or backups used when those migrations were applied.
-4. Do not paste API keys, database passwords, access tokens, or connection strings into chat. The SQL DDL itself is what is needed; redact any credentials or sensitive literal data if present.
-5. Share the recovered scripts or attach them to the repository as **unverified recovery artifacts** on this feature branch. Do not label them authoritative until each script can be tied to a ledger entry and compared with live catalog evidence.
-
-**Important:** do not rerun, reapply, or edit production migrations to recover their source. Source recovery is an inspection task, not a database change.
-
-## Required recovery checklist
-
-1. Export or locate the exact SQL submitted for each production migration-ledger version and retain its version/name metadata.
-2. Compare every recovered script with the corresponding source file: tables/columns, constraints, indexes, functions, function security settings, grants, RLS policies, triggers, and seeds.
-3. Mark each source mapping as exact match, partial match, superseded, not applied, or missing—with evidence.
-4. Create no paid Supabase branch/resource. Use an already available isolated non-production database only if one is confirmed; otherwise keep testing blocked.
-5. Replay only the verified baseline in that isolated database, then apply proposals in dependency order and run catalog checks plus authenticated-JWT tests.
-6. Keep production read-only and do not merge the draft PR until this evidence and testing are complete.
+1. Preserve the recovered SQL as clearly labeled recovery artifacts in Git, separate from any automatically replayed migration directory until the repository's migration conventions and current branch history are reconciled.
+2. Compare the recovered SQL to the live catalog and classify each object as matching, partially matching, or divergent. The checks above are a first pass, not the full audit.
+3. Inspect the organization-specific seed result for organization code `GRMB`; the seed SQL only targets organizations with that code.
+4. Recover/reconcile the exact source for earlier ledger entries, especially onboarding, and explain the missing AI assistant tables before preparing a complete baseline.
+5. Use an already available isolated non-production database only if one is confirmed; do not create a paid Supabase branch/resource.
+6. Run integration tests with real authenticated JWTs in non-production before considering a production change or merging PR #1.
 
 ## Safety boundary
 
-This document records source review, not a production verification result. No production migration, database write, or RLS integration test was performed. CI success does not establish database authorization correctness.
+Do not rerun, reapply, or edit production migrations to recover their source. Source recovery is an inspection task, not a database change. Keep production read-only until source mapping, schema reconciliation, and authenticated authorization tests are complete.
