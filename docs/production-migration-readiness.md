@@ -132,3 +132,12 @@ No definite migration-order contradiction was found in the documented 011–017 
 ## 13. Organization-member helper security regression coverage (Step 60)
 
 The catalog regression script now checks that `private.is_org_member(uuid)`, used by migration 014 conversation policies, is a SECURITY DEFINER function with an empty `search_path`; authenticated has EXECUTE for policy evaluation; and anon/service_role do not have direct EXECUTE. This is a source-level regression check only. It has not been run against staging or production, and it does not establish actual-user row-level behavior.
+
+
+## 14. Parent-road organization integrity and helper grants (Step 61)
+
+Static review found that migration 015's trigger on `road_sections` did not prevent an update to `roads.organization_id` from leaving existing sections attached to a parent road in a different organization. The proposal now adds a SECURITY DEFINER trigger on `roads` that blocks organization changes while sections exist. A future cross-organization transfer must use a separate, explicit workflow that validates and updates all related records consistently.
+
+The authorization catalog checks now require this parent-road guard trigger and verify its helper is SECURITY DEFINER with an empty `search_path`, with direct EXECUTE revoked from API roles. Migration 017 now explicitly pins `search_path` and grants execution on `private.is_org_admin(uuid)` and `private.is_org_member(uuid)` to authenticated only, revoking PUBLIC/anon/service_role execution.
+
+These are source-only changes. They have not been run in a database. Confirm the helper signatures and behavior in an isolated staging database, then test that a road with sections cannot change organizations, while a road with no sections follows the intended policy. Do not apply to production until the migration ledger and full JWT matrix are reconciled and pass.
