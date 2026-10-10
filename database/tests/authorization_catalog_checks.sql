@@ -524,7 +524,7 @@ BEGIN
     RAISE EXCEPTION 'public.match_document_chunks must remain SECURITY INVOKER';
   END IF;
 
-  -- Privileged organization creation must be callable only by authenticated users
+  -- Privileged organization creation must be callable by authenticated users only
   -- and the SECURITY DEFINER function must not depend on a caller-controlled path.
   IF NOT EXISTS (
     SELECT 1
@@ -543,7 +543,7 @@ BEGIN
        'public.create_organization_for_current_user(text,text)',
        'EXECUTE'
      ) THEN
-    RAISE EXCEPTION 'anonymous/public execution is unexpectedly allowed on organization creation';
+    RAISE EXCEPTION 'anonymous execution is unexpectedly allowed on organization creation';
   END IF;
 
   IF NOT has_function_privilege(
@@ -552,6 +552,14 @@ BEGIN
     'EXECUTE'
   ) THEN
     RAISE EXCEPTION 'authenticated role cannot execute organization creation function';
+  END IF;
+
+  IF has_function_privilege(
+    'service_role',
+    'public.create_organization_for_current_user(text,text)',
+    'EXECUTE'
+  ) THEN
+    RAISE EXCEPTION 'service_role unexpectedly can execute organization creation function';
   END IF;
 
   RAISE NOTICE 'Authorization catalog checks passed. Runtime JWT/RLS tests are still required.';
