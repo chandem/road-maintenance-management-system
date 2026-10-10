@@ -16,7 +16,8 @@ INSERT INTO auth.users (
   ('a1000000-0000-4000-8000-000000000003', 'authenticated', 'authenticated', 'rls-road-readonly@example.invalid', '', now(), '{"provider":"email","providers":["email"]}'::jsonb, '{}'::jsonb, now(), now()),
   ('a1000000-0000-4000-8000-000000000004', 'authenticated', 'authenticated', 'rls-finance@example.invalid', '', now(), '{"provider":"email","providers":["email"]}'::jsonb, '{}'::jsonb, now(), now()),
   ('a1000000-0000-4000-8000-000000000005', 'authenticated', 'authenticated', 'rls-unassigned@example.invalid', '', now(), '{"provider":"email","providers":["email"]}'::jsonb, '{}'::jsonb, now(), now()),
-  ('a1000000-0000-4000-8000-000000000006', 'authenticated', 'authenticated', 'rls-other-org@example.invalid', '', now(), '{"provider":"email","providers":["email"]}'::jsonb, '{}'::jsonb, now(), now())
+  ('a1000000-0000-4000-8000-000000000006', 'authenticated', 'authenticated', 'rls-other-org@example.invalid', '', now(), '{"provider":"email","providers":["email"]}'::jsonb, '{}'::jsonb, now(), now()),
+  ('a1000000-0000-4000-8000-000000000007', 'authenticated', 'authenticated', 'rls-inactive-member@example.invalid', '', now(), '{"provider":"email","providers":["email"]}'::jsonb, '{}'::jsonb, now(), now())
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO public.organizations (id, name, code) VALUES
@@ -30,7 +31,8 @@ INSERT INTO public.organization_members (organization_id, user_id, role, is_acti
   ('b1000000-0000-4000-8000-000000000001', 'a1000000-0000-4000-8000-000000000003', 'member', true),
   ('b1000000-0000-4000-8000-000000000001', 'a1000000-0000-4000-8000-000000000004', 'member', true),
   ('b1000000-0000-4000-8000-000000000001', 'a1000000-0000-4000-8000-000000000005', 'member', true),
-  ('b1000000-0000-4000-8000-000000000002', 'a1000000-0000-4000-8000-000000000006', 'member', true)
+  ('b1000000-0000-4000-8000-000000000002', 'a1000000-0000-4000-8000-000000000006', 'member', true),
+  ('b1000000-0000-4000-8000-000000000001', 'a1000000-0000-4000-8000-000000000007', 'member', false)
 ON CONFLICT (organization_id, user_id) DO NOTHING;
 
 INSERT INTO public.departments (id, organization_id, name, code) VALUES
@@ -260,6 +262,29 @@ BEGIN
   SELECT count(*) INTO visible_count FROM public.document_chunks;
   IF visible_count <> 1 THEN
     RAISE EXCEPTION 'RLS FAIL: organization B user should see only its own finance chunk, saw %', visible_count;
+  END IF;
+END
+$test$;
+RESET ROLE;
+
+-- Inactive organization membership must not retain access even if the user
+-- has no active department assignment.
+SET LOCAL request.jwt.claim.sub = 'a1000000-0000-4000-8000-000000000007';
+SET LOCAL ROLE authenticated;
+DO $test$
+DECLARE visible_count integer;
+BEGIN
+  SELECT count(*) INTO visible_count FROM public.roads;
+  IF visible_count <> 0 THEN
+    RAISE EXCEPTION 'RLS FAIL: inactive organization member saw % road row(s)', visible_count;
+  END IF;
+  SELECT count(*) INTO visible_count FROM public.documents;
+  IF visible_count <> 0 THEN
+    RAISE EXCEPTION 'RLS FAIL: inactive organization member saw % document row(s)', visible_count;
+  END IF;
+  SELECT count(*) INTO visible_count FROM public.document_chunks;
+  IF visible_count <> 0 THEN
+    RAISE EXCEPTION 'RLS FAIL: inactive organization member saw % document chunk row(s)', visible_count;
   END IF;
 END
 $test$;
