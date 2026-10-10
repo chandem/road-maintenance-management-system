@@ -1,0 +1,154 @@
+name: Isolated Supabase migration integration test
+
+on:
+  pull_request:
+    branches:
+      - main
+      - feature/department-role-management
+    paths:
+      - "database/migrations/**/*.sql"
+      - "database/tests/**/*.sql"
+      - "database/tests/**/*.py"
+      - ".github/workflows/supabase-migration-integration.yml"
+  push:
+    branches:
+      - feature/department-role-management
+    paths:
+      - "database/migrations/**/*.sql"
+      - "database/tests/**/*.sql"
+      - "database/tests/**/*.py"
+      - ".github/workflows/supabase-migration-integration.yml"
+  workflow_dispatch:
+    inputs:
+      run_staging_jwt_smoke:
+        description: "Run read-only Data API smoke tests using real staging user JWTs (requires repository Actions secrets)."
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  migration-integration:
+    name: Apply repository migrations to disposable local Supabase
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Initialize disposable local Supabase config
+        run: supabase init
+
+      - name: Copy repository SQL migrations into isolated test sequence
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          files=(database/migrations/*.sql)
+          if [ "${#files[@]}" -eq 0 ]; then
+            echo "ERROR: No migration SQL files found."
+            exit 1
+          fi
+
+          mkdir -p supabase/migrations
+          index=1
+          for file in "${files[@]}"; do
+            base="$(basename "$file" .sql)"
+            timestamp="$(printf '202601010000%02d' "$index")"
+            cp "$file" "supabase/migrations/${timestamp}_${base}.sql"
+            echo "Queued isolated migration: $file"
+            index=$((index + 1))
+          done
+
+      - name: Start isolated Supabase services
+        run: supabase start
+
+      - name: Apply all repository migrations to disposable database
+        run: supabase db reset
+
+      - name: Validate read-only Data API smoke-test Python syntax
+        run: python -m py_compile database/tests/data_api_road_read_isolation_smoke.py
+
+      - name: Run authorization catalog regression checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" \
+            -v ON_ERROR_STOP=1 \
+            -f database/tests/authorization_catalog_checks.sql
+
+      - name: Run department road RLS behavior checks with synthetic JWT claims
+        shell: bash
+        run: |
+          set -euo pipefail
+          psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" \
+            -v ON_ERROR_STOP=1 \
+            -f database/tests/department_rls_behavior_checks.sql
+
+      - name: Run read-only migration release preflight
+        shell: bash
+        run: |
+          set -euo pipefail
+          psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" \
+            -v ON_ERROR_STOP=1 \
+            -f database/tests/migration_release_preflight.sql
+
+      - name: Explain test boundary
+        if: always()
+        run: |
+          echo "This workflow uses a disposable local Supabase instance on a GitHub-hosted runner."
+          echo "A successful run validates this repository's clean-install migration sequence and catalog checks."
+          echo "Synthetic-claim SQL checks exercise PostgreSQL RLS but do not prove real signed JWT/PostgREST behavior."
+          echo "It does not prove production schema equivalence or backend/UI compatibility."
+          echo "Never use this workflow to apply migrations to the production project."
+
+
+  # This job runs only when manually requested. It uses real signed user access
+  # tokens against a verified non-production project and performs read-only
+  # road SELECT checks plus an anonymous helper-RPC denial check.
+  staging-real-jwt-smoke:
+    name: Staging Data API smoke test (real user JWTs)
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_staging_jwt_smoke == true }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    env:
+      STAGING_SUPABASE_URL: ${{ secrets.STAGING_SUPABASE_URL }}
+      STAGING_SUPABASE_ANON_KEY: ${{ secrets.STAGING_SUPABASE_ANON_KEY }}
+      STAGING_ROAD_ID: ${{ secrets.STAGING_ROAD_ID }}
+      TOKEN_ORG_ADMIN: ${{ secrets.TOKEN_ORG_ADMIN }}
+      TOKEN_ROAD_MANAGER: ${{ secrets.TOKEN_ROAD_MANAGER }}
+      TOKEN_ROAD_READ_ONLY: ${{ secrets.TOKEN_ROAD_READ_ONLY }}
+      TOKEN_FINANCE_MANAGER: ${{ secrets.TOKEN_FINANCE_MANAGER }}
+      TOKEN_NO_DEPARTMENT_ROLE: ${{ secrets.TOKEN_NO_DEPARTMENT_ROLE }}
+      TOKEN_INACTIVE_MEMBER: ${{ secrets.TOKEN_INACTIVE_MEMBER }}
+      TOKEN_OTHER_ORG: ${{ secrets.TOKEN_OTHER_ORG }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify staging configuration is present
+        shell: bash
+        run: |
+          set -euo pipefail
+          for name in STAGING_SUPABASE_URL STAGING_SUPABASE_ANON_KEY STAGING_ROAD_ID TOKEN_ORG_ADMIN TOKEN_ROAD_MANAGER TOKEN_ROAD_READ_ONLY TOKEN_FINANCE_MANAGER TOKEN_NO_DEPARTMENT_ROLE TOKEN_INACTIVE_MEMBER TOKEN_OTHER_ORG; do
+            if [ -z "${!name:-}" ]; then
+              echo "::error::Missing required Actions secret for $name. Configure only verified staging values; do not use production tokens."
+              exit 1
+            fi
+          done
+          if [[ "$STAGING_SUPABASE_URL" == *"firzbqzbezuecvplsibi"* ]]; then
+            echo "::error::Refusing to run against the known production project."
+            exit 1
+          fi
+
+      - name: Run read-only road visibility and anonymous RPC checks
+        run: python database/tests/data_api_road_read_isolation_smoke.py

@@ -86,6 +86,14 @@ const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL_RMMS ??
   "https://ai-rmms-backend.onrender.com/api/v1";
 
+const DOCUMENT_DEPARTMENTS = [
+  { code: "road_asset", label: "Road Asset Management" },
+  { code: "machinery_maintenance", label: "Machinery Maintenance" },
+  { code: "finance", label: "Finance" },
+  { code: "human_resources", label: "Human Resources" },
+  { code: "general_assets", label: "General Asset Management" },
+] as const;
+
 async function authToken(): Promise<string> {
   const { data, error } = await supabase.auth.getSession();
   if (error) throw error;
@@ -113,6 +121,7 @@ function App() {
   const [assistantLoading, setAssistantLoading] = useState(false);
   const [dashboard, setDashboard] = useState<ExecutiveDashboard | null>(null);
   const [dashboardLoading, setDashboardLoading] = useState(false);
+  const [documentDepartment, setDocumentDepartment] = useState("");
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [uploadLoading, setUploadLoading] = useState(false);
   const [uploadResult, setUploadResult] = useState<DocumentUploadResult | null>(null);
@@ -292,7 +301,10 @@ function App() {
 
   const handleUploadDocument = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!uploadFile) return;
+    if (!uploadFile || !documentDepartment) {
+      setError("Select a department before uploading a document.");
+      return;
+    }
     setUploadLoading(true);
     setError(null);
     setUploadResult(null);
@@ -300,6 +312,7 @@ function App() {
       const token = await authToken();
       const form = new FormData();
       form.append("file", uploadFile);
+      form.append("department_code", documentDepartment);
       const response = await fetch(`${API_BASE_URL}/documents/upload-and-classify`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
@@ -322,6 +335,10 @@ function App() {
 
   const handleDocumentQuestion = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (!documentDepartment) {
+      setError("Select a department before asking a document question.");
+      return;
+    }
     setDocLoading(true);
     setError(null);
     setDocAnswer(null);
@@ -333,7 +350,10 @@ function App() {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ question: docQuestion.trim() }),
+        body: JSON.stringify({
+          question: docQuestion.trim(),
+          department_code: documentDepartment,
+        }),
       });
       if (!response.ok) {
         throw new Error(`Document Q&A failed (${response.status})`);
@@ -561,12 +581,28 @@ function App() {
                     Upload TXT, CSV, PDF, DOCX, or Excel. The file is extracted,
                     classified, chunked, and embedded for semantic search.
                   </p>
+                  <label className="panel-help" htmlFor="document-department">
+                    Document department
+                  </label>
+                  <select
+                    id="document-department"
+                    value={documentDepartment}
+                    onChange={(e) => setDocumentDepartment(e.target.value)}
+                    required
+                  >
+                    <option value="">Select a department</option>
+                    {DOCUMENT_DEPARTMENTS.map((department) => (
+                      <option key={department.code} value={department.code}>
+                        {department.label}
+                      </option>
+                    ))}
+                  </select>
                   <input
                     type="file"
                     accept=".txt,.csv,.pdf,.docx,.xlsx,.xlsm"
                     onChange={(e) => setUploadFile(e.target.files?.[0] ?? null)}
                   />
-                  <button type="submit" disabled={uploadLoading || !uploadFile}>
+                  <button type="submit" disabled={uploadLoading || !uploadFile || !documentDepartment}>
                     {uploadLoading ? "Uploading…" : "Upload & index"}
                   </button>
                   {uploadResult && (
@@ -605,6 +641,22 @@ function App() {
                     Ask questions answered only from stored document evidence
                     (semantic search first, keyword fallback).
                   </p>
+                  <label className="panel-help" htmlFor="document-question-department">
+                    Search within department
+                  </label>
+                  <select
+                    id="document-question-department"
+                    value={documentDepartment}
+                    onChange={(e) => setDocumentDepartment(e.target.value)}
+                    required
+                  >
+                    <option value="">Select a department</option>
+                    {DOCUMENT_DEPARTMENTS.map((department) => (
+                      <option key={department.code} value={department.code}>
+                        {department.label}
+                      </option>
+                    ))}
+                  </select>
                   <textarea
                     value={docQuestion}
                     onChange={(e) => setDocQuestion(e.target.value)}
@@ -615,7 +667,7 @@ function App() {
                   />
                   <button
                     type="submit"
-                    disabled={docLoading || !docQuestion.trim()}
+                    disabled={docLoading || !docQuestion.trim() || !documentDepartment}
                   >
                     {docLoading ? "Searching…" : "Ask documents"}
                   </button>

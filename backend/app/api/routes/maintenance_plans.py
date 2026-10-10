@@ -2,7 +2,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from app.api.dependencies import get_current_user
+from app.api.dependencies import get_current_user, require_department_access
 from app.schemas.maintenance_plans import (
     MaintenancePlan,
     MaintenancePlanCreate,
@@ -29,7 +29,7 @@ def _org_id(current_user) -> str:
 
 @router.get("", response_model=list[MaintenancePlan])
 def list_maintenance_plans(
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_department_access("road_asset", ['department_manager', 'officer', 'read_only'])),
     status: str | None = Query(default=None),
     fiscal_year: str | None = Query(default=None),
     limit: int = Query(default=100, ge=1, le=200),
@@ -51,7 +51,7 @@ def list_maintenance_plans(
 @router.get("/{plan_id}", response_model=MaintenancePlan)
 def get_maintenance_plan(
     plan_id: UUID,
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_department_access("road_asset", ['department_manager', 'officer', 'read_only'])),
 ):
     response = (
         current_user["client"]
@@ -69,7 +69,7 @@ def get_maintenance_plan(
 @router.post("", response_model=MaintenancePlan, status_code=201)
 def create_maintenance_plan(
     payload: MaintenancePlanCreate,
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_department_access("road_asset", ['department_manager', 'officer'])),
 ):
     organization_id = _org_id(current_user)
     row = {
@@ -91,7 +91,7 @@ def create_maintenance_plan(
 def update_maintenance_plan(
     plan_id: UUID,
     payload: MaintenancePlanUpdate,
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_department_access("road_asset", ['department_manager', 'officer'])),
 ):
     updates = {
         k: v

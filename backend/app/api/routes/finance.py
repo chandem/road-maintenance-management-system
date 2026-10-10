@@ -3,7 +3,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from app.api.dependencies import get_current_user
+from app.api.dependencies import get_current_user, require_department_access
 from app.schemas.finance import (
     Budget,
     BudgetCreate,
@@ -29,7 +29,13 @@ EXPENSE_COLS = (
 
 
 def _org_id(current_user) -> str:
-    org_id = resolve_organization_id(current_user["client"], current_user["id"])
+    try:
+        org_id = resolve_organization_id(current_user["client"], current_user["id"])
+    except Exception as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="Organization membership could not be verified.",
+        ) from exc
     if not org_id:
         raise HTTPException(status_code=409, detail="User is not assigned to an organization.")
     return org_id
@@ -37,7 +43,7 @@ def _org_id(current_user) -> str:
 
 @router.get("/summary", response_model=FinanceSummary)
 def finance_summary(
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_department_access("finance", ['department_manager', 'officer', 'read_only'])),
     fiscal_year: str | None = Query(default=None, max_length=20),
 ):
     """Budget utilization snapshot (Financial Management)."""
@@ -75,7 +81,7 @@ def finance_summary(
 
 @router.get("/budgets", response_model=list[Budget])
 def list_budgets(
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_department_access("finance", ['department_manager', 'officer', 'read_only'])),
     limit: int = Query(default=50, ge=1, le=100),
     fiscal_year: str | None = Query(default=None, max_length=20),
     status: str | None = Query(default=None, max_length=50),
@@ -97,7 +103,7 @@ def list_budgets(
 @router.get("/budgets/{budget_id}", response_model=Budget)
 def get_budget(
     budget_id: UUID,
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_department_access("finance", ['department_manager', 'officer', 'read_only'])),
 ):
     response = (
         current_user["client"]
@@ -115,7 +121,7 @@ def get_budget(
 @router.post("/budgets", response_model=Budget, status_code=201)
 def create_budget(
     payload: BudgetCreate,
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_department_access("finance", ['department_manager', 'officer'])),
 ):
     organization_id = _org_id(current_user)
     row = {"organization_id": organization_id, **payload.model_dump(mode="json")}
@@ -129,7 +135,7 @@ def create_budget(
 def update_budget(
     budget_id: UUID,
     payload: BudgetUpdate,
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_department_access("finance", ['department_manager', 'officer'])),
 ):
     updates = {
         k: v for k, v in payload.model_dump(mode="json", exclude_unset=True).items()
@@ -150,7 +156,7 @@ def update_budget(
 
 @router.get("/expenses", response_model=list[Expense])
 def list_expenses(
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_department_access("finance", ['department_manager', 'officer', 'read_only'])),
     limit: int = Query(default=100, ge=1, le=200),
     budget_id: UUID | None = Query(default=None),
     work_order_id: UUID | None = Query(default=None),
@@ -172,7 +178,7 @@ def list_expenses(
 @router.get("/expenses/{expense_id}", response_model=Expense)
 def get_expense(
     expense_id: UUID,
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_department_access("finance", ['department_manager', 'officer', 'read_only'])),
 ):
     response = (
         current_user["client"]
@@ -190,7 +196,7 @@ def get_expense(
 @router.post("/expenses", response_model=Expense, status_code=201)
 def create_expense(
     payload: ExpenseCreate,
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_department_access("finance", ['department_manager', 'officer'])),
 ):
     """Record an expense. Does not approve payments — advisory record only."""
     organization_id = _org_id(current_user)

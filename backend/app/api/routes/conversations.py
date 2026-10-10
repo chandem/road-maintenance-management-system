@@ -1,8 +1,10 @@
+from datetime import datetime, timezone
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from app.api.dependencies import get_current_user
+from app.api.dependencies import get_current_user, require_department_access, require_org_admin
+from app.db.supabase import get_service_client
 from app.schemas.conversations import (
     Conversation,
     ConversationCreate,
@@ -31,15 +33,16 @@ def _org_id(current_user) -> str:
 
 @router.get("", response_model=list[Conversation])
 def list_conversations(
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_department_access("road_asset", ['department_manager', 'officer', 'read_only'])),
     limit: int = Query(default=20, ge=1, le=50),
 ):
     """List AI conversations for the caller's organization."""
     supabase = current_user["client"]
+    organization_id = _org_id(current_user)
     response = (
         supabase.table("ai_conversations")
         .select("id,organization_id,created_by,title,status,created_at,updated_at")
-        .eq("created_by", current_user["id"])
+        .eq("organization_id", organization_id)
         .order("updated_at", desc=True)
         .limit(limit)
         .execute()
@@ -50,9 +53,9 @@ def list_conversations(
 @router.post("", response_model=Conversation, status_code=201)
 def create_conversation(
     body: ConversationCreate,
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_department_access("road_asset", ['department_manager', 'officer'])),
 ):
-    """Start a new AI conversation."""
+    """Start a new AI conversation (read-only users cannot create one)."""
     org_id = _org_id(current_user)
     supabase = current_user["client"]
 
@@ -76,7 +79,7 @@ def create_conversation(
 @router.get("/{conversation_id}/messages", response_model=list[Message])
 def list_messages(
     conversation_id: UUID,
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_department_access("road_asset", ['department_manager', 'officer', 'read_only'])),
     limit: int = Query(default=50, ge=1, le=100),
 ):
     """List messages in a conversation."""
@@ -108,9 +111,9 @@ def list_messages(
 def post_message(
     conversation_id: UUID,
     body: MessageCreate,
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_department_access("road_asset", ['department_manager', 'officer'])),
 ):
-    """Post a user message and receive an evidence-aware assistant reply."""
+    """Post a message; read-only users cannot mutate conversation history."""
     supabase = current_user["client"]
 
     conv = (
@@ -125,7 +128,18 @@ def post_message(
     if conv.data.get("status") != "active":
         raise HTTPException(status_code=409, detail="Conversation is not active.")
 
-    # Store user message
+    # Assistant messages are written only through the backend's trusted service client.
+    # Create it before persisting the user message so missing server configuration
+    # fails without leaving a partial conversation turn.
+    try:
+        trusted_client = get_service_client()
+    except RuntimeError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="Trusted AI message storage is not configured.",
+        ) from exc
+
+    # Store user message with the caller's JWT; RLS permits only role='user'.
     user_msg = (
         supabase.table("ai_messages")
         .insert(
@@ -141,15 +155,27 @@ def post_message(
         raise HTTPException(status_code=500, detail="Message could not be saved.")
 
     # Lightweight context for the assistant (counts only — full office assistant
-    # endpoint remains available for deep queries).
-    roads = supabase.table("roads").select("id", count="exact").limit(1).execute()
-    sections = supabase.table("road_sections").select("id", count="exact").limit(1).execute()
-    orders = supabase.table("work_orders").select("id", count="exact").limit(1).execute()
+    # endpoint remains available for deep queries). A failed count must not
+    # abort the turn after the user message is persisted or be presented as zero.
+    def count_label(table_name: str) -> str:
+        try:
+            result = (
+                supabase.table(table_name)
+                .select("id", count="exact")
+                .limit(1)
+                .execute()
+            )
+            count = getattr(result, "count", None)
+            if count is None:
+                count = len(result.data or [])
+            return str(count)
+        except Exception:
+            return "unavailable"
 
     evidence_summary = (
-        f"Roads: {getattr(roads, 'count', None) or len(roads.data or [])}; "
-        f"Sections: {getattr(sections, 'count', None) or len(sections.data or [])}; "
-        f"Work orders: {getattr(orders, 'count', None) or len(orders.data or [])}."
+        f"Roads: {count_label('roads')}; "
+        f"Sections: {count_label('road_sections')}; "
+        f"Work orders: {count_label('work_orders')}."
     )
 
     prompt = (
@@ -160,7 +186,13 @@ def post_message(
         f"User message: {body.content}"
     )
 
-    ai_result = generate_text(prompt)
+    try:
+        ai_result = generate_text(prompt)
+    except Exception:
+        # A provider/network error must not leave the persisted user message
+        # without a corresponding assistant response.
+        ai_result = None
+
     if ai_result:
         assistant_content = ai_result.text
         model_name = ai_result.model
@@ -172,24 +204,46 @@ def post_message(
         )
         model_name = None
 
-    assistant_msg = (
-        supabase.table("ai_messages")
-        .insert(
-            {
-                "conversation_id": str(conversation_id),
-                "role": "assistant",
-                "content": assistant_content,
-                "model": model_name,
-            }
+    # Persist the generated assistant reply using the server-only service role.
+    # The conversation was first verified through the caller's RLS-scoped client.
+    try:
+        assistant_msg = (
+            trusted_client.table("ai_messages")
+            .insert(
+                {
+                    "conversation_id": str(conversation_id),
+                    "role": "assistant",
+                    "content": assistant_content,
+                    "model": model_name,
+                }
+            )
+            .execute()
         )
-        .execute()
-    )
+    except Exception as exc:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "Your message was saved, but the assistant reply could not be stored. "
+                "Refresh the conversation before sending another message."
+            ),
+        ) from exc
     if not assistant_msg.data:
-        raise HTTPException(status_code=500, detail="Assistant reply could not be saved.")
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "Your message was saved, but the assistant reply could not be stored. "
+                "Refresh the conversation before sending another message."
+            ),
+        )
 
-    # Touch conversation updated_at
-    supabase.table("ai_conversations").update(
-        {"updated_at": "now()"}
-    ).eq("id", str(conversation_id)).execute()
+    # Updating the list-sort timestamp is best-effort: the assistant reply
+    # is already saved, so a timestamp failure must not turn success into an
+    # API error that encourages clients to resend the same message.
+    try:
+        trusted_client.table("ai_conversations").update(
+            {"updated_at": datetime.now(timezone.utc).isoformat()}
+        ).eq("id", str(conversation_id)).execute()
+    except Exception:
+        pass
 
     return assistant_msg.data[0]

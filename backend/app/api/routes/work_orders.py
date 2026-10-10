@@ -2,7 +2,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from app.api.dependencies import get_current_user
+from app.api.dependencies import get_current_user, require_department_access
 from app.schemas.work_orders import WorkOrder, WorkOrderCreate, WorkOrderUpdate
 from app.services.ai_audit import resolve_organization_id
 
@@ -24,7 +24,7 @@ def _org_id(current_user) -> str:
 
 @router.get("", response_model=list[WorkOrder])
 def list_work_orders(
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_department_access("road_asset", ['department_manager', 'officer', 'read_only'])),
     status: str | None = Query(default=None),
     priority: str | None = Query(default=None),
     road_section_id: str | None = Query(default=None),
@@ -50,7 +50,7 @@ def list_work_orders(
 
 
 @router.get("/{work_order_id}", response_model=WorkOrder)
-def get_work_order(work_order_id: UUID, current_user=Depends(get_current_user)):
+def get_work_order(work_order_id: UUID, current_user=Depends(require_department_access("road_asset", ['department_manager', 'officer', 'read_only']))):
     response = (
         current_user["client"]
         .table("work_orders")
@@ -67,7 +67,7 @@ def get_work_order(work_order_id: UUID, current_user=Depends(get_current_user)):
 @router.post("", response_model=WorkOrder, status_code=201)
 def create_work_order(
     payload: WorkOrderCreate,
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_department_access("road_asset", ['department_manager', 'officer'])),
 ):
     organization_id = _org_id(current_user)
     row = {
@@ -85,7 +85,7 @@ def create_work_order(
 def update_work_order(
     work_order_id: UUID,
     payload: WorkOrderUpdate,
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_department_access("road_asset", ['department_manager', 'officer'])),
 ):
     updates = {
         k: v for k, v in payload.model_dump(mode="json", exclude_unset=True).items()

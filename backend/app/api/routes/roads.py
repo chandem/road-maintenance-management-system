@@ -2,7 +2,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from app.api.dependencies import get_current_user
+from app.api.dependencies import get_current_user, require_department_access
 from app.schemas.roads import Road, RoadCreate, RoadUpdate
 from app.services.ai_audit import resolve_organization_id
 
@@ -23,7 +23,7 @@ def _org_id(current_user) -> str:
 
 @router.get("", response_model=list[Road])
 def list_roads(
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_department_access("road_asset", ["department_manager", "officer", "read_only"])),
     limit: int = Query(default=100, ge=1, le=200),
     status: str | None = Query(default=None, max_length=50),
 ):
@@ -31,6 +31,7 @@ def list_roads(
         current_user["client"]
         .table("roads")
         .select(SELECT_COLS)
+        .eq("organization_id", _org_id(current_user))
         .order("name")
         .limit(limit)
     )
@@ -40,12 +41,16 @@ def list_roads(
 
 
 @router.get("/{road_id}", response_model=Road)
-def get_road(road_id: UUID, current_user=Depends(get_current_user)):
+def get_road(
+    road_id: UUID,
+    current_user=Depends(require_department_access("road_asset", ["department_manager", "officer", "read_only"])),
+):
     response = (
         current_user["client"]
         .table("roads")
         .select(SELECT_COLS)
         .eq("id", str(road_id))
+        .eq("organization_id", _org_id(current_user))
         .maybe_single()
         .execute()
     )
@@ -55,7 +60,10 @@ def get_road(road_id: UUID, current_user=Depends(get_current_user)):
 
 
 @router.post("", response_model=Road, status_code=201)
-def create_road(payload: RoadCreate, current_user=Depends(get_current_user)):
+def create_road(
+    payload: RoadCreate,
+    current_user=Depends(require_department_access("road_asset", ["department_manager", "officer"])),
+):
     organization_id = _org_id(current_user)
     row = {"organization_id": organization_id, **payload.model_dump(mode="json")}
     response = current_user["client"].table("roads").insert(row).execute()
@@ -68,7 +76,7 @@ def create_road(payload: RoadCreate, current_user=Depends(get_current_user)):
 def update_road(
     road_id: UUID,
     payload: RoadUpdate,
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_department_access("road_asset", ["department_manager", "officer"])),
 ):
     updates = {
         k: v for k, v in payload.model_dump(mode="json", exclude_unset=True).items()
@@ -80,6 +88,7 @@ def update_road(
         .table("roads")
         .update(updates)
         .eq("id", str(road_id))
+        .eq("organization_id", _org_id(current_user))
         .execute()
     )
     if not response.data:
