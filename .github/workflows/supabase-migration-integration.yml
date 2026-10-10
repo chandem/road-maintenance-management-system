@@ -19,6 +19,12 @@ on:
       - "database/tests/**/*.py"
       - ".github/workflows/supabase-migration-integration.yml"
   workflow_dispatch:
+    inputs:
+      run_staging_jwt_smoke:
+        description: "Run read-only Data API smoke tests using real staging user JWTs (requires repository Actions secrets)."
+        required: true
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -102,3 +108,47 @@ jobs:
           echo "Synthetic-claim SQL checks exercise PostgreSQL RLS but do not prove real signed JWT/PostgREST behavior."
           echo "It does not prove production schema equivalence or backend/UI compatibility."
           echo "Never use this workflow to apply migrations to the production project."
+
+
+  # This job runs only when manually requested. It uses real signed user access
+  # tokens against a verified non-production project and performs read-only
+  # road SELECT checks plus an anonymous helper-RPC denial check.
+  staging-real-jwt-smoke:
+    name: Staging Data API smoke test (real user JWTs)
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_staging_jwt_smoke == true }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    env:
+      STAGING_SUPABASE_URL: ${{ secrets.STAGING_SUPABASE_URL }}
+      STAGING_SUPABASE_ANON_KEY: ${{ secrets.STAGING_SUPABASE_ANON_KEY }}
+      STAGING_ROAD_ID: ${{ secrets.STAGING_ROAD_ID }}
+      TOKEN_ORG_ADMIN: ${{ secrets.TOKEN_ORG_ADMIN }}
+      TOKEN_ROAD_MANAGER: ${{ secrets.TOKEN_ROAD_MANAGER }}
+      TOKEN_ROAD_READ_ONLY: ${{ secrets.TOKEN_ROAD_READ_ONLY }}
+      TOKEN_FINANCE_MANAGER: ${{ secrets.TOKEN_FINANCE_MANAGER }}
+      TOKEN_NO_DEPARTMENT_ROLE: ${{ secrets.TOKEN_NO_DEPARTMENT_ROLE }}
+      TOKEN_INACTIVE_MEMBER: ${{ secrets.TOKEN_INACTIVE_MEMBER }}
+      TOKEN_OTHER_ORG: ${{ secrets.TOKEN_OTHER_ORG }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify staging configuration is present
+        shell: bash
+        run: |
+          set -euo pipefail
+          for name in STAGING_SUPABASE_URL STAGING_SUPABASE_ANON_KEY STAGING_ROAD_ID TOKEN_ORG_ADMIN TOKEN_ROAD_MANAGER TOKEN_ROAD_READ_ONLY TOKEN_FINANCE_MANAGER TOKEN_NO_DEPARTMENT_ROLE TOKEN_INACTIVE_MEMBER TOKEN_OTHER_ORG; do
+            if [ -z "${!name:-}" ]; then
+              echo "::error::Missing required Actions secret for $name. Configure only verified staging values; do not use production tokens."
+              exit 1
+            fi
+          done
+          if [[ "$STAGING_SUPABASE_URL" == *"firzbqzbezuecvplsibi"* ]]; then
+            echo "::error::Refusing to run against the known production project."
+            exit 1
+          fi
+
+      - name: Run read-only road visibility and anonymous RPC checks
+        run: python database/tests/data_api_road_read_isolation_smoke.py
