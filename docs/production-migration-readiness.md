@@ -98,3 +98,32 @@ The source proposal was corrected so every chunk operation first requires a pare
 - Production data modified: none.
 - PR #1: remains open and unmerged.
 - Do not claim actual-user RLS validation until the authenticated-user matrix has been run against an isolated test database.
+
+
+## 12. Migration dependency and ordering review (Step 59)
+
+Static review of the current proposals supports this order for an isolated staging run:
+
+1. 011 — move/harden the department-role helper and add road RLS.
+2. 012 — add module-level department RLS; depends on the public wrapper/private helper introduced by 011.
+3. 013 — add document department classification and parent-consistent chunk policies.
+4. 014 — create AI conversation tables and ownership/department policies.
+5. 015 — preflight/backfill road-section organization IDs, enforce NOT NULL, and add the parent-road integrity trigger.
+6. 016 — revoke excess table privileges; requires every listed target table, including the three AI conversation tables, to exist.
+7. 017 — repeat helper/RPC execution-grant hardening; depends on the function names/signatures established by 011 and the existing organization-creation RPC.
+
+This ordering is only a proposed staging order, not an approved production migration plan. Reconcile the actual timestamped migration ledger before assigning final versions.
+
+### Dependency blockers still open
+
+- Migrations 011 and 012 call `private.is_org_admin(uuid)`; migration 014 also calls `private.is_org_member(uuid)`. The exact applied authorization-foundation SQL and grants have not yet been verified. Do not assume the helpers are callable by authenticated users merely because the proposal references them.
+- Migration 011 alters the schema of `public.has_department_role(uuid,text,text[])` to `private`. Confirm the exact signature exists, `private` schema exists, and dependencies on the existing function are understood before running it in staging.
+- Migration 013 requires `public.documents` and `public.document_chunks` to have the referenced columns and compatible constraints. Production currently lacks `documents.department_code`; migration 013 is not already satisfied by the live schema.
+- Migration 014 introduces three tables that backend routes already expect. Confirm the proposed columns and grants match every backend query before treating the route/schema contract as complete.
+- Migration 015 modifies existing road-section data and makes `organization_id` NOT NULL. The read-only preflight must run first and return zero blocking rows; the empty production table is not a substitute for staging tests.
+- Migration 016 includes `ai_conversations`, `ai_messages`, and `ai_message_sources`, so it cannot run before migration 014 succeeds.
+- Migration 017 assumes the public organization-creation function has the exact signature shown. Verify it against the applied schema before executing `ALTER FUNCTION` or changing grants.
+
+### Outcome
+
+No definite migration-order contradiction was found in the documented 011–017 staging sequence. However, the applied helper-function definitions/grants, timestamp mapping, and actual SQL execution remain unverified. The sequence therefore remains **blocked from production** pending source reconciliation and isolated staging tests. No production writes or migrations were performed for this review.
