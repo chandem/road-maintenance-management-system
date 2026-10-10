@@ -193,6 +193,7 @@ CREATE POLICY ai_messages_department_insert
     AND EXISTS (
       SELECT 1 FROM public.ai_conversations c
       WHERE c.id = ai_messages.conversation_id
+        AND c.status = 'active'
         AND c.created_by = (SELECT auth.uid())
         AND (
           private.is_org_admin(c.organization_id)
