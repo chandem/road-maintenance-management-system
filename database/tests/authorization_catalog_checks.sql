@@ -249,7 +249,8 @@ BEGIN
   IF NOT EXISTS (
     SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
     WHERE n.nspname = 'private' AND p.proname = 'is_org_member'
-      AND pg_get_function_identity_arguments(p.oid) = 'uuid'
+      AND p.pronargs = 1
+      AND p.proargtypes[0] = 'uuid'::regtype
       AND p.prosecdef AND p.proconfig @> ARRAY['search_path=""']
   ) THEN
     RAISE EXCEPTION 'private.is_org_member(uuid) must be SECURITY DEFINER with empty search_path';
