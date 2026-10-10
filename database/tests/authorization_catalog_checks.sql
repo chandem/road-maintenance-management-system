@@ -93,6 +93,23 @@ BEGIN
     RAISE EXCEPTION 'No authenticated policy found on: %', array_to_string(missing_policies, ', ');
   END IF;
 
+  -- Restrictive policies narrow access but cannot grant it by themselves.
+  -- Require at least one applicable permissive policy per table as well;
+  -- otherwise a missing baseline policy can make every request fail closed.
+  FOREACH rel_name IN ARRAY required_policy_tables LOOP
+    IF NOT EXISTS (
+      SELECT 1
+      FROM pg_policies p
+      WHERE p.schemaname = 'public'
+        AND p.tablename = rel_name
+        AND p.permissive = 'PERMISSIVE'
+        AND 'authenticated' = ANY(p.roles)
+    ) THEN
+      RAISE EXCEPTION
+        'No permissive authenticated baseline policy found on public.%', rel_name;
+    END IF;
+  END LOOP;
+
   -- A policy existing on a table is not enough: it could be permissive-only,
   -- leaving organization-level policies broader than intended. For each
   -- department-protected business table, require restrictive coverage for
