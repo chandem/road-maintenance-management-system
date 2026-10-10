@@ -195,6 +195,25 @@ BEGIN
     RAISE EXCEPTION 'ai_message_sources missing restrictive SELECT policy';
   END IF;
 
+  -- Non-admin road users may see only approved road-maintenance source types.
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_policies
+    WHERE schemaname = 'public'
+      AND tablename = 'ai_message_sources'
+      AND policyname = 'ai_message_sources_department_select'
+      AND permissive = 'RESTRICTIVE'
+      AND cmd = 'SELECT'
+      AND 'authenticated' = ANY(roles)
+      AND coalesce(qual, '') ILIKE '%source_type%'
+      AND coalesce(qual, '') ILIKE '%road%'
+      AND coalesce(qual, '') ILIKE '%work_order%'
+      AND coalesce(qual, '') ILIKE '%has_department_role%'
+  ) THEN
+    RAISE EXCEPTION
+      'ai_message_sources restrictive SELECT policy must limit non-admin evidence to authorized road-maintenance sources';
+  END IF;
+
   -- RLS does not protect TRUNCATE. Normal authenticated users must not
   -- retain elevated table privileges from project defaults or older migrations.
   FOREACH rel_name IN ARRAY ARRAY[
