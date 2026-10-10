@@ -513,10 +513,28 @@ def office_assistant(
                     limit=4,
                     minimum_similarity=0.35,
                 )
-                document_evidence = [
-                    f"{m.content[:280].strip()} (similarity {m.similarity:.2f})"
-                    for m in matches
-                ]
+                # Verify every semantic match against authoritative document metadata
+                # using the caller's JWT-scoped client. Never send raw vector-RPC
+                # snippets to the model when the parent document cannot be verified.
+                document_ids = list(dict.fromkeys(str(match.document_id) for match in matches))
+                if document_ids:
+                    metadata = (
+                        supabase.table("documents")
+                        .select("id,organization_id")
+                        .eq("organization_id", str(org_id))
+                        .in_("id", document_ids)
+                        .execute()
+                    )
+                    verified_ids = {
+                        str(row["id"])
+                        for row in (metadata.data or [])
+                        if str(row.get("organization_id")) == str(org_id)
+                    }
+                    document_evidence = [
+                        f"{match.content[:280].strip()} (similarity {match.similarity:.2f})"
+                        for match in matches
+                        if str(match.document_id) in verified_ids
+                    ]
                 if document_evidence:
                     modules.append("Document Intelligence")
                     evidence.append(
