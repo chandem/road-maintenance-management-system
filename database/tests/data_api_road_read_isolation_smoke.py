@@ -2,7 +2,7 @@
 """Read-only Supabase Data API smoke test for road-row RLS.
 
 Run ONLY against an isolated staging project with fake test data. This script
-performs GET requests only; it never inserts, updates, or deletes records.
+performs road GET requests plus a read-only helper RPC authorization probe; it never changes table data.
 
 Required environment variables:
   STAGING_SUPABASE_URL       e.g. https://<staging-ref>.supabase.co
@@ -16,8 +16,9 @@ Required environment variables:
   TOKEN_INACTIVE_MEMBER      valid token for user with inactive organization membership
   TOKEN_OTHER_ORG            access token for member of a different organization
 
-The script expects the admin and road manager to see STAGING_ROAD_ID and the
-other identities to receive an empty result. Seed fake records and confirm
+The script expects the admin, road manager, and road read-only user to see
+STAGING_ROAD_ID. Finance-only, unassigned, inactive-membership, and other-organization
+identities must receive an empty result. Seed fake records and confirm
 role assignments before running. Do not use production tokens or keys.
 """
 from __future__ import annotations
@@ -137,11 +138,11 @@ def main() -> int:
                 f"but RPC returned HTTP {response.status}"
             )
     except HTTPError as exc:
-        if exc.code in (401, 403, 404):
+        if exc.code in (401, 403):
             print(f"PASS anonymous_rpc: helper execution denied with HTTP {exc.code}")
         else:
             failures.append(
-                f"anonymous_rpc: expected HTTP 401/403/404, got HTTP {exc.code}"
+                f"anonymous_rpc: expected HTTP 401/403, got HTTP {exc.code}"
             )
     except (URLError, TimeoutError) as exc:
         failures.append(f"anonymous_rpc: request error: {exc}")
