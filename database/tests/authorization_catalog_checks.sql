@@ -458,3 +458,60 @@ BEGIN
   RAISE NOTICE 'Authorization catalog checks passed. Runtime JWT/RLS tests are still required.';
 END
 $checks$;
+
+
+-- Migration 018 profile/role grant regression checks.
+DO $profile_grant_checks$
+DECLARE
+  expected_privilege record;
+BEGIN
+  IF has_table_privilege('anon', 'public.user_department_roles', 'SELECT')
+     OR has_table_privilege('anon', 'public.user_department_roles', 'INSERT')
+     OR has_table_privilege('anon', 'public.user_department_roles', 'UPDATE')
+     OR has_table_privilege('anon', 'public.user_department_roles', 'DELETE')
+     OR has_table_privilege('anon', 'public.user_department_roles', 'TRUNCATE')
+     OR has_table_privilege('anon', 'public.user_department_roles', 'REFERENCES')
+     OR has_table_privilege('anon', 'public.user_department_roles', 'TRIGGER') THEN
+    RAISE EXCEPTION 'anon retains a privilege on public.user_department_roles';
+  END IF;
+
+  IF NOT has_table_privilege('authenticated', 'public.user_profiles', 'SELECT') THEN
+    RAISE EXCEPTION 'authenticated must retain SELECT on public.user_profiles';
+  END IF;
+
+  IF has_table_privilege('authenticated', 'public.user_profiles', 'INSERT')
+     OR has_table_privilege('authenticated', 'public.user_profiles', 'UPDATE')
+     OR has_table_privilege('authenticated', 'public.user_profiles', 'DELETE')
+     OR has_table_privilege('authenticated', 'public.user_profiles', 'TRUNCATE')
+     OR has_table_privilege('authenticated', 'public.user_profiles', 'REFERENCES')
+     OR has_table_privilege('authenticated', 'public.user_profiles', 'TRIGGER') THEN
+    RAISE EXCEPTION 'authenticated retains broad table-level mutation/structural privileges on public.user_profiles';
+  END IF;
+
+  IF NOT has_column_privilege('authenticated', 'public.user_profiles', 'id', 'INSERT')
+     OR NOT has_column_privilege('authenticated', 'public.user_profiles', 'full_name', 'INSERT') THEN
+    RAISE EXCEPTION 'authenticated must retain INSERT on user_profiles(id, full_name)';
+  END IF;
+
+  IF has_column_privilege('authenticated', 'public.user_profiles', 'organization_id', 'INSERT')
+     OR has_column_privilege('authenticated', 'public.user_profiles', 'department_id', 'INSERT')
+     OR has_column_privilege('authenticated', 'public.user_profiles', 'employee_code', 'INSERT')
+     OR has_column_privilege('authenticated', 'public.user_profiles', 'is_active', 'INSERT')
+     OR has_column_privilege('authenticated', 'public.user_profiles', 'job_title', 'INSERT') THEN
+    RAISE EXCEPTION 'authenticated retains INSERT privilege on protected user_profiles columns';
+  END IF;
+
+  IF NOT has_column_privilege('authenticated', 'public.user_profiles', 'full_name', 'UPDATE') THEN
+    RAISE EXCEPTION 'authenticated must retain UPDATE on user_profiles.full_name';
+  END IF;
+
+  IF has_column_privilege('authenticated', 'public.user_profiles', 'organization_id', 'UPDATE')
+     OR has_column_privilege('authenticated', 'public.user_profiles', 'department_id', 'UPDATE')
+     OR has_column_privilege('authenticated', 'public.user_profiles', 'employee_code', 'UPDATE')
+     OR has_column_privilege('authenticated', 'public.user_profiles', 'is_active', 'UPDATE')
+     OR has_column_privilege('authenticated', 'public.user_profiles', 'job_title', 'UPDATE')
+     OR has_column_privilege('authenticated', 'public.user_profiles', 'id', 'UPDATE') THEN
+    RAISE EXCEPTION 'authenticated retains UPDATE privilege on protected user_profiles columns';
+  END IF;
+END;
+$profile_grant_checks$;
