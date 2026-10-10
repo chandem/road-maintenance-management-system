@@ -541,6 +541,57 @@ BEGIN
     RAISE EXCEPTION 'documents.department_code is missing';
   END IF;
 
+  -- Every chunk policy must require a matching parent document in the same
+  -- organization, including the organization-admin branch. Otherwise an admin
+  -- could create or update orphaned/cross-organization chunk rows.
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies p
+    WHERE p.schemaname = 'public'
+      AND p.tablename = 'document_chunks'
+      AND p.policyname = 'document_chunks_department_select'
+      AND p.cmd = 'SELECT'
+      AND coalesce(p.qual, '') ILIKE '%d.id = document_chunks.document_id%'
+      AND coalesce(p.qual, '') ILIKE '%d.organization_id = document_chunks.organization_id%'
+  ) THEN
+    RAISE EXCEPTION 'document chunk SELECT policy must require a matching parent document in the same organization';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies p
+    WHERE p.schemaname = 'public'
+      AND p.tablename = 'document_chunks'
+      AND p.policyname = 'document_chunks_department_insert'
+      AND p.cmd = 'INSERT'
+      AND coalesce(p.with_check, '') ILIKE '%d.id = document_chunks.document_id%'
+      AND coalesce(p.with_check, '') ILIKE '%d.organization_id = document_chunks.organization_id%'
+  ) THEN
+    RAISE EXCEPTION 'document chunk INSERT policy must require a matching parent document in the same organization';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies p
+    WHERE p.schemaname = 'public'
+      AND p.tablename = 'document_chunks'
+      AND p.policyname = 'document_chunks_department_update'
+      AND p.cmd = 'UPDATE'
+      AND coalesce(p.qual, '') ILIKE '%d.organization_id = document_chunks.organization_id%'
+      AND coalesce(p.with_check, '') ILIKE '%d.organization_id = document_chunks.organization_id%'
+  ) THEN
+    RAISE EXCEPTION 'document chunk UPDATE policy must preserve parent organization consistency';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies p
+    WHERE p.schemaname = 'public'
+      AND p.tablename = 'document_chunks'
+      AND p.policyname = 'document_chunks_department_delete'
+      AND p.cmd = 'DELETE'
+      AND coalesce(p.qual, '') ILIKE '%d.id = document_chunks.document_id%'
+      AND coalesce(p.qual, '') ILIKE '%d.organization_id = document_chunks.organization_id%'
+  ) THEN
+    RAISE EXCEPTION 'document chunk DELETE policy must require a matching parent document in the same organization';
+  END IF;
+
   IF NOT EXISTS (
     SELECT 1
     FROM pg_trigger t
