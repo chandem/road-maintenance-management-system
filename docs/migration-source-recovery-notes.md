@@ -3,7 +3,7 @@
 **Branch:** `feature/department-role-management`  
 **Repository:** `chandem/road-maintenance-management-system`  
 **Review date:** 2026-10-10  
-**Status:** SQL source recovered and archived for migrations 011–015. Production remains read-only during reconciliation.
+**Status:** SQL source recovered and archived for migrations 011–015 and the onboarding RPC; initial schema compared with repository source. Production remains read-only during reconciliation.
 
 ## Latest recovery update — 2026-10-10
 
@@ -47,7 +47,7 @@ The repository contains two distinct onboarding changes:
 - `003_onboarding_hardening.sql` defines `private.create_organization_for_current_user(text,text)` and changes a profile update policy.
 - `004_frontend_onboarding_rpc.sql` defines `public.create_organization_for_current_user(text,text)` for the frontend and rejects a second organization when the user's profile already has one.
 
-The production ledger label `add_organization_onboarding_rpc` is not sufficient evidence to determine which exact SQL was applied. Compare the live function definitions and grants using supported read-only inspection and recover the deployment SQL/log. Do not assume both source files ran.
+The exact production-ledger SQL for `20261008183919_add_organization_onboarding_rpc` was recovered and archived at `docs/recovered-migrations/20261008183919_add_organization_onboarding_rpc.sql`. It creates the public RPC with role `admin`, `search_path = public, pg_catalog`, an explicit duplicate organization-code check, and profile activation. This differs from `database/migrations/004_frontend_onboarding_rpc.sql` (role `owner`, empty search path, no explicit duplicate-code check). Preserve both as evidence; do not overwrite the repository source or replay either automatically.
 
 ### Department and role migration history
 
@@ -55,7 +55,7 @@ The five applied SQL bodies were recovered and archived as documented above. The
 
 ## Remaining work
 
-1. Reconcile the exact source for earlier ledger entries, especially organization onboarding, and investigate why the AI assistant tables are absent.
+1. Continue reconciling the earlier ledger entries and investigate why the AI assistant tables are absent.
 2. Compare the full live schema with all ledger/source migrations and classify each source mapping as matching, partially matching, divergent, superseded, or missing.
 3. Use an already available isolated non-production database only if one is confirmed; do not create a paid Supabase branch/resource.
 4. Run integration tests with real authenticated JWTs in non-production before considering a production change or merging PR #1.
@@ -64,3 +64,8 @@ The five applied SQL bodies were recovered and archived as documented above. The
 ## Safety boundary
 
 Do not rerun, reapply, or edit production migrations to recover their source. Source recovery is an inspection task, not a database change. Keep production read-only until source mapping, schema reconciliation, and authenticated authorization tests are complete.
+
+
+### Initial schema comparison — 2026-10-10
+
+The exact statement recorded for ledger version `20261008122917` (`initial_ai_rmms_schema`) was inspected read-only. Its table and index definitions match the core domain model in `database/migrations/001_initial_schema.sql` in substance: organizations, departments, profiles, roads/sections, plans, work orders, machinery, assets, employees, budgets, expenses, documents, AI analysis runs, AI recommendations, and their listed indexes. The ledger SQL is compactly formatted and omits the source file's explanatory comments, so this is a semantic comparison rather than a byte-for-byte identity claim. No additional archive was created because the source file already represents the same core schema. This does not establish that later migrations or live objects are fully reconciled.
