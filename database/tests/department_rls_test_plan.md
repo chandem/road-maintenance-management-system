@@ -119,7 +119,7 @@ The live Supabase migration history uses timestamp-based versions and currently 
 
 The live-schema preflight found that `ai_conversations`, `ai_messages`, and `ai_message_sources` are referenced by backend routes but absent from the live public schema. Migration 014 creates them idempotently and adds restrictive department/ownership policies. Do not apply until tested in staging.
 
-- A road department manager/officer can create and update their own conversations and post messages.
+- A road department manager/officer can create their own conversations and post messages. Authenticated clients have no `UPDATE` grant on `ai_conversations`; conversation-state/timestamp updates are performed only by the trusted backend.
 - A road department read-only user can read their own conversation and messages but cannot create a conversation, post a message, or update conversation state.
 - A non-admin cannot read another user's conversation or messages, even when both users belong to the same organization.
 - An organization owner/admin can read conversations and messages across their organization, and can create their own conversations. Even admins may insert user-role messages only into conversations they created; this prevents them from impersonating another conversation owner. Assistant/system messages remain trusted-backend-only.
