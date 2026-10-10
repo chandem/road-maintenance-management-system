@@ -123,26 +123,38 @@ def assign_department_role(
     _require_org_admin(current_user, organization_id)
     supabase = current_user["client"]
 
-    department = (
-        supabase.table("departments")
-        .select("id")
-        .eq("id", str(payload.department_id))
-        .eq("organization_id", organization_id)
-        .maybe_single()
-        .execute()
-    )
+    try:
+        department = (
+            supabase.table("departments")
+            .select("id")
+            .eq("id", str(payload.department_id))
+            .eq("organization_id", organization_id)
+            .maybe_single()
+            .execute()
+        )
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Unable to verify department membership.",
+        ) from exc
     if not department.data:
         raise HTTPException(status_code=404, detail="Department not found in this organization.")
 
-    membership = (
-        supabase.table("organization_members")
-        .select("user_id")
-        .eq("organization_id", organization_id)
-        .eq("user_id", str(payload.user_id))
-        .eq("is_active", True)
-        .maybe_single()
-        .execute()
-    )
+    try:
+        membership = (
+            supabase.table("organization_members")
+            .select("user_id")
+            .eq("organization_id", organization_id)
+            .eq("user_id", str(payload.user_id))
+            .eq("is_active", True)
+            .maybe_single()
+            .execute()
+        )
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Unable to verify target organization membership.",
+        ) from exc
     if not membership.data:
         raise HTTPException(
             status_code=422,
