@@ -8,6 +8,7 @@ on:
     paths:
       - "database/migrations/**/*.sql"
       - "database/tests/**/*.sql"
+      - "database/tests/**/*.py"
       - ".github/workflows/supabase-migration-integration.yml"
   push:
     branches:
@@ -64,6 +65,9 @@ jobs:
 
       - name: Apply all repository migrations to disposable database
         run: supabase db reset
+
+      - name: Validate read-only Data API smoke-test Python syntax
+        run: python -m py_compile database/tests/data_api_road_read_isolation_smoke.py
 
       - name: Run authorization catalog regression checks
         shell: bash
