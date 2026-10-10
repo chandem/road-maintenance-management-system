@@ -137,6 +137,24 @@ BEGIN
   VALUES
     ('e1000000-0000-4000-8000-000000000001', 'b1000000-0000-4000-8000-000000000001', 2, 'Manager-added road chunk', 'pending');
 
+  -- A road manager may not reclassify an authorized road document into
+  -- another department or move it to another organization.
+  BEGIN
+    UPDATE public.documents SET department_code = 'finance'
+    WHERE id = 'e1000000-0000-4000-8000-000000000001';
+    RAISE EXCEPTION 'RLS FAIL: road manager unexpectedly reclassified a road document as finance';
+  EXCEPTION WHEN insufficient_privilege THEN
+    NULL;
+  END;
+
+  BEGIN
+    UPDATE public.documents SET organization_id = 'b1000000-0000-4000-8000-000000000002'
+    WHERE id = 'e1000000-0000-4000-8000-000000000001';
+    RAISE EXCEPTION 'RLS FAIL: road manager unexpectedly moved a document to another organization';
+  EXCEPTION WHEN insufficient_privilege THEN
+    NULL;
+  END;
+
   -- A road manager must not attach a chunk to a finance document.
   BEGIN
     INSERT INTO public.document_chunks
