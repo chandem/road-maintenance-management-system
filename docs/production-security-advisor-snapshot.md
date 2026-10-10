@@ -50,3 +50,23 @@ Do not assume proposed repository migrations with similar numbering or functiona
 - A read-only query against the Supabase unified logs tool returned a backend error, so no deployment SQL was recovered from logs in this review.
 - Advisor findings are warnings requiring review; they are not proof that a specific exploit was exercised.
 - CI success does not establish database authorization correctness.
+
+
+## Additional live catalog inspection (read-only)
+
+A follow-up read-only query through `information_schema.routines` and `information_schema.routine_privileges` returned these live observations:
+
+- `public.has_department_role` is currently `SECURITY DEFINER`. Its visible definition checks `auth.uid()`, an active `user_department_roles` assignment, a matching department in the same organization, and active organization membership; it also checks the requested role array. The routine privilege view lists EXECUTE for `anon`, `authenticated`, `service_role`, and `postgres`.
+- `public.create_organization_for_current_user` is currently `SECURITY DEFINER`. Its visible definition rejects a null `auth.uid()`, blank organization names, users whose profile already has an organization, and duplicate non-empty organization codes. It creates the organization, an active admin membership, and a profile association. The routine privilege view lists EXECUTE for `authenticated`, `service_role`, and `postgres`.
+- `private.is_org_admin` and `private.is_org_member` are also `SECURITY DEFINER`; their visible definitions check the caller's active organization membership, and admin/owner role for the former. The routine privilege view lists EXECUTE for `authenticated` and `postgres`.
+
+These are observations of the current live definitions and grants, not proof that the original migration source has been recovered. The catalog query did not verify function-level `search_path` configuration, inherited PUBLIC privileges, or behavior under real authenticated JWT requests. Do not change grants based only on this snapshot; reconcile them with the exact applied migration SQL and intended backend flows first.
+
+## CI status for this snapshot
+
+GitHub Actions completed successfully for the current head commit `07f484c5ce5e2b14bfb6d85e3fb7a344ce61515f`:
+
+- [Backend Tests](https://github.com/chandem/road-maintenance-management-system/actions/runs/38039927625)
+- [Frontend Build](https://github.com/chandem/road-maintenance-management-system/actions/runs/38039927646)
+
+This verifies the repository's configured CI workflows for that commit only; it does not validate production RLS or database migration correctness.
