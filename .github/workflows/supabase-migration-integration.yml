@@ -78,6 +78,14 @@ jobs:
             -v ON_ERROR_STOP=1 \
             -f database/tests/authorization_catalog_checks.sql
 
+      - name: Run department road RLS behavior checks with synthetic JWT claims
+        shell: bash
+        run: |
+          set -euo pipefail
+          psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" \
+            -v ON_ERROR_STOP=1 \
+            -f database/tests/department_rls_behavior_checks.sql
+
       - name: Run read-only migration release preflight
         shell: bash
         run: |
@@ -91,5 +99,6 @@ jobs:
         run: |
           echo "This workflow uses a disposable local Supabase instance on a GitHub-hosted runner."
           echo "A successful run validates this repository's clean-install migration sequence and catalog checks."
-          echo "It does not prove production schema equivalence, real-user JWT behavior, or backend/UI compatibility."
+          echo "Synthetic-claim SQL checks exercise PostgreSQL RLS but do not prove real signed JWT/PostgREST behavior."
+          echo "It does not prove production schema equivalence or backend/UI compatibility."
           echo "Never use this workflow to apply migrations to the production project."
