@@ -1,0 +1,90 @@
+name: Isolated Supabase migration integration test
+
+on:
+  pull_request:
+    branches:
+      - main
+      - feature/department-role-management
+    paths:
+      - "database/migrations/**/*.sql"
+      - "database/tests/**/*.sql"
+      - ".github/workflows/supabase-migration-integration.yml"
+  push:
+    branches:
+      - feature/department-role-management
+    paths:
+      - "database/migrations/**/*.sql"
+      - "database/tests/**/*.sql"
+      - ".github/workflows/supabase-migration-integration.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  migration-integration:
+    name: Apply repository migrations to disposable local Supabase
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Initialize disposable local Supabase config
+        run: supabase init
+
+      - name: Copy repository SQL migrations into isolated test sequence
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          files=(database/migrations/*.sql)
+          if [ "${#files[@]}" -eq 0 ]; then
+            echo "ERROR: No migration SQL files found."
+            exit 1
+          fi
+
+          mkdir -p supabase/migrations
+          index=1
+          for file in "${files[@]}"; do
+            base="$(basename "$file" .sql)"
+            timestamp="$(printf '202601010000%02d' "$index")"
+            cp "$file" "supabase/migrations/${timestamp}_${base}.sql"
+            echo "Queued isolated migration: $file"
+            index=$((index + 1))
+          done
+
+      - name: Start isolated Supabase services
+        run: supabase start
+
+      - name: Apply all repository migrations to disposable database
+        run: supabase db reset
+
+      - name: Run authorization catalog regression checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" \
+            -v ON_ERROR_STOP=1 \
+            -f database/tests/authorization_catalog_checks.sql
+
+      - name: Run read-only migration release preflight
+        shell: bash
+        run: |
+          set -euo pipefail
+          psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" \
+            -v ON_ERROR_STOP=1 \
+            -f database/tests/migration_release_preflight.sql
+
+      - name: Explain test boundary
+        if: always()
+        run: |
+          echo "This workflow uses a disposable local Supabase instance on a GitHub-hosted runner."
+          echo "A successful run validates this repository's clean-install migration sequence and catalog checks."
+          echo "It does not prove production schema equivalence, real-user JWT behavior, or backend/UI compatibility."
+          echo "Never use this workflow to apply migrations to the production project."
