@@ -437,6 +437,21 @@ BEGIN
     RAISE EXCEPTION 'ai_messages lacks an authenticated INSERT policy that restricts role to user';
   END IF;
 
+  -- Even organization admins must not impersonate another conversation owner
+  -- when inserting a user-role message directly through the Data API.
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_policies p
+    WHERE p.schemaname = 'public'
+      AND p.tablename = 'ai_messages'
+      AND p.cmd = 'INSERT'
+      AND 'authenticated' = ANY(p.roles)
+      AND coalesce(p.with_check, '') ILIKE '%created_by%'
+      AND coalesce(p.with_check, '') ILIKE '%auth.uid%'
+  ) THEN
+    RAISE EXCEPTION 'ai_messages INSERT policy must enforce conversation ownership';
+  END IF;
+
   -- Message rows are append-only for authenticated clients. Without UPDATE,
   -- users cannot rewrite a user message into an assistant/system response.
   IF has_table_privilege('authenticated', 'public.ai_messages', 'UPDATE') THEN
