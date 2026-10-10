@@ -465,6 +465,24 @@ DO $profile_grant_checks$
 DECLARE
   expected_privilege record;
 BEGIN
+  -- Table-level REVOKE does not remove independently granted column ACLs.
+  -- Check every current column so a future schema addition cannot silently
+  -- leave anon access through a legacy column grant.
+  FOR expected_privilege IN
+    SELECT a.attname AS column_name
+    FROM pg_attribute a
+    WHERE a.attrelid = 'public.user_department_roles'::regclass
+      AND a.attnum > 0
+      AND NOT a.attisdropped
+  LOOP
+    IF has_column_privilege('anon', 'public.user_department_roles', expected_privilege.column_name, 'SELECT')
+       OR has_column_privilege('anon', 'public.user_department_roles', expected_privilege.column_name, 'INSERT')
+       OR has_column_privilege('anon', 'public.user_department_roles', expected_privilege.column_name, 'UPDATE')
+       OR has_column_privilege('anon', 'public.user_department_roles', expected_privilege.column_name, 'REFERENCES') THEN
+      RAISE EXCEPTION 'anon retains a column-level privilege on user_department_roles.%', expected_privilege.column_name;
+    END IF;
+  END LOOP;
+
   IF has_table_privilege('anon', 'public.user_department_roles', 'SELECT')
      OR has_table_privilege('anon', 'public.user_department_roles', 'INSERT')
      OR has_table_privilege('anon', 'public.user_department_roles', 'UPDATE')
