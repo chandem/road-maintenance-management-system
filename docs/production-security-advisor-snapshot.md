@@ -72,11 +72,11 @@ A fresh read-only Supabase security-advisor query at 09:25:13 UTC returned the s
 
 The migration ledger was also re-read and still reports 13 applied migrations; the five department/role entries remain without recovered exact source SQL. Searches of repository commit history for their migration labels and helper names did not recover matching commits. No production changes were made. These findings remain open until the exact applied SQL is reconciled and a reviewed remediation is tested outside production. The onboarding RPC may be intentionally callable by authenticated users, but its grants and guard must be validated against the recovered source and application flow.
 
-## CI status for current branch head
+## CI status
 
-GitHub Actions completed successfully for current head commit `40a025bb2b6e156054e7d01f6df59662d2eec079`:
+GitHub Actions completed successfully for the preceding code/documentation head `40a025bb2b6e156054e7d01f6df59662d2eec079`:
 
 - [Backend Tests](https://github.com/chandem/road-maintenance-management-system/actions/runs/38040120480)
 - [Frontend Build](https://github.com/chandem/road-maintenance-management-system/actions/runs/38040120380)
 
-Vercel status checks report a build-rate-limit failure. This is separate from the successful GitHub Actions backend and frontend checks. CI success does not validate production RLS or database migration correctness.
+The latest commit `77f1d5d3b9d802df820c77cc672e38534d37f990` updates this documentation only. The workflow-run lookup returned no runs for that commit, so its GitHub Actions status is not yet confirmed. Vercel status checks report a build-rate-limit failure. This is separate from the successful prior GitHub Actions backend and frontend checks. CI success does not validate production RLS or database migration correctness.
