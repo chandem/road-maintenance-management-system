@@ -423,6 +423,37 @@ BEGIN
       'authenticated role cannot execute private.is_org_member required by AI conversation policies';
   END IF;
 
+  -- is_org_member is called from policies on AI conversation tables. Because
+  -- it is SECURITY DEFINER, pin its search_path and prevent direct execution
+  -- by anonymous/service roles; authenticated needs EXECUTE for policy checks.
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_proc p
+    JOIN pg_namespace n ON n.oid = p.pronamespace
+    WHERE n.nspname = 'private'
+      AND p.proname = 'is_org_member'
+      AND pg_get_function_identity_arguments(p.oid) = 'uuid'
+      AND p.prosecdef
+      AND p.proconfig @> ARRAY['search_path=""']
+  ) THEN
+    RAISE EXCEPTION
+      'private.is_org_member(uuid) must be SECURITY DEFINER with empty search_path';
+  END IF;
+
+  IF has_function_privilege(
+       'anon',
+       'private.is_org_member(uuid)',
+       'EXECUTE'
+     )
+     OR has_function_privilege(
+       'service_role',
+       'private.is_org_member(uuid)',
+       'EXECUTE'
+     ) THEN
+    RAISE EXCEPTION
+      'anon or service_role unexpectedly has EXECUTE on private.is_org_member';
+  END IF;
+
   -- Direct authenticated inserts must be limited to user-role messages.
   -- Assistant/system replies are written only by the server-side trusted client.
   IF NOT EXISTS (
