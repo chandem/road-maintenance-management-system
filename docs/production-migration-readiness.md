@@ -67,6 +67,8 @@ Migration 015 runs a preflight, backfills NULL `road_sections.organization_id` v
 
 The backend conversation route reads conversations and messages with the caller's JWT, inserts user messages with that client, and saves assistant replies using the server-only service client. The SQL proposal is aligned with that separation at a high level. Still, verify the complete role/ownership matrix with JWTs, including that a road read-only user can list/read only their own conversations but cannot create or post, and that direct Data API inserts cannot forge assistant/system messages or evidence-source rows. Catalog checks alone cannot prove these row-level outcomes.
 
+The catalog regression script has now been strengthened to explicitly verify that `authenticated` can execute `private.is_org_member(uuid)`, which is used by the migration 014 conversation policies. This is a source change only; the SQL script has not been run against production or an isolated staging database. The grant's presence and actual policy behavior still require a controlled database test.
+
 ## Safe next steps
 
 1. Reconcile the repository migration files with the applied production migration ledger; assign unique ordered identifiers to new migrations.
