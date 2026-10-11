@@ -41,3 +41,19 @@ INSERT INTO public.roads (id, organization_id, road_code, name) VALUES
   ('d2000000-0000-4000-8000-000000000001', 'b2000000-0000-4000-8000-000000000001', 'JWT-A-ROAD', 'Signed JWT Road A'),
   ('d2000000-0000-4000-8000-000000000002', 'b2000000-0000-4000-8000-000000000002', 'JWT-B-ROAD', 'Signed JWT Road B')
 ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO public.documents (
+  id, organization_id, title, document_type, status, uploaded_by, department_code
+) VALUES
+  ('e2000000-0000-4000-8000-000000000001', 'b2000000-0000-4000-8000-000000000001', 'JWT Road Document', 'maintenance_plan', 'processed', 'a2000000-0000-4000-8000-000000000002', 'road_asset'),
+  ('e2000000-0000-4000-8000-000000000002', 'b2000000-0000-4000-8000-000000000001', 'JWT Finance Document', 'financial_report', 'processed', 'a2000000-0000-4000-8000-000000000004', 'finance'),
+  ('e2000000-0000-4000-8000-000000000003', 'b2000000-0000-4000-8000-000000000002', 'JWT Other Organization Document', 'maintenance_plan', 'processed', 'a2000000-0000-4000-8000-000000000005', 'road_asset')
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO public.document_chunks (
+  id, document_id, organization_id, chunk_index, content, embedding_status
+) VALUES
+  ('f2000000-0000-4000-8000-000000000001', 'e2000000-0000-4000-8000-000000000001', 'b2000000-0000-4000-8000-000000000001', 0, 'Synthetic road maintenance content', 'complete'),
+  ('f2000000-0000-4000-8000-000000000002', 'e2000000-0000-4000-8000-000000000002', 'b2000000-0000-4000-8000-000000000001', 0, 'Synthetic finance content', 'complete'),
+  ('f2000000-0000-4000-8000-000000000003', 'e2000000-0000-4000-8000-000000000003', 'b2000000-0000-4000-8000-000000000002', 0, 'Synthetic other organization content', 'complete')
+ON CONFLICT (id) DO NOTHING;
