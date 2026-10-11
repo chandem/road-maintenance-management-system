@@ -18,54 +18,28 @@ ORG_B_ROAD = "d2000000-0000-4000-8000-000000000002"
 ORG_A_ID = "b2000000-0000-4000-8000-000000000001"
 
 
-def json_request(url: str, method: str, headers: dict[str, str], body=None):
-    data = None if body is None else json.dumps(body).encode()
-    req = Request(url, data=data, headers=headers, method=method)
+def local_auth_access_token(api_url: str, anon_key: str, email: str, password: str) -> str:
+    # Users and password hashes are seeded only in disposable local CI SQL.
+    # This request obtains a real access token from local Supabase Auth.
+    data = json.dumps({"email": email, "password": password}).encode()
+    req = Request(
+        api_url.rstrip("/") + "/auth/v1/token?grant_type=password",
+        data=data,
+        headers={"apikey": anon_key, "Content-Type": "application/json", "Accept": "application/json"},
+        method="POST",
+    )
     try:
         with urlopen(req, timeout=20) as response:
-            raw = response.read().decode()
-            return response.status, json.loads(raw) if raw else None
+            result = json.loads(response.read().decode())
     except HTTPError as exc:
-        raw = exc.read().decode(errors="replace")
-        try:
-            parsed = json.loads(raw) if raw else None
-        except json.JSONDecodeError:
-            parsed = raw[:200]
-        return exc.code, parsed
-
-
-def local_auth_access_token(api_url: str, anon_key: str, service_role_key: str,
-                            user_id: str, email: str, password: str) -> str:
-    # This admin call targets only the disposable local Supabase instance in CI.
-    # Never configure production keys in this workflow.
-    admin_headers = {
-        "apikey": service_role_key,
-        "Authorization": "Bearer " + service_role_key,
-        "Content-Type": "application/json",
-        "Accept": "application/json",
-    }
-    status, result = json_request(
-        api_url.rstrip("/") + "/auth/v1/admin/users/" + user_id,
-        "PUT", admin_headers,
-        {"password": password, "email_confirm": True},
-    )
-    if status not in (200, 201) or not isinstance(result, dict):
         raise RuntimeError(
-            f"Local Auth could not prepare disposable test user {user_id} (HTTP {status}); "
-            "response details intentionally omitted."
-        )
-
-    status, result = json_request(
-        api_url.rstrip("/") + "/auth/v1/token?grant_type=password",
-        "POST",
-        {"apikey": anon_key, "Content-Type": "application/json", "Accept": "application/json"},
-        {"email": email, "password": password},
-    )
+            f"Local Supabase Auth did not issue an access token for disposable user {email} "
+            f"(HTTP {exc.code}); response details intentionally omitted."
+        ) from None
     token = result.get("access_token") if isinstance(result, dict) else None
-    if status != 200 or not isinstance(token, str) or not token:
+    if not isinstance(token, str) or not token:
         raise RuntimeError(
-            f"Local Supabase Auth did not issue an access token for disposable user {user_id} "
-            f"(HTTP {status}); response details intentionally omitted."
+            f"Local Supabase Auth response lacked an access token for disposable user {email}."
         )
     return token
 
@@ -112,7 +86,6 @@ def require(condition: bool, message: str) -> None:
 def main() -> None:
     api_url = os.environ["API_URL"]
     anon_key = os.environ["ANON_KEY"]
-    service_role_key = os.environ["SERVICE_ROLE_KEY"]
 
     admin = "a2000000-0000-4000-8000-000000000001"
     manager = "a2000000-0000-4000-8000-000000000002"
@@ -131,9 +104,7 @@ def main() -> None:
     for index, (user_id, email) in enumerate(identities.items(), start=1):
         # Fixed disposable-only credentials; never print them or any access token.
         password = f"Local-CI-only-Road-Role-{index}-92!"
-        tokens[user_id] = local_auth_access_token(
-            api_url, anon_key, service_role_key, user_id, email, password
-        )
+        tokens[user_id] = local_auth_access_token(api_url, anon_key, email, password)
     api = Api(api_url, anon_key, tokens)
 
     def roads(user_id: str):
