@@ -189,18 +189,18 @@ def main() -> None:
     require(bool(manager_conversation_id), "new conversation returns an identifier for message authorization tests")
 
     status, rows = api.request(read_only, "GET", "/rest/v1/ai_conversations?" + urlencode({
-        "select": "id,created_by", "id": "eq.g2000000-0000-4000-8000-000000000001"
+        "select": "id,created_by", "id": "eq.72000000-0000-4000-8000-000000000001"
     }))
     require(status == 200 and isinstance(rows, list) and len(rows) == 1,
             "read-only user can read their own conversation")
 
     status, rows = api.request(manager, "GET", "/rest/v1/ai_conversations?" + urlencode({
-        "select": "id", "id": "eq.g2000000-0000-4000-8000-000000000001"
+        "select": "id", "id": "eq.72000000-0000-4000-8000-000000000001"
     }))
     require(status == 200 and rows == [], "road manager cannot read another user's conversation")
 
     status, rows = api.request(manager, "GET", "/rest/v1/ai_messages?" + urlencode({
-        "select": "id,conversation_id", "conversation_id": "eq.g2000000-0000-4000-8000-000000000001"
+        "select": "id,conversation_id", "conversation_id": "eq.72000000-0000-4000-8000-000000000001"
     }))
     require(status == 200 and rows == [], "road manager cannot read messages from another user's conversation")
 
@@ -222,7 +222,7 @@ def main() -> None:
                 f"road manager cannot forge a {forged_role} message (HTTP {status})")
 
     status, result = api.request(manager, "POST", "/rest/v1/ai_messages", {
-        "conversation_id": "g2000000-0000-4000-8000-000000000001",
+        "conversation_id": "72000000-0000-4000-8000-000000000001",
         "role": "user",
         "content": "Must not post into another user's conversation",
     })
@@ -230,7 +230,7 @@ def main() -> None:
             f"road manager cannot post to another user's conversation (HTTP {status})")
 
     status, result = api.request(read_only, "POST", "/rest/v1/ai_messages", {
-        "conversation_id": "g2000000-0000-4000-8000-000000000001",
+        "conversation_id": "72000000-0000-4000-8000-000000000001",
         "role": "user",
         "content": "Read-only user must not post",
     })
@@ -238,7 +238,7 @@ def main() -> None:
             f"read-only user cannot post messages (HTTP {status})")
 
     status, result = api.request(manager, "POST", "/rest/v1/ai_messages", {
-        "conversation_id": "g2000000-0000-4000-8000-000000000002",
+        "conversation_id": "72000000-0000-4000-8000-000000000002",
         "role": "user",
         "content": "Archived conversation must reject writes",
     })
