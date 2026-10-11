@@ -101,11 +101,11 @@ def main() -> None:
     other_org = "a2000000-0000-4000-8000-000000000005"
 
     identities = {
-        admin: "jwt-admin@example.invalid",
-        manager: "jwt-road-manager@example.invalid",
-        read_only: "jwt-road-readonly@example.invalid",
-        finance: "jwt-finance@example.invalid",
-        other_org: "jwt-other-org@example.invalid",
+        admin: "jwt-admin@example.com",
+        manager: "jwt-road-manager@example.com",
+        read_only: "jwt-road-readonly@example.com",
+        finance: "jwt-finance@example.com",
+        other_org: "jwt-other-org@example.com",
     }
     tokens = {}
     for index, (user_id, email) in enumerate(identities.items(), start=1):
