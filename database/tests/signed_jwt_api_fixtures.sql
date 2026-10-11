@@ -44,7 +44,7 @@ ON CONFLICT (provider_id, provider) DO UPDATE SET
   updated_at = now();
 
 -- Fail early if the disposable fixture password hashes do not match their known passwords.
-DO $
+DO $fixture$
 DECLARE
   fixture RECORD;
 BEGIN
@@ -63,7 +63,7 @@ BEGIN
       RAISE EXCEPTION 'Missing password hash for disposable Auth fixture %', fixture.email;
     END IF;
   END LOOP;
-END $;
+END $fixture$;
 
 INSERT INTO public.organizations (id, name, code) VALUES
   ('b2000000-0000-4000-8000-000000000001', 'Signed JWT Test Organization A', 'JWT-TEST-A'),
