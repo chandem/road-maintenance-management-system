@@ -185,6 +185,65 @@ def main() -> None:
     status, result = api.request(manager, "POST", "/rest/v1/ai_conversations", conversation_payload)
     require(status in (200, 201) and isinstance(result, list) and len(result) == 1,
             f"signed road-manager JWT creates own AI conversation (HTTP {status})")
+    manager_conversation_id = result[0]["id"] if status in (200, 201) and result else None
+    require(bool(manager_conversation_id), "new conversation returns an identifier for message authorization tests")
+
+    status, rows = api.request(read_only, "GET", "/rest/v1/ai_conversations?" + urlencode({
+        "select": "id,created_by", "id": "eq.g2000000-0000-4000-8000-000000000001"
+    }))
+    require(status == 200 and isinstance(rows, list) and len(rows) == 1,
+            "read-only user can read their own conversation")
+
+    status, rows = api.request(manager, "GET", "/rest/v1/ai_conversations?" + urlencode({
+        "select": "id", "id": "eq.g2000000-0000-4000-8000-000000000001"
+    }))
+    require(status == 200 and rows == [], "road manager cannot read another user's conversation")
+
+    status, rows = api.request(manager, "GET", "/rest/v1/ai_messages?" + urlencode({
+        "select": "id,conversation_id", "conversation_id": "eq.g2000000-0000-4000-8000-000000000001"
+    }))
+    require(status == 200 and rows == [], "road manager cannot read messages from another user's conversation")
+
+    status, result = api.request(manager, "POST", "/rest/v1/ai_messages", {
+        "conversation_id": manager_conversation_id,
+        "role": "user",
+        "content": "Signed JWT authorized user message",
+    })
+    require(status in (200, 201) and isinstance(result, list) and len(result) == 1,
+            f"road manager can post a user message to own active conversation (HTTP {status})")
+
+    for forged_role in ("assistant", "system"):
+        status, result = api.request(manager, "POST", "/rest/v1/ai_messages", {
+            "conversation_id": manager_conversation_id,
+            "role": forged_role,
+            "content": "Forged role must be denied",
+        })
+        require(status in (401, 403) or (status in (200, 201) and result == []),
+                f"road manager cannot forge a {forged_role} message (HTTP {status})")
+
+    status, result = api.request(manager, "POST", "/rest/v1/ai_messages", {
+        "conversation_id": "g2000000-0000-4000-8000-000000000001",
+        "role": "user",
+        "content": "Must not post into another user's conversation",
+    })
+    require(status in (401, 403) or (status in (200, 201) and result == []),
+            f"road manager cannot post to another user's conversation (HTTP {status})")
+
+    status, result = api.request(read_only, "POST", "/rest/v1/ai_messages", {
+        "conversation_id": "g2000000-0000-4000-8000-000000000001",
+        "role": "user",
+        "content": "Read-only user must not post",
+    })
+    require(status in (401, 403) or (status in (200, 201) and result == []),
+            f"read-only user cannot post messages (HTTP {status})")
+
+    status, result = api.request(manager, "POST", "/rest/v1/ai_messages", {
+        "conversation_id": "g2000000-0000-4000-8000-000000000002",
+        "role": "user",
+        "content": "Archived conversation must reject writes",
+    })
+    require(status in (401, 403) or (status in (200, 201) and result == []),
+            f"manager cannot post into an archived conversation (HTTP {status})")
 
     status, result = api.request(read_only, "POST", "/rest/v1/ai_conversations", {
         "organization_id": ORG_A_ID,
@@ -193,6 +252,11 @@ def main() -> None:
     })
     require(status in (401, 403) or (status in (200, 201) and result == []),
             f"signed read-only JWT cannot create AI conversations (HTTP {status})")
+
+    status, rows = api.request(finance, "GET", "/rest/v1/ai_conversations?" + urlencode({
+        "select": "id", "organization_id": f"eq.{ORG_A_ID}"
+    }))
+    require(status == 200 and rows == [], "finance-only user cannot read road AI conversations")
 
 
 if __name__ == "__main__":
