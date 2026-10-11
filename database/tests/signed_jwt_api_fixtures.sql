@@ -11,7 +11,12 @@ INSERT INTO auth.users (
   ('a2000000-0000-4000-8000-000000000003', 'authenticated', 'authenticated', 'jwt-road-readonly@example.com', extensions.crypt('Local-CI-only-Road-Role-3-92!', extensions.gen_salt('bf')), now(), '{"provider":"email","providers":["email"]}'::jsonb, '{}'::jsonb, now(), now()),
   ('a2000000-0000-4000-8000-000000000004', 'authenticated', 'authenticated', 'jwt-finance@example.com', extensions.crypt('Local-CI-only-Road-Role-4-92!', extensions.gen_salt('bf')), now(), '{"provider":"email","providers":["email"]}'::jsonb, '{}'::jsonb, now(), now()),
   ('a2000000-0000-4000-8000-000000000005', 'authenticated', 'authenticated', 'jwt-other-org@example.com', extensions.crypt('Local-CI-only-Road-Role-5-92!', extensions.gen_salt('bf')), now(), '{"provider":"email","providers":["email"]}'::jsonb, '{}'::jsonb, now(), now())
-ON CONFLICT (id) DO NOTHING;
+ON CONFLICT (id) DO UPDATE SET
+  email = EXCLUDED.email,
+  encrypted_password = EXCLUDED.encrypted_password,
+  email_confirmed_at = EXCLUDED.email_confirmed_at,
+  raw_app_meta_data = EXCLUDED.raw_app_meta_data,
+  updated_at = now();
 
 -- GoTrue password sign-in also expects the corresponding email identity rows.
 INSERT INTO auth.identities (
@@ -33,7 +38,32 @@ WHERE id IN (
   'a2000000-0000-4000-8000-000000000004',
   'a2000000-0000-4000-8000-000000000005'
 )
-ON CONFLICT (provider_id, provider) DO NOTHING;
+ON CONFLICT (provider_id, provider) DO UPDATE SET
+  user_id = EXCLUDED.user_id,
+  identity_data = EXCLUDED.identity_data,
+  updated_at = now();
+
+-- Fail early if the disposable fixture password hashes do not match their known passwords.
+DO $
+DECLARE
+  fixture RECORD;
+BEGIN
+  FOR fixture IN
+    SELECT id, encrypted_password, email
+    FROM auth.users
+    WHERE id IN (
+      'a2000000-0000-4000-8000-000000000001',
+      'a2000000-0000-4000-8000-000000000002',
+      'a2000000-0000-4000-8000-000000000003',
+      'a2000000-0000-4000-8000-000000000004',
+      'a2000000-0000-4000-8000-000000000005'
+    )
+  LOOP
+    IF fixture.encrypted_password IS NULL OR fixture.encrypted_password = '' THEN
+      RAISE EXCEPTION 'Missing password hash for disposable Auth fixture %', fixture.email;
+    END IF;
+  END LOOP;
+END $;
 
 INSERT INTO public.organizations (id, name, code) VALUES
   ('b2000000-0000-4000-8000-000000000001', 'Signed JWT Test Organization A', 'JWT-TEST-A'),
