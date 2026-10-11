@@ -32,9 +32,16 @@ def local_auth_access_token(api_url: str, anon_key: str, email: str, password: s
         with urlopen(req, timeout=20) as response:
             result = json.loads(response.read().decode())
     except HTTPError as exc:
+        # Surface only the Auth error code/message for debugging; never log passwords or tokens.
+        try:
+            detail = json.loads(exc.read().decode(errors="replace"))
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            detail = {}
+        safe_code = detail.get("error_code") or detail.get("code") or "unknown"
+        safe_message = detail.get("msg") or detail.get("message") or detail.get("error_description") or "no message"
         raise RuntimeError(
             f"Local Supabase Auth did not issue an access token for disposable user {email} "
-            f"(HTTP {exc.code}); response details intentionally omitted."
+            f"(HTTP {exc.code}, {safe_code}: {str(safe_message)[:180]})."
         ) from None
     token = result.get("access_token") if isinstance(result, dict) else None
     if not isinstance(token, str) or not token:
