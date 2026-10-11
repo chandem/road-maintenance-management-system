@@ -92,7 +92,7 @@ jobs:
             -v ON_ERROR_STOP=1 \
             -f database/tests/department_rls_behavior_checks.sql
 
-      - name: Run signed-JWT Data API smoke tests against local Supabase
+      - name: Run local-Auth-issued JWT Data API smoke tests against local Supabase
         shell: bash
         run: |
           set -euo pipefail
@@ -106,7 +106,7 @@ jobs:
           source "$RUNNER_TEMP/supabase.env"
           set +a
 
-          for name in API_URL ANON_KEY JWT_SECRET; do
+          for name in API_URL ANON_KEY SERVICE_ROLE_KEY; do
             if [ -z "${!name:-}" ]; then
               echo "::error::Local Supabase CLI did not provide required $name for signed-JWT smoke tests."
               exit 1
@@ -128,7 +128,7 @@ jobs:
         run: |
           echo "This workflow uses a disposable local Supabase instance on a GitHub-hosted runner."
           echo "A successful run validates this repository's clean-install migration sequence and catalog checks."
-          echo "Synthetic-claim SQL checks exercise PostgreSQL RLS but do not prove real signed JWT/PostgREST behavior."
+          echo "Local Auth-issued JWT tests exercise real password-grant tokens against the local PostgREST Data API using disposable synthetic users."
           echo "It does not prove production schema equivalence or backend/UI compatibility."
           echo "Never use this workflow to apply migrations to the production project."
 
