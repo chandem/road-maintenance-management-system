@@ -106,7 +106,7 @@ jobs:
           source "$RUNNER_TEMP/supabase.env"
           set +a
 
-          for name in API_URL ANON_KEY SERVICE_ROLE_KEY; do
+          for name in API_URL ANON_KEY; do
             if [ -z "${!name:-}" ]; then
               echo "::error::Local Supabase CLI did not provide required $name for signed-JWT smoke tests."
               exit 1
