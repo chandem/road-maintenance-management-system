@@ -1,22 +1,25 @@
 # AI-RMMS Development Roadmap
 
-## Current status (2026-10-09)
+## Current status (2026-10-11)
 
-The backend foundation for the **first useful release** is largely in place:
+**Product line (`main`):** first-release backend + Materials/Inspections UI foundation.
 
-> Ask AI questions about actual road-maintenance data and organizational documents and receive evidence-based answers.
+**Security line (`feature/department-role-management`, draft PR #1):** department roles, department-aware RLS, conversation policies, privilege hardening.
+
+Disposable local Supabase **security gates are green** (catalog, RLS behavior, real Auth-issued JWT PostgREST, release preflight). Production migration apply and PR merge remain **blocked** pending owner sign-off (`docs/production-migration-checklist.md`, `docs/security-gate-status.md`).
 
 | Capability | Status |
 |------------|--------|
-| Auth-aware FastAPI + Supabase RLS | Done |
+| Auth-aware FastAPI + Supabase RLS | Done on main; department hardening on feature branch |
 | Core domain APIs (roads, sections, plans, work orders) | Done (CRUD) |
-| MMMS / Finance / HR / General Assets | Done (CRUD + summaries) |
+| MMMS / Finance / HR / General Assets / Materials / Inspections | Done (CRUD + summaries where applicable) |
 | Deterministic road priority & ranking | Done |
 | Document extract → classify → chunk → embed → Q&A | Done |
 | Cross-module office assistant | Done |
 | Executive & module dashboards + operational report | Done |
-| Frontend product UI | In progress / next |
-| Live production validation | Ongoing |
+| Department role + RLS proposals | Feature branch; CI security gates pass; prod apply held |
+| Frontend product UI | Partial (dashboards, docs, materials, inspections) |
+| Live production validation of new RLS | Not started (held) |
 | Predictive intelligence | Not started |
 
 ---
@@ -39,6 +42,7 @@ The backend foundation for the **first useful release** is largely in place:
 - [x] Finance (budgets, expenses)
 - [x] General assets
 - [x] Documents
+- [x] Materials / road inspections (module APIs)
 
 ## Phase 3 — AI Core
 - [x] AI provider abstraction (Gemini)
@@ -69,7 +73,16 @@ The backend foundation for the **first useful release** is largely in place:
 - [ ] Cost analysis by road / activity (deeper)
 - [ ] Resource optimization recommendations
 
-## Phase 7 — Predictive Intelligence
+## Phase 7 — Authorization hardening (current feature branch)
+- [x] Recovered production department-role ledger SQL into `docs/recovered-migrations/`
+- [x] Repository proposals for department RLS, documents, conversations, privileges
+- [x] Disposable CI: catalog + RLS behavior + Auth-issued JWT PostgREST + preflight
+- [ ] Owner ledger reconciliation sign-off
+- [ ] Optional approved non-production replay
+- [ ] Production timestamped apply (only after sign-off)
+- [ ] Merge PR #1 to `main`
+
+## Phase 8 — Predictive Intelligence
 - [ ] Road deterioration forecasting
 - [ ] Machinery failure risk
 - [ ] Budget forecasting
@@ -80,9 +93,9 @@ The backend foundation for the **first useful release** is largely in place:
 
 ## Immediate next priorities
 
-1. **Live validation** — confirm Render + Supabase env, migrations `001`–`008`, upload a real document, run ranking and office assistant.
-2. **Frontend** — bind Vercel UI to dashboards, document upload, and AI endpoints.
-3. **Operational depth** — inspections/defects, cost-by-road, materials module.
+1. **Owner decision on department RLS rollout** — complete `docs/production-migration-checklist.md`; keep production frozen until then.
+2. **Live validation on current main capabilities** — Render + Supabase env, document upload, ranking, office assistant.
+3. **Frontend** — complete department-aware UX only after RLS is approved for the target environment.
 4. **Predictive phase** — only after reliable historical data is flowing.
 
 ## Design principle (unchanged)
