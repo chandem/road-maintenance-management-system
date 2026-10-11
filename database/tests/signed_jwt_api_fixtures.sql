@@ -6,11 +6,11 @@ INSERT INTO auth.users (
   id, aud, role, email, encrypted_password, email_confirmed_at,
   raw_app_meta_data, raw_user_meta_data, created_at, updated_at
 ) VALUES
-  ('a2000000-0000-4000-8000-000000000001', 'authenticated', 'authenticated', 'jwt-admin@example.invalid', '', now(), '{"provider":"email","providers":["email"]}'::jsonb, '{}'::jsonb, now(), now()),
-  ('a2000000-0000-4000-8000-000000000002', 'authenticated', 'authenticated', 'jwt-road-manager@example.invalid', '', now(), '{"provider":"email","providers":["email"]}'::jsonb, '{}'::jsonb, now(), now()),
-  ('a2000000-0000-4000-8000-000000000003', 'authenticated', 'authenticated', 'jwt-road-readonly@example.invalid', '', now(), '{"provider":"email","providers":["email"]}'::jsonb, '{}'::jsonb, now(), now()),
-  ('a2000000-0000-4000-8000-000000000004', 'authenticated', 'authenticated', 'jwt-finance@example.invalid', '', now(), '{"provider":"email","providers":["email"]}'::jsonb, '{}'::jsonb, now(), now()),
-  ('a2000000-0000-4000-8000-000000000005', 'authenticated', 'authenticated', 'jwt-other-org@example.invalid', '', now(), '{"provider":"email","providers":["email"]}'::jsonb, '{}'::jsonb, now(), now())
+  ('a2000000-0000-4000-8000-000000000001', 'authenticated', 'authenticated', 'jwt-admin@example.invalid', extensions.crypt('Local-CI-only-Road-Role-1-92!', extensions.gen_salt('bf')), now(), '{"provider":"email","providers":["email"]}'::jsonb, '{}'::jsonb, now(), now()),
+  ('a2000000-0000-4000-8000-000000000002', 'authenticated', 'authenticated', 'jwt-road-manager@example.invalid', extensions.crypt('Local-CI-only-Road-Role-2-92!', extensions.gen_salt('bf')), now(), '{"provider":"email","providers":["email"]}'::jsonb, '{}'::jsonb, now(), now()),
+  ('a2000000-0000-4000-8000-000000000003', 'authenticated', 'authenticated', 'jwt-road-readonly@example.invalid', extensions.crypt('Local-CI-only-Road-Role-3-92!', extensions.gen_salt('bf')), now(), '{"provider":"email","providers":["email"]}'::jsonb, '{}'::jsonb, now(), now()),
+  ('a2000000-0000-4000-8000-000000000004', 'authenticated', 'authenticated', 'jwt-finance@example.invalid', extensions.crypt('Local-CI-only-Road-Role-4-92!', extensions.gen_salt('bf')), now(), '{"provider":"email","providers":["email"]}'::jsonb, '{}'::jsonb, now(), now()),
+  ('a2000000-0000-4000-8000-000000000005', 'authenticated', 'authenticated', 'jwt-other-org@example.invalid', extensions.crypt('Local-CI-only-Road-Role-5-92!', extensions.gen_salt('bf')), now(), '{"provider":"email","providers":["email"]}'::jsonb, '{}'::jsonb, now(), now())
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO public.organizations (id, name, code) VALUES
