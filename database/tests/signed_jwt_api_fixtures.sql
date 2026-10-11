@@ -62,12 +62,12 @@ ON CONFLICT (id) DO NOTHING;
 -- Existing conversations/messages exercise ownership and append-only policy paths.
 INSERT INTO public.ai_conversations (id, organization_id, created_by, title, status)
 VALUES
-  ('g2000000-0000-4000-8000-000000000001', 'b2000000-0000-4000-8000-000000000001', 'a2000000-0000-4000-8000-000000000003', 'Read-only owner conversation', 'active'),
-  ('g2000000-0000-4000-8000-000000000002', 'b2000000-0000-4000-8000-000000000001', 'a2000000-0000-4000-8000-000000000002', 'Archived manager conversation', 'archived')
+  ('72000000-0000-4000-8000-000000000001', 'b2000000-0000-4000-8000-000000000001', 'a2000000-0000-4000-8000-000000000003', 'Read-only owner conversation', 'active'),
+  ('72000000-0000-4000-8000-000000000002', 'b2000000-0000-4000-8000-000000000001', 'a2000000-0000-4000-8000-000000000002', 'Archived manager conversation', 'archived')
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO public.ai_messages (id, conversation_id, role, content)
 VALUES
-  ('h2000000-0000-4000-8000-000000000001', 'g2000000-0000-4000-8000-000000000001', 'user', 'Synthetic private conversation message'),
-  ('h2000000-0000-4000-8000-000000000002', 'g2000000-0000-4000-8000-000000000002', 'user', 'Synthetic archived conversation message')
+  ('82000000-0000-4000-8000-000000000001', '72000000-0000-4000-8000-000000000001', 'user', 'Synthetic private conversation message'),
+  ('82000000-0000-4000-8000-000000000002', '72000000-0000-4000-8000-000000000002', 'user', 'Synthetic archived conversation message')
 ON CONFLICT (id) DO NOTHING;
