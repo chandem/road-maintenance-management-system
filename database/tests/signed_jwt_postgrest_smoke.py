@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Local-Auth-issued JWT/PostgREST smoke tests against disposable Supabase only.
 
-Seeds synthetic fixtures, sets passwords for those disposable users through the
-local Supabase Auth admin API, obtains access tokens through the password grant,
-then exercises the real HTTP Data API. Never use production credentials here.
+Auth users are provisioned earlier via the local Supabase Auth Admin API.
+This script obtains genuine access tokens through the password grant, then
+exercises the real HTTP Data API. Never use production credentials here.
 """
 from __future__ import annotations
 
@@ -18,38 +18,8 @@ ORG_B_ROAD = "d2000000-0000-4000-8000-000000000002"
 ORG_A_ID = "b2000000-0000-4000-8000-000000000001"
 
 
-def set_disposable_password(api_url: str, service_role_key: str, user_id: str, password: str) -> None:
-    """Set a known password through the local-only Supabase Auth admin API."""
-    data = json.dumps({"password": password, "email_confirm": True}).encode()
-    req = Request(
-        api_url.rstrip("/") + "/auth/v1/admin/users/" + user_id,
-        data=data,
-        headers={
-            "apikey": service_role_key,
-            "Authorization": "Bearer " + service_role_key,
-            "Content-Type": "application/json",
-            "Accept": "application/json",
-        },
-        method="PUT",
-    )
-    try:
-        with urlopen(req, timeout=20) as response:
-            response.read()
-    except HTTPError as exc:
-        try:
-            detail = json.loads(exc.read().decode(errors="replace"))
-        except (json.JSONDecodeError, UnicodeDecodeError):
-            detail = {}
-        safe_code = detail.get("error_code") or detail.get("code") or "unknown"
-        safe_message = detail.get("msg") or detail.get("message") or "no message"
-        raise RuntimeError(
-            f"Local Supabase Auth could not set a disposable password for user {user_id} "
-            f"(HTTP {exc.code}, {safe_code}: {str(safe_message)[:180]})."
-        ) from None
-
-
 def local_auth_access_token(api_url: str, anon_key: str, email: str, password: str) -> str:
-    # Users and password hashes are seeded only in disposable local CI SQL.
+    # Disposable users were created via the local Auth Admin API.
     # This request obtains a real access token from local Supabase Auth.
     data = json.dumps({"email": email, "password": password}).encode()
     req = Request(
@@ -123,7 +93,8 @@ def require(condition: bool, message: str) -> None:
 def main() -> None:
     api_url = os.environ["API_URL"]
     anon_key = os.environ["ANON_KEY"]
-    service_role_key = os.environ["SERVICE_ROLE_KEY"]
+    if "firzbqzbezuecvplsibi" in api_url:
+        raise RuntimeError("Refusing to run JWT smoke tests against the production project.")
 
     admin = "a2000000-0000-4000-8000-000000000001"
     manager = "a2000000-0000-4000-8000-000000000002"
@@ -142,7 +113,6 @@ def main() -> None:
     for index, (user_id, email) in enumerate(identities.items(), start=1):
         # Fixed disposable-only credentials; never print them or any access token.
         password = f"Local-CI-only-Road-Role-{index}-92!"
-        set_disposable_password(api_url, service_role_key, user_id, password)
         tokens[user_id] = local_auth_access_token(api_url, anon_key, email, password)
     api = Api(api_url, anon_key, tokens)
 

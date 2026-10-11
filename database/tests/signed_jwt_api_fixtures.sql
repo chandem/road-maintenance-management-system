@@ -1,71 +1,7 @@
--- Persistent fixtures for signed-JWT/PostgREST tests.
+-- Public-schema fixtures for signed-JWT/PostgREST tests.
+-- Auth users must already exist (created via local Supabase Auth Admin API).
 -- Runs only in disposable local Supabase CI after a clean database reset.
 -- Never run against a shared or production database.
-
-INSERT INTO auth.users (
-  id, aud, role, email, encrypted_password, email_confirmed_at,
-  raw_app_meta_data, raw_user_meta_data, created_at, updated_at
-) VALUES
-  ('a2000000-0000-4000-8000-000000000001', 'authenticated', 'authenticated', 'jwt-admin@example.com', extensions.crypt('Local-CI-only-Road-Role-1-92!', extensions.gen_salt('bf')), now(), '{"provider":"email","providers":["email"]}'::jsonb, '{}'::jsonb, now(), now()),
-  ('a2000000-0000-4000-8000-000000000002', 'authenticated', 'authenticated', 'jwt-road-manager@example.com', extensions.crypt('Local-CI-only-Road-Role-2-92!', extensions.gen_salt('bf')), now(), '{"provider":"email","providers":["email"]}'::jsonb, '{}'::jsonb, now(), now()),
-  ('a2000000-0000-4000-8000-000000000003', 'authenticated', 'authenticated', 'jwt-road-readonly@example.com', extensions.crypt('Local-CI-only-Road-Role-3-92!', extensions.gen_salt('bf')), now(), '{"provider":"email","providers":["email"]}'::jsonb, '{}'::jsonb, now(), now()),
-  ('a2000000-0000-4000-8000-000000000004', 'authenticated', 'authenticated', 'jwt-finance@example.com', extensions.crypt('Local-CI-only-Road-Role-4-92!', extensions.gen_salt('bf')), now(), '{"provider":"email","providers":["email"]}'::jsonb, '{}'::jsonb, now(), now()),
-  ('a2000000-0000-4000-8000-000000000005', 'authenticated', 'authenticated', 'jwt-other-org@example.com', extensions.crypt('Local-CI-only-Road-Role-5-92!', extensions.gen_salt('bf')), now(), '{"provider":"email","providers":["email"]}'::jsonb, '{}'::jsonb, now(), now())
-ON CONFLICT (id) DO UPDATE SET
-  email = EXCLUDED.email,
-  encrypted_password = EXCLUDED.encrypted_password,
-  email_confirmed_at = EXCLUDED.email_confirmed_at,
-  raw_app_meta_data = EXCLUDED.raw_app_meta_data,
-  updated_at = now();
-
--- GoTrue password sign-in also expects the corresponding email identity rows.
-INSERT INTO auth.identities (
-  provider_id, user_id, identity_data, provider, last_sign_in_at, created_at, updated_at
-)
-SELECT
-  id::text,
-  id,
-  jsonb_build_object('sub', id::text, 'email', email, 'email_verified', true),
-  'email',
-  now(),
-  now(),
-  now()
-FROM auth.users
-WHERE id IN (
-  'a2000000-0000-4000-8000-000000000001',
-  'a2000000-0000-4000-8000-000000000002',
-  'a2000000-0000-4000-8000-000000000003',
-  'a2000000-0000-4000-8000-000000000004',
-  'a2000000-0000-4000-8000-000000000005'
-)
-ON CONFLICT (provider_id, provider) DO UPDATE SET
-  user_id = EXCLUDED.user_id,
-  identity_data = EXCLUDED.identity_data,
-  updated_at = now();
-
--- Verify each fixture password hash using the same crypt implementation used to create it.
-DO $fixture$
-DECLARE
-  fixture RECORD;
-BEGIN
-  FOR fixture IN
-    SELECT u.id, u.encrypted_password, u.email, p.password
-    FROM auth.users AS u
-    JOIN (VALUES
-      ('a2000000-0000-4000-8000-000000000001'::uuid, 'Local-CI-only-Road-Role-1-92!'),
-      ('a2000000-0000-4000-8000-000000000002'::uuid, 'Local-CI-only-Road-Role-2-92!'),
-      ('a2000000-0000-4000-8000-000000000003'::uuid, 'Local-CI-only-Road-Role-3-92!'),
-      ('a2000000-0000-4000-8000-000000000004'::uuid, 'Local-CI-only-Road-Role-4-92!'),
-      ('a2000000-0000-4000-8000-000000000005'::uuid, 'Local-CI-only-Road-Role-5-92!')
-    ) AS p(id, password) ON p.id = u.id
-  LOOP
-    IF fixture.encrypted_password IS NULL
-       OR fixture.encrypted_password = ''
-       OR extensions.crypt(fixture.password, fixture.encrypted_password) <> fixture.encrypted_password THEN
-      RAISE EXCEPTION 'Password hash validation failed for disposable Auth fixture %', fixture.email;
-    END IF;
-  END LOOP;
-END $fixture$;
 
 INSERT INTO public.organizations (id, name, code) VALUES
   ('b2000000-0000-4000-8000-000000000001', 'Signed JWT Test Organization A', 'JWT-TEST-A'),
@@ -111,7 +47,6 @@ INSERT INTO public.document_chunks (
   ('f2000000-0000-4000-8000-000000000002', 'e2000000-0000-4000-8000-000000000002', 'b2000000-0000-4000-8000-000000000001', 0, 'Synthetic finance content', 'complete'),
   ('f2000000-0000-4000-8000-000000000003', 'e2000000-0000-4000-8000-000000000003', 'b2000000-0000-4000-8000-000000000002', 0, 'Synthetic other organization content', 'complete')
 ON CONFLICT (id) DO NOTHING;
-
 
 -- Existing conversations/messages exercise ownership and append-only policy paths.
 INSERT INTO public.ai_conversations (id, organization_id, created_by, title, status)
