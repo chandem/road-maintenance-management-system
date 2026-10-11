@@ -144,5 +144,56 @@ def main() -> None:
     require(status == 200 and rows == [], "signed road-manager JWT cannot read another organization's road")
 
 
+    def document_rows(user_id: str):
+        query = urlencode({"select": "id,title,department_code", "organization_id": f"eq.{ORG_A_ID}"})
+        return api.request(user_id, "GET", "/rest/v1/documents?" + query)
+
+    status, rows = document_rows(manager)
+    require(status == 200 and any(r.get("id") == "e2000000-0000-4000-8000-000000000001" for r in rows)
+            and all(r.get("id") != "e2000000-0000-4000-8000-000000000002" for r in rows),
+            "signed road-manager JWT reads road documents but not finance documents")
+
+    status, rows = document_rows(finance)
+    require(status == 200 and any(r.get("id") == "e2000000-0000-4000-8000-000000000002" for r in rows)
+            and all(r.get("id") != "e2000000-0000-4000-8000-000000000001" for r in rows),
+            "signed finance-manager JWT reads finance documents but not road documents")
+
+    status, rows = api.request(manager, "GET", "/rest/v1/document_chunks?" + urlencode({
+        "select": "id,document_id,content", "organization_id": f"eq.{ORG_A_ID}"
+    }))
+    require(status == 200 and any(r.get("id") == "f2000000-0000-4000-8000-000000000001" for r in rows)
+            and all(r.get("id") != "f2000000-0000-4000-8000-000000000002" for r in rows),
+            "signed road-manager JWT retrieves road chunks only")
+
+    # A manager must not reclassify a road document into finance to gain access.
+    status, result = api.request(manager, "PATCH", "/rest/v1/documents?id=eq.e2000000-0000-4000-8000-000000000001",
+                                {"department_code": "finance"})
+    require(status in (401, 403) or (status == 200 and result == []),
+            f"road manager cannot reclassify a road document into finance (HTTP {status})")
+
+    # Nor can a road manager attach a road chunk to a finance document.
+    status, result = api.request(manager, "PATCH", "/rest/v1/document_chunks?id=eq.f2000000-0000-4000-8000-000000000001",
+                                {"document_id": "e2000000-0000-4000-8000-000000000002"})
+    require(status in (401, 403) or (status == 200 and result == []),
+            f"road manager cannot re-parent a road chunk to a finance document (HTTP {status})")
+
+    conversation_payload = {
+        "organization_id": ORG_A_ID,
+        "created_by": manager,
+        "title": "Signed JWT test conversation",
+    }
+    status, result = api.request(manager, "POST", "/rest/v1/ai_conversations", conversation_payload)
+    require(status in (200, 201) and isinstance(result, list) and len(result) == 1,
+            f"signed road-manager JWT creates own AI conversation (HTTP {status})")
+
+    status, result = api.request(read_only, "POST", "/rest/v1/ai_conversations", {
+        "organization_id": ORG_A_ID,
+        "created_by": read_only,
+        "title": "Read-only must not create",
+    })
+    require(status in (401, 403) or (status in (200, 201) and result == []),
+            f"signed read-only JWT cannot create AI conversations (HTTP {status})")
+
+
 if __name__ == "__main__":
     main()
