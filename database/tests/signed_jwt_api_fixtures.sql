@@ -1,0 +1,43 @@
+-- Persistent fixtures for signed-JWT/PostgREST tests.
+-- Runs only in disposable local Supabase CI after a clean database reset.
+-- Never run against a shared or production database.
+
+INSERT INTO auth.users (
+  id, aud, role, email, encrypted_password, email_confirmed_at,
+  raw_app_meta_data, raw_user_meta_data, created_at, updated_at
+) VALUES
+  ('a2000000-0000-4000-8000-000000000001', 'authenticated', 'authenticated', 'jwt-admin@example.invalid', '', now(), '{"provider":"email","providers":["email"]}'::jsonb, '{}'::jsonb, now(), now()),
+  ('a2000000-0000-4000-8000-000000000002', 'authenticated', 'authenticated', 'jwt-road-manager@example.invalid', '', now(), '{"provider":"email","providers":["email"]}'::jsonb, '{}'::jsonb, now(), now()),
+  ('a2000000-0000-4000-8000-000000000003', 'authenticated', 'authenticated', 'jwt-road-readonly@example.invalid', '', now(), '{"provider":"email","providers":["email"]}'::jsonb, '{}'::jsonb, now(), now()),
+  ('a2000000-0000-4000-8000-000000000004', 'authenticated', 'authenticated', 'jwt-finance@example.invalid', '', now(), '{"provider":"email","providers":["email"]}'::jsonb, '{}'::jsonb, now(), now()),
+  ('a2000000-0000-4000-8000-000000000005', 'authenticated', 'authenticated', 'jwt-other-org@example.invalid', '', now(), '{"provider":"email","providers":["email"]}'::jsonb, '{}'::jsonb, now(), now())
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO public.organizations (id, name, code) VALUES
+  ('b2000000-0000-4000-8000-000000000001', 'Signed JWT Test Organization A', 'JWT-TEST-A'),
+  ('b2000000-0000-4000-8000-000000000002', 'Signed JWT Test Organization B', 'JWT-TEST-B')
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO public.organization_members (organization_id, user_id, role, is_active) VALUES
+  ('b2000000-0000-4000-8000-000000000001', 'a2000000-0000-4000-8000-000000000001', 'admin', true),
+  ('b2000000-0000-4000-8000-000000000001', 'a2000000-0000-4000-8000-000000000002', 'member', true),
+  ('b2000000-0000-4000-8000-000000000001', 'a2000000-0000-4000-8000-000000000003', 'member', true),
+  ('b2000000-0000-4000-8000-000000000001', 'a2000000-0000-4000-8000-000000000004', 'member', true),
+  ('b2000000-0000-4000-8000-000000000002', 'a2000000-0000-4000-8000-000000000005', 'member', true)
+ON CONFLICT (organization_id, user_id) DO NOTHING;
+
+INSERT INTO public.departments (id, organization_id, name, code) VALUES
+  ('c2000000-0000-4000-8000-000000000001', 'b2000000-0000-4000-8000-000000000001', 'JWT Road Asset', 'road_asset'),
+  ('c2000000-0000-4000-8000-000000000002', 'b2000000-0000-4000-8000-000000000001', 'JWT Finance', 'finance')
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO public.user_department_roles (organization_id, user_id, department_id, role, is_active) VALUES
+  ('b2000000-0000-4000-8000-000000000001', 'a2000000-0000-4000-8000-000000000002', 'c2000000-0000-4000-8000-000000000001', 'department_manager', true),
+  ('b2000000-0000-4000-8000-000000000001', 'a2000000-0000-4000-8000-000000000003', 'c2000000-0000-4000-8000-000000000001', 'read_only', true),
+  ('b2000000-0000-4000-8000-000000000001', 'a2000000-0000-4000-8000-000000000004', 'c2000000-0000-4000-8000-000000000002', 'department_manager', true)
+ON CONFLICT (organization_id, user_id, department_id) DO NOTHING;
+
+INSERT INTO public.roads (id, organization_id, road_code, name) VALUES
+  ('d2000000-0000-4000-8000-000000000001', 'b2000000-0000-4000-8000-000000000001', 'JWT-A-ROAD', 'Signed JWT Road A'),
+  ('d2000000-0000-4000-8000-000000000002', 'b2000000-0000-4000-8000-000000000002', 'JWT-B-ROAD', 'Signed JWT Road B')
+ON CONFLICT (id) DO NOTHING;
