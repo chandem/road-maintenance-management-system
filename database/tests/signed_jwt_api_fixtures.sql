@@ -13,6 +13,28 @@ INSERT INTO auth.users (
   ('a2000000-0000-4000-8000-000000000005', 'authenticated', 'authenticated', 'jwt-other-org@example.invalid', extensions.crypt('Local-CI-only-Road-Role-5-92!', extensions.gen_salt('bf')), now(), '{"provider":"email","providers":["email"]}'::jsonb, '{}'::jsonb, now(), now())
 ON CONFLICT (id) DO NOTHING;
 
+-- GoTrue password sign-in also expects the corresponding email identity rows.
+INSERT INTO auth.identities (
+  provider_id, user_id, identity_data, provider, last_sign_in_at, created_at, updated_at
+)
+SELECT
+  id::text,
+  id,
+  jsonb_build_object('sub', id::text, 'email', email, 'email_verified', true),
+  'email',
+  now(),
+  now(),
+  now()
+FROM auth.users
+WHERE id IN (
+  'a2000000-0000-4000-8000-000000000001',
+  'a2000000-0000-4000-8000-000000000002',
+  'a2000000-0000-4000-8000-000000000003',
+  'a2000000-0000-4000-8000-000000000004',
+  'a2000000-0000-4000-8000-000000000005'
+)
+ON CONFLICT (provider_id, provider) DO NOTHING;
+
 INSERT INTO public.organizations (id, name, code) VALUES
   ('b2000000-0000-4000-8000-000000000001', 'Signed JWT Test Organization A', 'JWT-TEST-A'),
   ('b2000000-0000-4000-8000-000000000002', 'Signed JWT Test Organization B', 'JWT-TEST-B')
