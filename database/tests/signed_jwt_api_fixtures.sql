@@ -43,24 +43,26 @@ ON CONFLICT (provider_id, provider) DO UPDATE SET
   identity_data = EXCLUDED.identity_data,
   updated_at = now();
 
--- Fail early if the disposable fixture password hashes do not match their known passwords.
+-- Verify each fixture password hash using the same crypt implementation used to create it.
 DO $fixture$
 DECLARE
   fixture RECORD;
 BEGIN
   FOR fixture IN
-    SELECT id, encrypted_password, email
-    FROM auth.users
-    WHERE id IN (
-      'a2000000-0000-4000-8000-000000000001',
-      'a2000000-0000-4000-8000-000000000002',
-      'a2000000-0000-4000-8000-000000000003',
-      'a2000000-0000-4000-8000-000000000004',
-      'a2000000-0000-4000-8000-000000000005'
-    )
+    SELECT u.id, u.encrypted_password, u.email, p.password
+    FROM auth.users AS u
+    JOIN (VALUES
+      ('a2000000-0000-4000-8000-000000000001'::uuid, 'Local-CI-only-Road-Role-1-92!'),
+      ('a2000000-0000-4000-8000-000000000002'::uuid, 'Local-CI-only-Road-Role-2-92!'),
+      ('a2000000-0000-4000-8000-000000000003'::uuid, 'Local-CI-only-Road-Role-3-92!'),
+      ('a2000000-0000-4000-8000-000000000004'::uuid, 'Local-CI-only-Road-Role-4-92!'),
+      ('a2000000-0000-4000-8000-000000000005'::uuid, 'Local-CI-only-Road-Role-5-92!')
+    ) AS p(id, password) ON p.id = u.id
   LOOP
-    IF fixture.encrypted_password IS NULL OR fixture.encrypted_password = '' THEN
-      RAISE EXCEPTION 'Missing password hash for disposable Auth fixture %', fixture.email;
+    IF fixture.encrypted_password IS NULL
+       OR fixture.encrypted_password = ''
+       OR extensions.crypt(fixture.password, fixture.encrypted_password) <> fixture.encrypted_password THEN
+      RAISE EXCEPTION 'Password hash validation failed for disposable Auth fixture %', fixture.email;
     END IF;
   END LOOP;
 END $fixture$;
