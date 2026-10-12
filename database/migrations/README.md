@@ -271,3 +271,44 @@ The production audit also confirmed both road-integrity triggers are enabled, th
 - **Production catalog observations reported by the operator:** the checks listed in Steps 37–38 completed, with the policy-expression scan treated as preliminary only.
 - **Isolated staging migration run and real staging-user JWT/API matrix:** not completed.
 - **Production rollout approval:** **BLOCKED**. Do not merge or apply proposed migrations 011–018 to production based only on local CI or policy keyword screening. Continue with an approved isolated non-production environment, test valid and invalid road/section cases, verify organization isolation and parent-linked document/message authorization using real JWTs, validate onboarding and backend service-role flows, and record the results before a production rollout is considered. Do not create paid infrastructure without explicit approval.
+
+## Step 39 — follow-up verification of policy screen and trigger permissions (2026-10-12)
+
+A follow-up read-only check confirmed the following production observations:
+
+- Both user-defined road-integrity triggers are enabled (tgenabled = 'O'):
+  enforce_road_section_organization on public.road_sections and
+  prevent_road_organization_change_with_sections on public.roads.
+- Both trigger functions are in the private schema, owned by postgres, use
+  SECURITY DEFINER and an empty function search_path, and have no direct
+  EXECUTE privilege for anon, authenticated, or service_role.
+- The road-section aggregate query returned zero for total sections, orphan
+  sections, missing organization IDs, and parent/section organization
+  mismatches. Since the production table contains zero sections, this is not
+  a behavioral test of the triggers; valid and invalid non-empty cases remain
+  required in an isolated test database.
+- The RLS policy keyword screen returned 15 total policies and found
+  organization-related terms in all 15 (zero were flagged by that screen).
+  This is a heuristic only; it cannot establish that each expression correctly
+  enforces tenant isolation. Exact policy expressions and real-JWT/Data API
+  behavior remain release gates.
+
+### CI status at this update
+
+The branch head was e6ba4c71d6bc026086d6956cce4919cf4db7be64 when checked.
+The GitHub Actions run for that commit (38289025846, “Isolated Supabase
+migration integration test”) was still in progress at the time of this
+documentation update. Do not treat that run as passed until its final
+conclusion is available. The previously completed run on
+13bf0037b345ebef1cf12d0b3daa68191bf23328 had passed the frontend build,
+backend tests, SQL syntax checks, and disposable-local-Supabase integration
+tests; the separate real staging-user JWT/API job was skipped because no
+isolated staging database was available.
+
+These checks do not reconcile production migration SQL with the repository
+files and do not authorize a production rollout. The staging gate remains
+**BLOCKED**. Do not merge or apply proposed migrations 011–018 to production
+until the migration history/catalog are reconciled and an approved isolated
+environment passes migration, catalog, non-empty road-integrity, onboarding,
+service-role, and real-JWT/API tests. Do not create paid infrastructure without
+explicit approval.
