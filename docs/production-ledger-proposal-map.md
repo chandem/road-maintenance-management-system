@@ -1,7 +1,7 @@
 # Production ledger ↔ repository proposal map
 
 **Branch:** `feature/department-role-management`  
-**As of:** 2026-10-11  
+**As of:** 2026-10-12  
 **Purpose:** Prevent accidental re-application of already-applied SQL and clarify what remains to ship.
 
 **Safety:** Recovered files under `docs/recovered-migrations/` are **evidence only**. Do not replay them against production.
@@ -21,90 +21,90 @@ Production ledger **names** end in `_011` … `_015`. Repository proposal **file
 | `department_role_policies_014` | `014_ai_conversation_department_rls.sql` |
 | `department_access_helper_015` | `015_road_section_organization_integrity.sql` |
 
-Any production apply of repository `011`–`018` must use **new unique timestamps after** `20261009115736`.
+Any production apply of repository `011`–`018` must use **new unique timestamps after** `20261009115736`, and only after approval and non-production validation.
 
 ---
 
-## 2. Applied production ledger (department/role slice)
+## 2. Applied production ledger
 
-| Ledger version | Ledger name | Archive | What it did |
-|----------------|-------------|---------|-------------|
-| `20261009115651` | `seed_core_departments_011` | `docs/recovered-migrations/20261009115651_seed_core_departments_011.sql` | Unique `(organization_id, code)` on departments; seed five GRMB departments |
-| `20261009115706` | `create_department_role_assignments_012` | `…_012.sql` | Create `user_department_roles` table/constraints |
-| `20261009115713` | `secure_department_role_assignments_013` | `…_013.sql` | Indexes + enable RLS on assignments |
-| `20261009115721` | `department_role_policies_014` | `…_014.sql` | View-own + org-admin manage policies |
-| `20261009115736` | `department_access_helper_015` | `…_015.sql` | `public.has_department_role` **SECURITY DEFINER**, `search_path = ''`, execute for `authenticated` only |
+The live Supabase migration ledger was checked on 2026-10-12. It contains 13 entries; its current tip is `20261009115736_department_access_helper_015`.
 
-Also recovered (related, not department-role numbered):
+| Ledger version | Ledger name |
+|----------------|-------------|
+| `20261008122917` | `initial_ai_rmms_schema` |
+| `20261008123128` | `document_intelligence` |
+| `20261008123135` | `document_embeddings` |
+| `20261008140938` | `authorization_foundation` |
+| `20261008141032` | `secure_semantic_search` |
+| `20261008183919` | `add_organization_onboarding_rpc` |
+| `20261009092658` | `materials_inventory_009` |
+| `20261009092727` | `road_inspections_010` |
+| `20261009115651` | `seed_core_departments_011` |
+| `20261009115706` | `create_department_role_assignments_012` |
+| `20261009115713` | `secure_department_role_assignments_013` |
+| `20261009115721` | `department_role_policies_014` |
+| `20261009115736` | `department_access_helper_015` |
 
-| Ledger version | Name | Archive |
-|----------------|------|---------|
-| `20261008183919` | `add_organization_onboarding_rpc` | `docs/recovered-migrations/20261008183919_add_organization_onboarding_rpc.sql` |
-
-Live production helper state (from recovery notes): `public.has_department_role` is DEFINER with empty search path — **not** yet moved to `private` with an INVOKER public wrapper.
-
----
-
-## 3. Repository proposals still to ship (after new timestamps)
-
-| Repo file | Intent | Depends on | Production gap it closes |
-|-----------|--------|------------|--------------------------|
-| `010_department_role_foundation.sql` | Foundation if clean-install only | Earlier core | Clean CI install path; production already has role objects via ledger 011–015 |
-| `011_department_road_rls.sql` | Move helper to `private` + INVOKER wrapper; restrictive road/section/inspection RLS | Live `has_department_role` | Department isolation on road data |
-| `012_department_module_rls.sql` | Restrictive module RLS | 011 helpers | Module isolation |
-| `013_department_aware_document_access.sql` | `documents.department_code` + dept document/chunk policies | 011–012 | Live has org-only document policies; no `department_code` |
-| `014_ai_conversation_department_rls.sql` | Create AI conversation tables + ownership policies | 011 helpers | Live missing `ai_conversations` / `ai_messages` / `ai_message_sources` |
-| `015_road_section_organization_integrity.sql` | Backfill/triggers for section org integrity | Road data | Nullable section org IDs |
-| `016_revoke_excess_authenticated_table_privileges.sql` | Revoke TRUNCATE/REFERENCES/TRIGGER | Tables from 014 present | Excess grants on many public tables |
-| `017_harden_function_execution_privileges.sql` | Function ACL + empty search_path | 011 private helper + onboarding RPC | Defense in depth |
-| `018_profile_and_role_privilege_hardening.sql` | Column-level profile/role grants | Onboarding still works | Direct profile write surface |
-
-**Clean-install CI** applies `001`–`018` in filename order on a disposable DB. That validates the *proposal sequence*, not production ledger identity.
+Recovered files under `docs/recovered-migrations/` are evidence for the applied history, not runnable migrations.
 
 ---
 
-## 4. Known live vs proposal divergences
+## 3. Live catalog facts verified 2026-10-12
 
-| Area | Live production | Repo proposal |
-|------|-----------------|---------------|
-| `has_department_role` | `public`, SECURITY DEFINER | 011 moves body to `private`, public INVOKER wrapper |
-| Document access | Org-member policy only; no `department_code` | 013 adds department scoping |
-| AI conversation tables | Absent | 014 creates them |
-| Onboarding RPC | Recovered SQL: role `admin`, `search_path=public, pg_catalog` | `004` / 017 differ (owner vs admin, search_path hardening) |
-| TRUNCATE on `authenticated` | Present on many tables | 016 revokes |
+Read-only queries against production confirmed:
 
----
+- `public.documents.department_code` exists (type `text`).
+- `public.ai_conversations`, `public.ai_messages`, and `public.ai_message_sources` all exist.
+- `public.roads` and `public.road_sections` exist.
+- RLS is enabled on `documents`, all three AI conversation tables, `roads`, and `road_sections`; FORCE RLS is false on those tables.
+- The four document/conversation tables have 15 policies in total: documents 5, conversations 4, messages 4, message sources 2.
+- The department-specific policies on those four tables are marked **RESTRICTIVE**; the older organization-member policies are **PERMISSIVE**. PostgreSQL combines restrictive policies with the applicable permissive policies, so review must account for both sets rather than judging a policy by name alone.
+- `public.has_department_role(uuid,text,text[])` is **SECURITY INVOKER** (not SECURITY DEFINER), has `search_path = ''`, is executable by `authenticated`, and is not executable by `anon` or `service_role` according to `has_function_privilege`.
 
-## 5. Recommended production apply strategy (when approved)
-
-1. **Do not** insert recovered `20261009*` SQL again.  
-2. Confirm ledger tip is still `20261009115736` (or note any newer applied versions).  
-3. On staging (owner-approved only): apply **new** timestamps for repo `011`→`018` in order.  
-4. Re-run catalog + Auth JWT matrix.  
-5. Especially verify after 011: PostgREST still resolves `public.has_department_role`; after 017/018: onboarding still creates org + membership.  
-6. Only then schedule production with backup/PITR and the same timestamped SQL.
+These are catalog facts only. They do not replace behavior tests with real Auth-issued JWTs against an owner-approved non-production environment, nor do they prove Render/Vercel runtime behavior or data integrity over non-empty historical road-section rows.
 
 ---
 
-## 6. CI evidence (disposable, not production)
+## 4. Repository proposals still to reconcile
 
-| Gate | Status |
-|------|--------|
-| Migration apply | Pass |
-| Catalog checks | Pass |
-| Department RLS behavior | Pass |
-| Auth Admin provision + password-grant JWT PostgREST | Pass |
-| Release preflight | Pass |
+| Repo file | Intent | Status / caution |
+|-----------|--------|------------------|
+| `010_department_role_foundation.sql` | Foundation for clean installs | Clean-install CI sequence only; do not replay as a production migration by filename |
+| `011_department_road_rls.sql` | Road/section/inspection department RLS and helper arrangement | Must be compared against the live catalog and tested before any release |
+| `012_department_module_rls.sql` | Module-specific RLS | Compare against live policies/grants before scheduling |
+| `013_department_aware_document_access.sql` | Department-aware document access | Live `department_code` and department policies already exist; inspect for exact semantic differences before applying anything |
+| `014_ai_conversation_department_rls.sql` | AI conversation ownership and department policies | The three AI tables already exist in production; inspect differences, do not treat this as table creation from scratch |
+| `015_road_section_organization_integrity.sql` | Road-section organization integrity | Verify live constraints/triggers and non-empty historical rows before any change |
+| `016_revoke_excess_authenticated_table_privileges.sql` | Revoke excess table privileges | Confirm current grants and app behavior first |
+| `017_harden_function_execution_privileges.sql` | Function ACL and search-path hardening | Compare exact live function definitions/ACLs; onboarding compatibility must be tested |
+| `018_profile_and_role_privilege_hardening.sql` | Profile/role privilege hardening | Test onboarding and role assignment flows before release |
 
-Latest green integration example: Actions run on `6655350` (PR workflow #96).
+**Clean-install CI** applies the repository sequence to a disposable database. This validates the proposal sequence, not the identity or safety of those files for production.
 
 ---
 
-## 7. Owner decision required
+## 5. CI and validation boundary
 
-| Decision | Default until explicit yes |
-|----------|----------------------------|
-| Create paid Supabase branch | **No** |
-| Apply proposals to production | **No** |
-| Merge PR #1 | **No** (remain draft) |
-| Use existing free/non-prod project for extra validation | Owner must name the project |
+The repository security-gate report records passing disposable local Supabase checks for migration apply, authorization catalog checks, department RLS behavior, Auth Admin provisioning, password-grant JWT/PostgREST smoke tests, release preflight, backend tests, frontend build, and SQL syntax.
+
+Those checks do **not** prove:
+- exact production behavior under every real-user role;
+- Render/Vercel service-role runtime paths;
+- integrity of non-empty historical road-section data;
+- owner-approved staging validation.
+
+The existing RAMS Supabase project is paused, and restoring it requires a paid upgrade. Do not restore or pay for it without explicit approval. Do not create a paid branch/project without explicit approval.
+
+---
+
+## 6. Recommended next steps
+
+1. Keep production migration apply on hold.
+2. Keep PR #1 in draft; do not merge until the release checklist is signed off.
+3. Complete a policy/grant/function diff between live production and each proposal file.
+4. Use the existing free disposable CI database for repeatable authorization tests; clearly label this as CI, not staging.
+5. If a genuinely separate non-production Supabase target becomes available at no cost, run Auth-issued JWT/PostgREST behavior tests there.
+6. Verify road-section integrity against non-empty data before any related migration.
+7. Only after all gates pass and explicit approval, prepare uniquely timestamped release SQL after `20261009115736`, backup/PITR checks, and a rollback plan.
+
+**Do not** apply proposals `011`–`018` to production by filename, replay recovered migration SQL, merge PR #1, or pay for staging without explicit approval.
