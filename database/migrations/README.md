@@ -208,3 +208,44 @@ resource was created. Do not apply these proposals to production, merge the PR,
 or create paid infrastructure without explicit approval. The next real gate is
 to obtain an approved isolated staging database, run the SQL scripts and
 migrations there, and complete the authenticated-JWT/API matrix.
+
+
+## Step 37 — follow-up read-only production audit (2026-10-12)
+
+This section supersedes earlier statements in this README that said
+`documents.department_code` and the AI conversation tables were absent, and
+that `road_sections.organization_id` was nullable. Those statements reflected
+an earlier audit snapshot and are stale.
+
+The operator re-ran read-only catalog queries against production and reported:
+
+- The migration ledger still returns 13 rows, ending at
+  `20261009115736` (`department_access_helper_015`). The repository migration
+  files 011–018 still must not be inferred to have run based on suffixes.
+- `public.documents.department_code`, `public.ai_conversations`,
+  `public.ai_messages`, and `public.ai_message_sources` all exist.
+- RLS is enabled on `documents`, `ai_conversations`, `ai_messages`, and
+  `ai_message_sources`; `FORCE ROW LEVEL SECURITY` is false on each.
+- The operator's summary query returned 15 policies across these four tables:
+  4 on `ai_conversations`, 2 on `ai_message_sources`, 4 on `ai_messages`,
+  and 5 on `documents`. A text screen found organization-related terms in all
+  15 policy expressions. This is only a preliminary screen, **not proof** that
+  each policy correctly enforces tenant isolation; inspect actual expressions
+  and retain real-JWT/Data API tests.
+- `road_sections.organization_id` was directly reported as NOT NULL.
+  The two user-defined road-integrity triggers are enabled (`tgenabled = 'O'`)
+  on `road_sections` and `roads`. Their functions are in `private`, owned
+  by `postgres`, use `SECURITY DEFINER` with an empty `search_path`, and
+  cannot be executed directly by `anon`, `authenticated`, or `service_role`.
+- The road-section integrity aggregate returned zero rows for all four counts
+  (total sections, orphan sections, missing organization, mismatches). Because
+  there are no sections, this is a vacuous data check and does not test trigger
+  behavior on non-empty data.
+
+These are reported read-only observations, not a migration deployment. They do
+not establish that production's schema and policy definitions are equivalent to
+the feature-branch migrations. The isolated staging gate remains BLOCKED; do
+not merge or apply proposed migrations 011–018 to production until a non-
+production migration run, catalog checks, and the complete real-JWT/API matrix
+have passed. No paid staging resource should be created without explicit
+approval.
