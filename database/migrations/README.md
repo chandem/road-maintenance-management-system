@@ -249,3 +249,25 @@ not merge or apply proposed migrations 011–018 to production until a non-
 production migration run, catalog checks, and the complete real-JWT/API matrix
 have passed. No paid staging resource should be created without explicit
 approval.
+
+
+## Step 38 — production policy screen and latest CI status (2026-10-12)
+
+The operator completed another read-only production check for the four authorization-sensitive tables:
+
+- `documents`, `ai_conversations`, `ai_messages`, and `ai_message_sources` all have RLS enabled.
+- `FORCE ROW LEVEL SECURITY` is false on all four tables. This is not, by itself, a failure; owner and privileged-role behavior must be considered separately.
+- The policy inventory returned 15 policies total: 5 for documents, 4 for conversations, 4 for messages, and 2 for message sources.
+- A text-only scan found organization-related terms in all 15 policy expressions and none without such a term. This is only a heuristic screen. It does **not** prove the policy logic correctly enforces organization isolation; exact expressions and real-JWT/Data API behavior still require review.
+- The operator confirmed the four objects exist in production: `documents.department_code`, `ai_conversations`, `ai_messages`, and `ai_message_sources`. These findings supersede earlier missing-object observations recorded above.
+
+The latest GitHub Actions run for commit `13bf0037b345ebef1cf12d0b3daa68191bf23328` completed successfully for the frontend build, backend tests, SQL syntax checks, and isolated Supabase migration integration test. The integration job applied the repository migration sequence to a **disposable local Supabase instance**, ran catalog checks, department RLS behavior checks, local-Auth-issued JWT Data API smoke tests, and the read-only release preflight. The separate staging Data API job using real staging-user JWTs was **skipped** because no isolated staging database is available.
+
+The production audit also confirmed both road-integrity triggers are enabled, their private SECURITY DEFINER functions use an empty search path and are not directly executable by `anon`, `authenticated`, or `service_role`. The aggregate integrity query returned zero for total sections and all violation counts; because the production table is empty, it does not test trigger behavior with real section rows.
+
+### Updated gate decision
+
+- **Repository CI on disposable local Supabase:** passed for the latest commit.
+- **Production catalog observations reported by the operator:** the checks listed in Steps 37–38 completed, with the policy-expression scan treated as preliminary only.
+- **Isolated staging migration run and real staging-user JWT/API matrix:** not completed.
+- **Production rollout approval:** **BLOCKED**. Do not merge or apply proposed migrations 011–018 to production based only on local CI or policy keyword screening. Continue with an approved isolated non-production environment, test valid and invalid road/section cases, verify organization isolation and parent-linked document/message authorization using real JWTs, validate onboarding and backend service-role flows, and record the results before a production rollout is considered. Do not create paid infrastructure without explicit approval.
