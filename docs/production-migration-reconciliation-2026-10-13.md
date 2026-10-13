@@ -35,7 +35,7 @@ Read-only catalog checks confirmed:
 - Repository migration `003_onboarding_hardening.sql` instead defines `private.create_organization_for_current_user`, sets an empty search path, assigns role `owner`, and grants EXECUTE to `authenticated`. This is a material mismatch and must be reconciled with real application/backend behavior before changing either function.
 
 ## Repository source reconciliation
-The expected paths for original migrations 011–015 could not be recovered at the time of this review. The production ledger entries therefore cannot yet be mapped with confidence to exact source-controlled SQL files. Do not recreate historical migration files as if they were the originals; reconstruct only as clearly labelled recovery proposals based on catalog evidence and verified commit history.
+The exact SQL bodies for production ledger migrations 011–015 have since been recovered from production migration statements/logs and archived as evidence under `docs/recovered-migrations/`. They are intentionally outside `database/migrations/` so clean-install automation will not mistake evidence archives for new migrations. They must still be compared semantically with the current proposed migration sequence; do not replay them or assume the proposal files are equivalent.
 
 Repository proposals present on the reviewed branch:
 - `database/migrations/018_profile_and_role_privilege_hardening.sql`
@@ -43,7 +43,7 @@ Repository proposals present on the reviewed branch:
 - `database/tests/authorization_catalog_checks.sql`
 - `database/tests/migration_release_preflight.sql`
 
-The isolated migration integration workflow passed at commit `bc2eac3996379684aed076f8b06681330fc40b26`. The workflow is not proof of production equivalence; its real staging Data API test was skipped because staging credentials/configuration were not available.
+The isolated migration integration workflow passed at commit `628795531b507187e93b6f62a367b3fca6deb18e`, including clean-install migrations, authorization catalog checks, RLS behavior checks, local Auth-issued JWT Data API tests, and read-only release preflight. Backend tests, frontend build, and SQL syntax checks also passed for that commit. The real staging Data API test was skipped because staging credentials/configuration were not available. These tests do not prove production equivalence.
 
 ## Release blockers
 1. Recover or formally reconstruct the source for migrations 011–015 and reconcile each definition against the live catalog.
@@ -55,3 +55,12 @@ The isolated migration integration workflow passed at commit `bc2eac3996379684ae
 
 ## Deployment status
 No production schema or data changes were made during this review. Do not apply migrations 016–019 or any reconstructed migration to production until the blockers above are resolved and the production change set has been explicitly approved.
+
+
+## Follow-up read-only verification — 2026-10-13
+
+A fresh catalog query reconfirmed that production still has 13 migration ledger entries; migrations 016–020 are not recorded as applied. It also reconfirmed effective privileges on `public.user_department_roles`: `anon` has table-level SELECT, INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, and TRIGGER privileges; `authenticated` has TRUNCATE, REFERENCES, and TRIGGER. RLS is enabled, but these grants remain excessive and need a tested revocation plan. The proposed migration 020 and its catalog test are source-controlled only.
+
+The current function catalog contains both `private.has_department_role(uuid,text,text[])` (SECURITY DEFINER, empty search path) and `public.has_department_role(uuid,text,text[])` (SECURITY INVOKER, empty search path); both deny anonymous EXECUTE and allow authenticated EXECUTE. The public onboarding RPC remains SECURITY DEFINER with `search_path=public, pg_catalog`, and EXECUTE is granted to authenticated and service_role but not anon. The exact recovered production onboarding statement is archived at `docs/recovered-migrations/20261008183919_add_organization_onboarding_rpc.sql`; it assigns the initial membership role `admin`. These are observations, not authorization behavior tests.
+
+No production schema, grants, functions, or data were changed during this follow-up.
