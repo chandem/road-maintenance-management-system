@@ -23,6 +23,10 @@ ORG_B_ROAD_PATH = (
     "b2000000-0000-4000-8000-000000000002/road_asset/"
     "e2000000-0000-4000-8000-000000000003/other-org-original.pdf"
 )
+ORG_A_OFFICER_PATH = (
+    "b2000000-0000-4000-8000-000000000001/road_asset/"
+    "e2000000-0000-4000-8000-000000000004/officer-original.pdf"
+)
 
 
 def auth_token(api_url: str, anon_key: str, email: str, password: str) -> str:
@@ -76,6 +80,7 @@ def main() -> None:
     read_only = auth_token(api_url, anon_key, "jwt-road-readonly@example.com", "Local-CI-only-Road-Role-3-92!")
     finance = auth_token(api_url, anon_key, "jwt-finance@example.com", "Local-CI-only-Road-Role-4-92!")
     other_org = auth_token(api_url, anon_key, "jwt-other-org@example.com", "Local-CI-only-Road-Role-5-92!")
+    officer = auth_token(api_url, anon_key, "jwt-onboarding-new@example.com", "Local-CI-only-Road-Role-6-92!")
 
     object_route = lambda path: "/object/documents-private/" + path
     download_route = lambda path: "/object/authenticated/documents-private/" + path
@@ -91,6 +96,9 @@ def main() -> None:
 
     status, _ = request_storage(api_url, anon_key, other_org, "POST", object_route(ORG_A_ROAD_PATH), test_bytes)
     expect(status in (400, 401, 403), "other-organization user cannot upload into organization A", status)
+
+    status, _ = request_storage(api_url, anon_key, officer, "POST", object_route(ORG_A_OFFICER_PATH), test_bytes)
+    expect(status in (200, 201), "road department officer can upload authorized private original", status)
 
     status, _ = request_storage(api_url, anon_key, manager, "POST", object_route(ORG_A_ROAD_PATH), test_bytes)
     expect(status in (200, 201), "road manager can upload authorized private original", status)
