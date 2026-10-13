@@ -34,8 +34,9 @@ BEGIN
 
   IF has_table_privilege('authenticated', v_table, 'TRUNCATE')
      OR has_table_privilege('authenticated', v_table, 'REFERENCES')
-     OR has_table_privilege('authenticated', v_table, 'TRIGGER') THEN
-    RAISE EXCEPTION 'authenticated retains structural privileges on user_department_roles';
+     OR has_table_privilege('authenticated', v_table, 'TRIGGER')
+     OR has_table_privilege('authenticated', v_table, 'MAINTAIN') THEN
+    RAISE EXCEPTION 'authenticated retains structural privileges (including MAINTAIN) on user_department_roles';
   END IF;
 END
 $checks$;
