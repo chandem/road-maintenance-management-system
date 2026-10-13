@@ -1,6 +1,7 @@
 import json
+import secrets
 from pathlib import Path
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 
@@ -33,6 +34,24 @@ router = APIRouter(prefix="/documents", tags=["documents"])
 # migration unapplied until the authenticated-JWT staging matrix passes.
 ALLOWED_EXTENSIONS = {".txt", ".csv", ".pdf", ".docx", ".xlsx", ".xlsm"}
 MAX_FILE_SIZE = 10 * 1024 * 1024
+PRIVATE_DOCUMENT_BUCKET = "documents-private"
+SIGNED_URL_TTL_SECONDS = 60
+MIME_TYPES = {
+    ".txt": "text/plain",
+    ".csv": "text/csv",
+    ".pdf": "application/pdf",
+    ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    ".xlsm": "application/vnd.ms-excel.sheet.macroEnabled.12",
+}
+
+
+def _private_storage_path(organization_id: str, department_code: str, document_id: str, suffix: str) -> str:
+    """Build a non-user-controlled object name bound to one document row."""
+    if department_code not in VALID_DEPARTMENT_CODES:
+        raise ValueError("Invalid department code")
+    return f"{organization_id}/{department_code}/{document_id}/{uuid4()}{suffix}"
+
 
 
 def _document_snippet(text: str | None, query: str, max_length: int = 240) -> str:
@@ -257,6 +276,45 @@ def get_document(
         ),
         created_at=data.get("created_at"),
     )
+
+
+@router.get("/{document_id}/original")
+def get_original_document_url(
+    document_id: UUID,
+    current_user=Depends(get_current_user),
+):
+    """Return a short-lived signed URL after authorizing the stored document row."""
+    client = current_user["client"]
+    document = (
+        client.table("documents")
+        .select("id,title,organization_id,department_code,storage_path")
+        .eq("id", str(document_id))
+        .maybe_single()
+        .execute()
+    )
+    if not document.data:
+        raise HTTPException(status_code=404, detail="Document not found")
+    row = document.data
+    _authorize_document_row(current_user, row)
+    storage_path = row.get("storage_path")
+    if not storage_path:
+        raise HTTPException(status_code=404, detail="Original file is not available for this document.")
+
+    try:
+        signed = client.storage.from_(PRIVATE_DOCUMENT_BUCKET).create_signed_url(
+            storage_path, SIGNED_URL_TTL_SECONDS
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail="Could not create a secure document download link.") from exc
+    signed_url = (signed or {}).get("signedURL") or (signed or {}).get("signedUrl")
+    if not signed_url:
+        raise HTTPException(status_code=502, detail="Storage did not return a download link.")
+    return {
+        "document_id": str(document_id),
+        "filename": row.get("title"),
+        "url": signed_url,
+        "expires_in": SIGNED_URL_TTL_SECONDS,
+    }
 
 
 @router.post("/classify", response_model=DocumentClassificationResponse)
@@ -542,16 +600,21 @@ async def classify_uploaded_document(
 
     result = classify_document(filename, text)
 
+    client = current_user["client"]
+    document_id = str(uuid4())
+    storage_path = _private_storage_path(organization_id, department_code, document_id, suffix)
+    mime_type = MIME_TYPES[suffix]
     document = (
-        current_user["client"]
-        .table("documents")
+        client.table("documents")
         .insert(
             {
+                "id": document_id,
                 "organization_id": organization_id,
                 "department_code": department_code,
+                "storage_path": storage_path,
                 "title": filename,
                 "document_type": result.document_type,
-                "mime_type": file.content_type,
+                "mime_type": mime_type,
                 "status": "processed",
                 "extraction_status": "completed",
                 "classification_confidence": result.confidence,
@@ -565,7 +628,24 @@ async def classify_uploaded_document(
     if not document.data:
         raise HTTPException(status_code=500, detail="Document could not be saved.")
 
-    document_id = str(document.data[0]["id"])
+    # The row must exist first because Storage INSERT RLS binds the object to
+    # its exact documents.storage_path. If the object upload fails, clear the
+    # path and return an error; never report a successful original-file upload.
+    try:
+        client.storage.from_(PRIVATE_DOCUMENT_BUCKET).upload(
+            storage_path,
+            content,
+            file_options={"content-type": mime_type, "upsert": "false"},
+        )
+    except Exception as exc:
+        try:
+            client.table("documents").update({"storage_path": None}).eq("id", document_id).execute()
+        except Exception:
+            pass
+        raise HTTPException(
+            status_code=502,
+            detail="Original document storage failed. The document text may be retained; retry the upload.",
+        ) from exc
     chunk_count = None
     embedded_count = None
     embedding_status = None
