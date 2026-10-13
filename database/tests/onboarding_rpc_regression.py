@@ -118,8 +118,8 @@ def main() -> None:
     )
     require(status == 200 and isinstance(memberships, list) and len(memberships) == 1
             and memberships[0].get("is_active") is True
-            and memberships[0].get("role") in ("owner", "admin"),
-            "successful onboarding creates an active organization membership")
+            and memberships[0].get("role") == "admin",
+            "successful onboarding creates an active admin organization membership")
 
     # Existing organization member must not create a second organization.
     status, _ = call(
