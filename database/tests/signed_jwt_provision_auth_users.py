@@ -19,6 +19,8 @@ IDENTITIES = [
     ("a2000000-0000-4000-8000-000000000003", "jwt-road-readonly@example.com", 3),
     ("a2000000-0000-4000-8000-000000000004", "jwt-finance@example.com", 4),
     ("a2000000-0000-4000-8000-000000000005", "jwt-other-org@example.com", 5),
+    ("a2000000-0000-4000-8000-000000000006", "jwt-onboarding-new@example.com", 6),
+    ("a2000000-0000-4000-8000-000000000007", "jwt-onboarding-duplicate@example.com", 7),
 ]
 
 
