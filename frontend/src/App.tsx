@@ -103,6 +103,47 @@ async function authToken(): Promise<string> {
   return token;
 }
 
+async function verifyDepartmentAccess(token: string, departmentCode: string): Promise<void> {
+  const headers = { Authorization: `Bearer ${token}` };
+
+  // Organization owners/admins are authorized by the backend without a separate
+  // department assignment. Check this first so admins are not blocked by the
+  // regular-member role check in the entry flow.
+  const adminResponse = await fetch(`${API_BASE_URL}/departments/roles`, { headers });
+  if (adminResponse.ok) {
+    const departmentsResponse = await fetch(`${API_BASE_URL}/departments`, { headers });
+    if (!departmentsResponse.ok) {
+      throw new Error(`Unable to verify organization departments (${departmentsResponse.status}).`);
+    }
+    const departments = await departmentsResponse.json();
+    if (!(departments as Array<{ code?: string }>).some((item) => item.code === departmentCode)) {
+      throw new Error("This department is not configured for your organization. Contact support or your organization administrator.");
+    }
+    return;
+  }
+
+  if (adminResponse.status !== 403) {
+    throw new Error(`Unable to verify organization administrator access (${adminResponse.status}).`);
+  }
+
+  const rolesResponse = await fetch(`${API_BASE_URL}/departments/me/roles`, { headers });
+  if (!rolesResponse.ok) {
+    throw new Error(`Unable to verify department access (${rolesResponse.status}).`);
+  }
+  const rolePayload = await rolesResponse.json();
+  const assignments = Array.isArray(rolePayload)
+    ? rolePayload
+    : (rolePayload.roles ?? rolePayload.items ?? []);
+  const hasAccess = assignments.some(
+    (item: any) =>
+      (item.department_code ?? item.departments?.code) === departmentCode &&
+      item.is_active !== false,
+  );
+  if (!hasAccess) {
+    throw new Error("You do not have an active role in this department. Contact your organization administrator.");
+  }
+}
+
 function App() {
   const [data, setData] = useState<RankingResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -269,24 +310,7 @@ function App() {
         } else {
           try {
             const token = await authToken();
-            const rolesResponse = await fetch(`${API_BASE_URL}/departments/me/roles`, {
-              headers: { Authorization: `Bearer ${token}` },
-            });
-            if (!rolesResponse.ok) {
-              throw new Error(`Unable to verify department access (${rolesResponse.status}).`);
-            }
-            const rolePayload = await rolesResponse.json();
-            const assignments = Array.isArray(rolePayload)
-              ? rolePayload
-              : (rolePayload.roles ?? rolePayload.items ?? []);
-            const hasAccess = assignments.some(
-              (item: any) =>
-                (item.department_code ?? item.departments?.code) === selectedDepartment &&
-                item.is_active !== false,
-            );
-            if (!hasAccess) {
-              throw new Error("You do not have an active role in this department. Contact your organization administrator.");
-            }
+            await verifyDepartmentAccess(token, selectedDepartment);
             setOrganizationName(org.name);
             setOrganizationId(org.id);
             setWorkspaceReady(true);
@@ -468,12 +492,7 @@ function App() {
                     const { data: org, error: orgError } = await supabase.from("organizations").select("id,name,code").eq("id", profile.organization_id).maybeSingle();
                     if (orgError || !org || String(org.code ?? "").trim().toLowerCase() !== organizationCode.trim().toLowerCase()) throw new Error(orgError?.message ?? "The organization code does not match your account.");
                     const token = await authToken();
-                    const response = await fetch(`${API_BASE_URL}/departments/me/roles`, { headers: { Authorization: `Bearer ${token}` } });
-                    if (!response.ok) throw new Error(response.status === 403 ? "You do not have access to department assignments." : `Unable to verify department access (${response.status}).`);
-                    const roles = await response.json();
-                    const assignments = Array.isArray(roles) ? roles : (roles.roles ?? roles.items ?? []);
-                    const allowed = assignments.some((item: any) => (item.department_code ?? item.departments?.code) === selectedDepartment && item.is_active !== false);
-                    if (!allowed) throw new Error("You do not have an active role in this department. Contact your organization administrator.");
+                    await verifyDepartmentAccess(token, selectedDepartment);
                     setOrganizationId(org.id); setOrganizationName(org.name); setWorkspaceReady(true);
                   } catch (err) { setError(err instanceof Error ? err.message : "Unable to verify workspace access."); }
                   finally { setAuthLoading(false); }
