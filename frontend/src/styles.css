@@ -380,3 +380,50 @@ button:disabled {
   .entry-panel { padding: 1rem; }
   .entry-panel .department-grid { grid-template-columns: 1fr; }
 }
+
+/* Dedicated department application shell */
+.department-app {
+  display: grid;
+  grid-template-columns: 250px minmax(0, 1fr);
+  gap: 1.25rem;
+  align-items: start;
+  margin-top: 1.25rem;
+}
+.department-sidebar {
+  position: sticky;
+  top: 1rem;
+  padding: 1.25rem;
+  border: 1px solid #dbe3ee;
+  border-radius: 16px;
+  background: #ffffff;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.04);
+}
+.department-sidebar h2 { font-size: 1.2rem; line-height: 1.35; margin: 0.35rem 0 1rem; }
+.department-sidebar nav { display: grid; gap: 0.35rem; margin-top: 0.75rem; }
+.department-sidebar nav a {
+  display: block;
+  padding: 0.7rem 0.75rem;
+  border-radius: 9px;
+  color: #334155;
+  text-decoration: none;
+  font-size: 0.92rem;
+}
+.department-sidebar nav a:hover,
+.department-sidebar nav a:focus-visible { background: #eff6ff; color: #1d4ed8; outline-offset: 2px; }
+.department-main { min-width: 0; display: grid; gap: 1rem; }
+.department-main > section { min-width: 0; }
+.department-main .section-heading { gap: 1rem; flex-wrap: wrap; }
+.department-module-card { scroll-margin-top: 1rem; }
+.department-module-card h3 { margin: 0 0 0.5rem; font-size: 1rem; }
+.department-module-card p { color: #64748b; line-height: 1.55; font-weight: 400; }
+.department-module-card .panel-help { display: inline-block; margin-top: 0.5rem; }
+@media (max-width: 900px) {
+  .department-app { grid-template-columns: 1fr; }
+  .department-sidebar { position: static; }
+  .department-sidebar nav { grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); }
+}
+@media (max-width: 560px) {
+  .department-sidebar, .department-main > section { padding: 1rem; }
+  .department-sidebar nav { grid-template-columns: 1fr 1fr; }
+  .department-module-card { min-width: 0; }
+}

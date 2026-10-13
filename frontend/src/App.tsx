@@ -4,6 +4,7 @@ import type { User } from "@supabase/supabase-js";
 import { supabase } from "./lib/supabase";
 import MaterialsModule from "./components/MaterialsModule";
 import RoadInspectionsModule from "./components/RoadInspectionsModule";
+import DepartmentWorkspace from "./components/DepartmentWorkspace";
 
 type Priority = "Critical" | "High" | "Medium" | "Low";
 
@@ -154,7 +155,7 @@ function App() {
   const [authLoading, setAuthLoading] = useState(false);
   const [organizationId, setOrganizationId] = useState<string | null>(null);
   const [organizationCode, setOrganizationCode] = useState("");
-  const [selectedDepartment, setSelectedDepartment] = useState("");
+  const [selectedDepartment, setSelectedDepartment] = useState(() => sessionStorage.getItem("ai-rmms-department") ?? "");
   const [workspaceReady, setWorkspaceReady] = useState(false);
   const [organizationName, setOrganizationName] = useState<string | null>(null);
   const [organizationLoading, setOrganizationLoading] = useState(false);
@@ -270,11 +271,11 @@ function App() {
   }, [loadOrganization]);
 
   useEffect(() => {
-    if (authReady && user && organizationId) {
+    if (authReady && user && organizationId && selectedDepartment === "road_asset") {
       void loadRanking();
       void loadDashboard();
     }
-  }, [authReady, user, organizationId, loadRanking, loadDashboard]);
+  }, [authReady, user, organizationId, selectedDepartment, loadRanking, loadDashboard]);
 
   const handleSignIn = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -475,7 +476,7 @@ function App() {
                 <button type="button" key={department.code}
                   className={`department-card ${selectedDepartment === department.code ? "selected" : ""}`}
                   aria-pressed={selectedDepartment === department.code}
-                  onClick={() => setSelectedDepartment(department.code)}>
+                  onClick={() => { setSelectedDepartment(department.code); sessionStorage.setItem("ai-rmms-department", department.code); }}>
                   <strong>{department.label}</strong>
                   <span>{selectedDepartment === department.code ? "Selected" : "Select department"}</span>
                 </button>
@@ -502,7 +503,7 @@ function App() {
             {error && <div className="error-message" role="alert">{error}</div>}
           </section>
         )}
-        {authReady && user && organizationId && workspaceReady && (
+        {authReady && user && organizationId && workspaceReady && selectedDepartment === "road_asset" && (
           <nav className="module-nav" aria-label="AI-RMMS modules">
             <a href="#dashboard">Dashboard</a>
             <a href="#road-ranking">Road ranking</a>
@@ -563,7 +564,10 @@ function App() {
           </section>
         )}
 
-        {authReady && user && organizationId && workspaceReady && (
+        {authReady && user && organizationId && workspaceReady && selectedDepartment !== "road_asset" && (
+          <DepartmentWorkspace departmentCode={selectedDepartment} />
+        )}
+        {authReady && user && organizationId && workspaceReady && selectedDepartment === "road_asset" && (
           <>
             <section id="dashboard" className="dashboard-panel">
               <div className="section-heading">
