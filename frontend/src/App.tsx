@@ -269,21 +269,36 @@ function App() {
         } else {
           try {
             const token = await authToken();
-            const rolesResponse = await fetch(`${API_BASE_URL}/departments/me/roles`, {
+            // Organization owners/admins are authorized across departments and do not
+            // need a separate user_department_roles assignment for each module.
+            const adminResponse = await fetch(`${API_BASE_URL}/departments/roles`, {
               headers: { Authorization: `Bearer ${token}` },
             });
-            if (!rolesResponse.ok) {
-              throw new Error(`Unable to verify department access (${rolesResponse.status}).`);
+            let hasAccess = adminResponse.ok;
+
+            if (!adminResponse.ok) {
+              // Only a 403 means this is not an organization admin. Fail closed on
+              // server/network errors rather than silently treating them as members.
+              if (adminResponse.status !== 403) {
+                throw new Error(`Unable to verify organization administrator access (${adminResponse.status}).`);
+              }
+              const rolesResponse = await fetch(`${API_BASE_URL}/departments/me/roles`, {
+                headers: { Authorization: `Bearer ${token}` },
+              });
+              if (!rolesResponse.ok) {
+                throw new Error(`Unable to verify department access (${rolesResponse.status}).`);
+              }
+              const rolePayload = await rolesResponse.json();
+              const assignments = Array.isArray(rolePayload)
+                ? rolePayload
+                : (rolePayload.roles ?? rolePayload.items ?? []);
+              hasAccess = assignments.some(
+                (item: any) =>
+                  (item.department_code ?? item.departments?.code) === selectedDepartment &&
+                  item.is_active !== false,
+              );
             }
-            const rolePayload = await rolesResponse.json();
-            const assignments = Array.isArray(rolePayload)
-              ? rolePayload
-              : (rolePayload.roles ?? rolePayload.items ?? []);
-            const hasAccess = assignments.some(
-              (item: any) =>
-                (item.department_code ?? item.departments?.code) === selectedDepartment &&
-                item.is_active !== false,
-            );
+
             if (!hasAccess) {
               throw new Error("You do not have an active role in this department. Contact your organization administrator.");
             }
