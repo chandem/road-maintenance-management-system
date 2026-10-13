@@ -26,7 +26,7 @@ INSERT INTO public.documents (
    'b2000000-0000-4000-8000-000000000001',
    'JWT Cross-department Upload Denial Fixture', 'maintenance_plan', 'processed',
    'a2000000-0000-4000-8000-000000000002', 'road_asset',
-   'b2000000-0000-4000-8000-000000000005/road_asset/e2000000-0000-4000-8000-000000000005/finance-denied.txt'),
+   'b2000000-0000-4000-8000-000000000001/road_asset/e2000000-0000-4000-8000-000000000005/finance-denied.txt'),
   ('e2000000-0000-4000-8000-000000000006',
    'b2000000-0000-4000-8000-000000000001',
    'JWT Org-admin Upload Fixture', 'financial_report', 'processed',
