@@ -1,3 +1,33 @@
+/* AI-RMMS design system foundations */
+:root {
+  --color-brand-50: #eff6ff;
+  --color-brand-100: #dbeafe;
+  --color-brand-600: #2563eb;
+  --color-brand-700: #1d4ed8;
+  --color-bg-app: #f1f5f9;
+  --color-bg-surface: #ffffff;
+  --color-bg-muted: #f8fafc;
+  --color-text-primary: #0f172a;
+  --color-text-secondary: #475569;
+  --color-text-muted: #64748b;
+  --color-border: #e2e8f0;
+  --color-border-strong: #cbd5e1;
+  --color-success: #15803d;
+  --color-warning: #b45309;
+  --color-danger: #b91c1c;
+  --color-info: #0369a1;
+  --radius-control: 10px;
+  --radius-card: 16px;
+  --shadow-card: 0 10px 30px rgba(15, 23, 42, 0.04);
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --focus-ring: 0 0 0 3px rgba(37, 99, 235, 0.28);
+}
+
 :root {
   color-scheme: light;
   font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
@@ -427,3 +457,13 @@ button:disabled {
   .department-sidebar nav { grid-template-columns: 1fr 1fr; }
   .department-module-card { min-width: 0; }
 }
+
+/* Accessible shared interaction states */
+:where(a, button, input, select, textarea, [tabindex]):focus-visible { outline: 3px solid rgba(37, 99, 235, 0.72); outline-offset: 2px; }
+select { width: 100%; min-height: 44px; border: 1px solid var(--color-border-strong); border-radius: var(--radius-control); padding: 0.65rem 0.8rem; color: var(--color-text-primary); background: var(--color-bg-surface); font: inherit; }
+button, input, select, textarea { min-height: 44px; }
+textarea { min-height: 100px; }
+button:hover:not(:disabled) { filter: brightness(0.96); }
+button:active:not(:disabled) { transform: translateY(1px); }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; } }
+@media (max-width: 640px) { .app-shell { padding: 0.85rem; } .topbar { flex-direction: column; align-items: stretch; } .topbar-meta { flex-wrap: wrap; } .metric-grid { grid-template-columns: repeat(auto-fit, minmax(135px, 1fr)); } }
