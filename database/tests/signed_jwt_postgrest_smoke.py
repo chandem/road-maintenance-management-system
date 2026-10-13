@@ -57,6 +57,29 @@ class Api:
         self.anon_key = anon_key
         self.tokens = tokens
 
+    def anonymous_request(self, method: str, path: str, body=None):
+        data = None if body is None else json.dumps(body).encode()
+        headers = {
+            "apikey": self.anon_key,
+            "Authorization": "Bearer " + self.anon_key,
+            "Accept": "application/json",
+        }
+        if data is not None:
+            headers["Content-Type"] = "application/json"
+            headers["Prefer"] = "return=representation"
+        req = Request(self.base + path, data=data, headers=headers, method=method)
+        try:
+            with urlopen(req, timeout=15) as response:
+                raw = response.read().decode()
+                return response.status, json.loads(raw) if raw else None
+        except HTTPError as exc:
+            raw = exc.read().decode(errors="replace")
+            try:
+                parsed = json.loads(raw) if raw else None
+            except json.JSONDecodeError:
+                parsed = raw[:200]
+            return exc.code, parsed
+
     def request(self, user_id: str, method: str, path: str, body=None):
         token = self.tokens.get(user_id)
         if not token:
@@ -271,6 +294,68 @@ def main() -> None:
         "select": "id", "organization_id": f"eq.{ORG_A_ID}"
     }))
     require(status == 200 and rows == [], "finance-only user cannot read road AI conversations")
+
+
+    # Profile and department-role privilege regression coverage.
+    profile_path = "/rest/v1/user_profiles"
+    profile_query = profile_path + "?" + urlencode({"select": "id,full_name,organization_id,department_id,employee_code,is_active", "id": f"eq.{manager}"})
+    status, profile_rows = api.request(manager, "GET", profile_query)
+    require(status == 200 and isinstance(profile_rows, list),
+            "authenticated user can query their own profile through the Data API")
+    if not profile_rows:
+        status, result = api.request(manager, "POST", profile_path, {"id": manager, "full_name": "JWT Road Manager"})
+        require(status in (200, 201) and isinstance(result, list) and len(result) == 1,
+                f"user can bootstrap a minimal own profile (HTTP {status})")
+    else:
+        status, result = api.request(manager, "PATCH", profile_path + "?id=eq." + manager,
+                                     {"full_name": "JWT Road Manager Updated"})
+        require(status in (200, 204) and (status == 204 or isinstance(result, list)),
+                f"user can update own profile name (HTTP {status})")
+
+    status, result = api.request(manager, "PATCH", profile_path + "?id=eq." + manager,
+                                 {"organization_id": "b2000000-0000-4000-8000-000000000002"})
+    require(status in (401, 403) or (status in (200, 204) and result == []),
+            f"user cannot change their own organization assignment (HTTP {status})")
+
+    status, result = api.request(manager, "PATCH", profile_path + "?id=eq." + manager,
+                                 {"is_active": False})
+    require(status in (401, 403) or (status in (200, 204) and result == []),
+            f"user cannot deactivate their own account profile (HTTP {status})")
+
+    role_path = "/rest/v1/user_department_roles"
+    status, result = api.anonymous_request("GET", role_path + "?" + urlencode({"select": "id", "limit": "1"}))
+    require(status in (401, 403), f"anonymous client cannot read department-role assignments (HTTP {status})")
+
+    status, result = api.anonymous_request("POST", role_path, {
+        "organization_id": ORG_A_ID,
+        "user_id": manager,
+        "department_id": "c2000000-0000-4000-8000-000000000002",
+        "role": "department_manager",
+        "is_active": True,
+    })
+    require(status in (401, 403), f"anonymous client cannot create department-role assignments (HTTP {status})")
+
+    # Organization admins should retain their intended ability to assign roles,
+    # while ordinary department managers must not grant themselves privileges.
+    status, result = api.request(admin, "POST", role_path, {
+        "organization_id": ORG_A_ID,
+        "user_id": read_only,
+        "department_id": "c2000000-0000-4000-8000-000000000002",
+        "role": "read_only",
+        "is_active": True,
+    })
+    require(status in (200, 201) and isinstance(result, list) and len(result) == 1,
+            f"organization admin can assign a department role (HTTP {status})")
+
+    status, result = api.request(manager, "POST", role_path, {
+        "organization_id": ORG_A_ID,
+        "user_id": manager,
+        "department_id": "c2000000-0000-4000-8000-000000000002",
+        "role": "department_manager",
+        "is_active": True,
+    })
+    require(status in (401, 403) or (status in (200, 201) and result == []),
+            f"department manager cannot assign themselves another department role (HTTP {status})")
 
 
 if __name__ == "__main__":
