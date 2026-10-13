@@ -135,8 +135,18 @@ jobs:
             -v ON_ERROR_STOP=1 \
             -f database/tests/signed_jwt_api_fixtures.sql
 
+          # Bind deterministic private object paths to synthetic document rows.
+          # These fixtures are only applied to the disposable local database.
+          psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" \
+            -v ON_ERROR_STOP=1 \
+            -f database/tests/private_document_storage_jwt_fixtures.sql
+
           python -m py_compile database/tests/signed_jwt_postgrest_smoke.py
           python database/tests/signed_jwt_postgrest_smoke.py
+
+          # Exercise the actual local Storage HTTP API with Auth-issued user JWTs.
+          python -m py_compile database/tests/private_document_storage_jwt_smoke.py
+          python database/tests/private_document_storage_jwt_smoke.py
 
           python -m py_compile database/tests/onboarding_rpc_regression.py
           python database/tests/onboarding_rpc_regression.py
