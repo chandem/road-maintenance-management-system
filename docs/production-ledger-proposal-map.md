@@ -1,7 +1,7 @@
 # Production ledger ↔ repository proposal map
 
 **Branch:** `feature/department-role-management`  
-**As of:** 2026-10-12  
+**As of:** 2026-10-13  
 **Purpose:** Prevent accidental re-application of already-applied SQL and clarify what remains to ship.
 
 **Safety:** Recovered files under `docs/recovered-migrations/` are **evidence only**. Do not replay them against production.
@@ -49,7 +49,7 @@ Recovered files under `docs/recovered-migrations/` are evidence for the applied 
 
 ---
 
-## 3. Live catalog facts verified 2026-10-12
+## 3. Live catalog facts verified 2026-10-12 and 2026-10-13
 
 Read-only queries against production confirmed:
 
@@ -60,6 +60,9 @@ Read-only queries against production confirmed:
 - The four document/conversation tables have 15 policies in total: documents 5, conversations 4, messages 4, message sources 2.
 - The department-specific policies on those four tables are marked **RESTRICTIVE**; the older organization-member policies are **PERMISSIVE**. PostgreSQL combines restrictive policies with the applicable permissive policies, so review must account for both sets rather than judging a policy by name alone.
 - `public.has_department_role(uuid,text,text[])` is **SECURITY INVOKER** (not SECURITY DEFINER), has `search_path = ''`, is executable by `authenticated`, and is not executable by `anon` or `service_role` according to `has_function_privilege`.
+- Proposal `016_revoke_excess_authenticated_table_privileges.sql` names 23 tables; **all 23 exist** in `public`. Read-only effective-privilege checks found 20 public tables with at least one of `TRUNCATE`, `REFERENCES`, or `TRIGGER` available to `authenticated` or `anon`; all 20 are covered by proposal 016, and no additional public table with these effective privileges was found outside its target list.
+- The notable exception to an authenticated-only framing is `public.user_department_roles`: the same effective-privilege check reports these three privileges for both `authenticated` and `anon`. Proposal 016 includes this table and revokes the named privileges from `PUBLIC`, `anon`, and `authenticated`. This is a catalog finding only; proposal 016 remains unapplied.
+- These checks used `has_table_privilege` (effective privileges), not just direct ACL rows. No changes were made to production.
 
 These are catalog facts only. They do not replace behavior tests with real Auth-issued JWTs against an owner-approved non-production environment, nor do they prove Render/Vercel runtime behavior or data integrity over non-empty historical road-section rows.
 
@@ -75,7 +78,7 @@ These are catalog facts only. They do not replace behavior tests with real Auth-
 | `013_department_aware_document_access.sql` | Department-aware document access | Live `department_code` and department policies already exist; inspect for exact semantic differences before applying anything |
 | `014_ai_conversation_department_rls.sql` | AI conversation ownership and department policies | The three AI tables already exist in production; inspect differences, do not treat this as table creation from scratch |
 | `015_road_section_organization_integrity.sql` | Road-section organization integrity | Verify live constraints/triggers and non-empty historical rows before any change |
-| `016_revoke_excess_authenticated_table_privileges.sql` | Revoke excess table privileges | Confirm current grants and app behavior first |
+| `016_revoke_excess_authenticated_table_privileges.sql` | Revoke excess table privileges | All 23 targets exist; catalog comparison confirms 20 tables with excess effective privileges are covered. Still requires app-behavior validation and approval before apply |
 | `017_harden_function_execution_privileges.sql` | Function ACL and search-path hardening | Compare exact live function definitions/ACLs; onboarding compatibility must be tested |
 | `018_profile_and_role_privilege_hardening.sql` | Profile/role privilege hardening | Test onboarding and role assignment flows before release |
 
@@ -101,7 +104,7 @@ The existing RAMS Supabase project is paused, and restoring it requires a paid u
 
 1. Keep production migration apply on hold.
 2. Keep PR #1 in draft; do not merge until the release checklist is signed off.
-3. Complete a policy/grant/function diff between live production and each proposal file.
+3. Continue exact policy/function-definition comparison for proposals 011–015 and 017–018; proposal 016's target table coverage has now been checked read-only.
 4. Use the existing free disposable CI database for repeatable authorization tests; clearly label this as CI, not staging.
 5. If a genuinely separate non-production Supabase target becomes available at no cost, run Auth-issued JWT/PostgREST behavior tests there.
 6. Verify road-section integrity against non-empty data before any related migration.
