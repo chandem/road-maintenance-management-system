@@ -4,7 +4,6 @@ import type { User } from "@supabase/supabase-js";
 import { supabase } from "./lib/supabase";
 import MaterialsModule from "./components/MaterialsModule";
 import RoadInspectionsModule from "./components/RoadInspectionsModule";
-import DepartmentDashboards from "./components/DepartmentDashboards";
 
 type Priority = "Critical" | "High" | "Medium" | "Low";
 
@@ -513,7 +512,6 @@ function App() {
             <a href="#office-assistant">AI assistant</a>
           </nav>
         )}
-        {authReady && user && organizationId && workspaceReady && <DepartmentDashboards /> }
         {!authReady && <div className="empty-state">Checking session…</div>}
 
         {authReady && !user && workspaceReady === false && organizationCode.trim() && selectedDepartment && (
