@@ -104,7 +104,7 @@ def main() -> None:
         }),
     )
     require(status == 200 and isinstance(profiles, list) and len(profiles) == 1
-            and profiles[0].get("organization_id") == new_org_id,
+            and profiles[0].get("organization_id") == new_org_id and profiles[0].get("is_active") is True,
             "successful onboarding assigns the created organization to the user's profile")
 
     status, memberships = call(
