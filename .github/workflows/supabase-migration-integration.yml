@@ -122,6 +122,9 @@ jobs:
           python -m py_compile database/tests/signed_jwt_postgrest_smoke.py
           python database/tests/signed_jwt_postgrest_smoke.py
 
+          python -m py_compile database/tests/onboarding_rpc_regression.py
+          python database/tests/onboarding_rpc_regression.py
+
       - name: Run read-only migration release preflight
         shell: bash
         run: |
