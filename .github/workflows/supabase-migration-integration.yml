@@ -92,6 +92,14 @@ jobs:
             -v ON_ERROR_STOP=1 \
             -f database/tests/department_rls_behavior_checks.sql
 
+      - name: Run road-section organization integrity regression checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" \
+            -v ON_ERROR_STOP=1 \
+            -f database/tests/road_section_organization_integrity_checks.sql
+
       - name: Run local-Auth-issued JWT Data API smoke tests against local Supabase
         shell: bash
         run: |
