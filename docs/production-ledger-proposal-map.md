@@ -111,3 +111,21 @@ The existing RAMS Supabase project is paused, and restoring it requires a paid u
 7. Only after all gates pass and explicit approval, prepare uniquely timestamped release SQL after `20261009115736`, backup/PITR checks, and a rollback plan.
 
 **Do not** apply proposals `011`–`018` to production by filename, replay recovered migration SQL, merge PR #1, or pay for staging without explicit approval.
+
+
+## 7. Onboarding RPC comparison verified 2026-10-13
+
+A read-only inspection of the live function body for `public.create_organization_for_current_user(text,text)` found these behaviors:
+
+- Requires a non-null `auth.uid()` and a non-empty organization name.
+- Rejects a user whose existing profile already has an organization.
+- Checks whether the supplied organization code already exists.
+- Creates the organization, inserts an active `admin` membership, and inserts/updates the caller's profile with `is_active = true`.
+- Its live ACL grants `EXECUTE` to `authenticated` and `service_role`, with no execution grant to `anon` or `PUBLIC`.
+- It is `SECURITY DEFINER` with `search_path = public, pg_catalog`.
+
+Compared with repository proposal `004_frontend_onboarding_rpc.sql`, the live function is not textually equivalent: the proposal inserts the initial member as `owner`, whereas production inserts `admin`; the live body also performs an explicit organization-code existence check and updates active-status fields. These differences may reflect intentional application evolution, so do not replace the function body based only on the migration file. Confirm the current frontend/backend role expectations and signup flow first.
+
+Proposal `017_harden_function_execution_privileges.sql` would set an empty search path and revoke `service_role` execution. Those changes remain **unapplied**. Before scheduling them, verify whether any trusted backend workflow intentionally calls this RPC and test authenticated onboarding with real user JWTs in a no-cost isolated environment. The RPC itself checks `auth.uid()`, but that alone does not prove that revoking the service-role grant is behaviorally safe.
+
+No production function, ACL, or schema was changed during this audit.
