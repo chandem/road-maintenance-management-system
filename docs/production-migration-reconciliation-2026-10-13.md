@@ -64,3 +64,12 @@ A fresh catalog query reconfirmed that production still has 13 migration ledger 
 The current function catalog contains both `private.has_department_role(uuid,text,text[])` (SECURITY DEFINER, empty search path) and `public.has_department_role(uuid,text,text[])` (SECURITY INVOKER, empty search path); both deny anonymous EXECUTE and allow authenticated EXECUTE. The public onboarding RPC remains SECURITY DEFINER with `search_path=public, pg_catalog`, and EXECUTE is granted to authenticated and service_role but not anon. The exact recovered production onboarding statement is archived at `docs/recovered-migrations/20261008183919_add_organization_onboarding_rpc.sql`; it assigns the initial membership role `admin`. These are observations, not authorization behavior tests.
 
 No production schema, grants, functions, or data were changed during this follow-up.
+
+
+## Follow-up application and CI verification — 2026-10-13
+
+The frontend source was inspected: `frontend/src/App.tsx` calls the Data API RPC `public.create_organization_for_current_user` when the user creates an organization. The reproducible repository migration `database/migrations/004_frontend_onboarding_rpc.sql` defines that public RPC, uses an empty search path, prevents a user with an existing organization from creating another, and assigns the initial membership role `owner`. Backend department authorization explicitly accepts both `owner` and `admin` roles. Therefore, the key production mismatch is specifically between the recovered live public RPC and the repository's intended public RPC behavior (including search path and the existing-organization guard), not simply the existence of a private function in migration 003. The private function in migration 003 is a separate implementation and should not be substituted for the frontend's public RPC without a deliberate API change.
+
+The isolated Supabase integration workflow for run `38358461194` completed successfully. It applied the repository migration sequence to a disposable local Supabase instance, then passed authorization catalog checks, department/road RLS behavior checks, local Auth-issued JWT Data API smoke tests, and read-only release preflight. The staging Data API test using real staging credentials remained skipped because those credentials/configuration were unavailable. This confirms clean-install consistency under the tested local fixtures, but does not prove that the production function/ACLs match the repository or that real staging signup works.
+
+No production changes were made.
