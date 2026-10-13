@@ -220,6 +220,7 @@ function App() {
         setDashboard(null);
         setOrganizationId(null);
         setOrganizationName(null);
+        setWorkspaceReady(false);
       }
     });
     return () => {
@@ -435,7 +436,7 @@ function App() {
       </header>
 
       <main className="content">
-        {authReady && (!user || !workspaceReady) && (
+        {authReady && (!user || (!workspaceReady && Boolean(organizationId))) && (
           <section className="entry-panel">
             <p className="eyebrow">YOUR WORKSPACE</p>
             <h2>Choose your organization</h2>
@@ -522,7 +523,7 @@ function App() {
           </section>
         )}
 
-        {authReady && user && workspaceReady && !organizationId && (
+        {authReady && user && !organizationId && (
           <section className="auth-panel">
             <h2>Create organization</h2>
             <form onSubmit={handleCreateOrganization}>
