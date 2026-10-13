@@ -122,3 +122,28 @@ def test_download_does_not_sign_when_document_has_no_original(monkeypatch):
 
     assert exc.value.status_code == 404
     assert client.storage_calls == []
+
+
+
+def test_download_denied_by_authorization_never_requests_signed_url(monkeypatch):
+    document_id = uuid4()
+    row = {
+        "id": str(document_id),
+        "title": "confidential.pdf",
+        "organization_id": str(uuid4()),
+        "department_code": "finance",
+        "storage_path": "org/finance/doc/private.pdf",
+    }
+    client = FakeClient(row)
+
+    def deny_access(*_args, **_kwargs):
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    monkeypatch.setattr("app.api.routes.documents._authorize_document_row", deny_access)
+
+    with pytest.raises(HTTPException) as exc:
+        get_original_document_url(document_id, current_user={"client": client})
+
+    assert exc.value.status_code == 403
+    assert client.storage_calls == []
+    assert client.bucket.calls == []
