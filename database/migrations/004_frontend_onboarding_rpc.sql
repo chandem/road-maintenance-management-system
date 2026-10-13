@@ -33,17 +33,26 @@ begin
     raise exception 'User already belongs to an organization';
   end if;
 
+  if nullif(btrim(p_code), '') is not null and exists (
+    select 1
+    from public.organizations o
+    where o.code = nullif(btrim(p_code), '')
+  ) then
+    raise exception 'Organization code already exists';
+  end if;
+
   insert into public.organizations(name, code)
   values (btrim(p_name), nullif(btrim(p_code), ''))
   returning id into v_org_id;
 
   insert into public.organization_members(organization_id, user_id, role, is_active)
-  values (v_org_id, v_user_id, 'owner', true);
+  values (v_org_id, v_user_id, 'admin', true);
 
-  insert into public.user_profiles(id, organization_id)
-  values (v_user_id, v_org_id)
+  insert into public.user_profiles(id, organization_id, is_active)
+  values (v_user_id, v_org_id, true)
   on conflict (id) do update
     set organization_id = excluded.organization_id,
+        is_active = true,
         updated_at = now();
 
   return v_org_id;
