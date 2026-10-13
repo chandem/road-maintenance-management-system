@@ -358,3 +358,25 @@ button:disabled {
   padding-top: 1rem;
 }
 .department-dashboard h3 { margin-top: 0; }
+
+
+/* Organization and department entry flow */
+.entry-panel {
+  max-width: 820px;
+  width: 100%;
+  margin: 1rem auto;
+}
+.entry-panel h2 { margin-bottom: 0.35rem; }
+.entry-panel > p:not(.eyebrow) { color: #64748b; }
+.entry-panel label {
+  display: block;
+  margin: 0.8rem 0 0.35rem;
+  font-weight: 650;
+}
+.entry-panel .department-grid { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+.entry-panel .department-card { min-height: 108px; }
+.entry-panel > button { margin-top: 0.5rem; }
+@media (max-width: 640px) {
+  .entry-panel { padding: 1rem; }
+  .entry-panel .department-grid { grid-template-columns: 1fr; }
+}
