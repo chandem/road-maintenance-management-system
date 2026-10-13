@@ -266,14 +266,33 @@ function App() {
           setError(orgError?.message ?? "The organization code does not match your account's organization.");
           await supabase.auth.signOut();
         } else {
-          await loadOrganization().catch((err) =>
-        setError(
-          err instanceof Error ? err.message : "Unable to load organization.",
-        ),
-      );
-          setOrganizationName(org.name);
-          setOrganizationId(org.id);
-          setWorkspaceReady(true);
+          try {
+            const token = await authToken();
+            const rolesResponse = await fetch(`${API_BASE_URL}/departments/me/roles`, {
+              headers: { Authorization: `Bearer ${token}` },
+            });
+            if (!rolesResponse.ok) {
+              throw new Error(`Unable to verify department access (${rolesResponse.status}).`);
+            }
+            const rolePayload = await rolesResponse.json();
+            const assignments = Array.isArray(rolePayload)
+              ? rolePayload
+              : (rolePayload.roles ?? rolePayload.items ?? []);
+            const hasAccess = assignments.some(
+              (item: any) =>
+                (item.department_code ?? item.departments?.code) === selectedDepartment &&
+                item.is_active !== false,
+            );
+            if (!hasAccess) {
+              throw new Error("You do not have an active role in this department. Contact your organization administrator.");
+            }
+            setOrganizationName(org.name);
+            setOrganizationId(org.id);
+            setWorkspaceReady(true);
+          } catch (err) {
+            setError(err instanceof Error ? err.message : "Unable to verify department access.");
+            await supabase.auth.signOut();
+          }
         }
       }
     }
