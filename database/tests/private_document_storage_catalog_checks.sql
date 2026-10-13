@@ -63,5 +63,40 @@ BEGIN
   ) THEN
     RAISE EXCEPTION 'Private document bucket must never be public';
   END IF;
+  -- Verify policies are row-bound, not merely bucket-wide grants.
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = 'storage'
+      AND tablename = 'objects'
+      AND policyname = 'documents_private_select_authorized'
+      AND qual ILIKE '%storage_path%'
+      AND qual ILIKE '%has_department_role%'
+      AND qual ILIKE '%is_org_admin%'
+  ) THEN
+    RAISE EXCEPTION 'SELECT policy must bind objects to document rows and check department/admin authorization';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = 'storage'
+      AND tablename = 'objects'
+      AND policyname = 'documents_private_insert_authorized'
+      AND with_check ILIKE '%storage_path%'
+      AND with_check ILIKE '%has_department_role%'
+      AND with_check ILIKE '%is_org_admin%'
+  ) THEN
+    RAISE EXCEPTION 'INSERT policy must bind objects to document rows and check write authorization';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = 'storage'
+      AND tablename = 'objects'
+      AND policyname LIKE 'documents_private_%'
+      AND cmd = 'UPDATE'
+  ) THEN
+    RAISE EXCEPTION 'Unexpected UPDATE policy on private document objects';
+  END IF;
+
 END
 $checks$;
