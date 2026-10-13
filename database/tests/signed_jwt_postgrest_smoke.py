@@ -315,12 +315,12 @@ def main() -> None:
     status, result = api.request(manager, "PATCH", profile_path + "?id=eq." + manager,
                                  {"organization_id": "b2000000-0000-4000-8000-000000000002"})
     require(status in (401, 403) or (status in (200, 204) and result == []),
-            f"user cannot change their own organization assignment (HTTP {status})")
+            f"user cannot change their own organization assignment (HTTP {status}; response={result!r})")
 
     status, result = api.request(manager, "PATCH", profile_path + "?id=eq." + manager,
                                  {"is_active": False})
     require(status in (401, 403) or (status in (200, 204) and result == []),
-            f"user cannot deactivate their own account profile (HTTP {status})")
+            f"user cannot deactivate their own account profile (HTTP {status}; response={result!r})")
 
     role_path = "/rest/v1/user_department_roles"
     status, result = api.anonymous_request("GET", role_path + "?" + urlencode({"select": "id", "limit": "1"}))
