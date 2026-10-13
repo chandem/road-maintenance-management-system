@@ -147,3 +147,89 @@ def test_download_denied_by_authorization_never_requests_signed_url(monkeypatch)
     assert exc.value.status_code == 403
     assert client.storage_calls == []
     assert client.bucket.calls == []
+
+
+def test_upload_storage_failure_clears_storage_path_and_returns_502(monkeypatch):
+    import asyncio
+    from io import BytesIO
+    from types import SimpleNamespace
+    from starlette.datastructures import UploadFile
+
+    document_id = str(uuid4())
+
+    class UploadQuery:
+        def __init__(self, parent):
+            self.parent = parent
+            self.operation = None
+            self.payload = None
+
+        def insert(self, payload):
+            self.operation = "insert"
+            self.payload = payload
+            return self
+
+        def update(self, payload):
+            self.operation = "update"
+            self.payload = payload
+            self.parent.cleanup_payloads.append(payload)
+            return self
+
+        def eq(self, *_args):
+            return self
+
+        def execute(self):
+            if self.operation == "insert":
+                self.parent.insert_payload = self.payload
+                return type("Result", (), {"data": [{"id": document_id}]})()
+            return type("Result", (), {"data": []})()
+
+    class FailingStorageBucket:
+        def upload(self, *_args, **_kwargs):
+            raise RuntimeError("synthetic storage outage")
+
+    class UploadClient:
+        def __init__(self):
+            self.insert_payload = None
+            self.cleanup_payloads = []
+            self.bucket = FailingStorageBucket()
+
+        def table(self, _name):
+            return UploadQuery(self)
+
+        class Storage:
+            def __init__(self, parent):
+                self.parent = parent
+
+            def from_(self, _bucket_name):
+                return self.parent.bucket
+
+        @property
+        def storage(self):
+            return self.Storage(self)
+
+    client = UploadClient()
+    monkeypatch.setattr(
+        "app.api.routes.documents._authorize_department",
+        lambda *_args, **_kwargs: str(uuid4()),
+    )
+    monkeypatch.setattr("app.api.routes.documents.extract_text", lambda *_args: "readable document text")
+    monkeypatch.setattr(
+        "app.api.routes.documents.classify_document",
+        lambda *_args: SimpleNamespace(document_type="financial_report", confidence=0.9, reasons=[]),
+    )
+
+    upload = UploadFile(filename="budget.pdf", file=BytesIO(b"%PDF-1.4 test"))
+
+    with pytest.raises(HTTPException) as exc:
+        asyncio.run(
+            __import__("app.api.routes.documents", fromlist=["classify_uploaded_document"])
+            .classify_uploaded_document(
+                file=upload,
+                department_code="finance",
+                current_user={"id": str(uuid4()), "client": client},
+            )
+        )
+
+    assert exc.value.status_code == 502
+    assert client.insert_payload["storage_path"].endswith(".pdf")
+    assert client.cleanup_payloads == [{"storage_path": None}]
