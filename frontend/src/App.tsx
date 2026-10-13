@@ -398,7 +398,7 @@ function App() {
           </nav>
         )}
         {authReady && user && organizationId && <DepartmentDashboards />}
-        {!authReady && <div className="empty-state">Checking session…</div>
+        {!authReady && <div className="empty-state">Checking session…</div>}
 
         {authReady && !user && (
           <section className="auth-panel">
