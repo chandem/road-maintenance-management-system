@@ -4,7 +4,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from app.api.dependencies import get_current_user
+from app.api.dependencies import get_current_user, require_department_access, require_org_admin
 from app.core.config import get_settings
 from app.schemas.ai import (
     RoadPriorityRecommendation,
@@ -24,6 +24,15 @@ from app.services.road_priority import (
 from app.services.semantic_search import search_document_chunks
 
 router = APIRouter(prefix="/ai", tags=["ai"])
+
+
+def _best_effort_organization_id(supabase, user_id: str) -> str | None:
+    """Resolve organization for optional evidence/audit work without hiding auth checks."""
+    try:
+        return resolve_organization_id(supabase, user_id)
+    except Exception:
+        return None
+
 
 
 def calculate_priority(
@@ -63,6 +72,56 @@ def generate_ai_explanation(
         system_instruction="You are an AI road-maintenance analyst.",
     )
     return result.text if result else None
+
+
+def _road_document_evidence(
+    supabase, current_user: dict, organization_id: str, query: str
+) -> list[str]:
+    """Return only verified road-department snippets for road-priority AI.
+
+    Semantic search is organization-scoped, so every result must be joined back
+    to authoritative document metadata using the caller's JWT-scoped client.
+    Unknown, unclassified, cross-organization, or other-department documents
+    are excluded. Retrieval/metadata failures fail closed with no evidence.
+    Database RLS remains the required defense-in-depth boundary.
+    """
+    access_token = current_user.get("access_token")
+    if not access_token:
+        return []
+
+    try:
+        matches = search_document_chunks(
+            query,
+            organization_id=organization_id,
+            access_token=access_token,
+            limit=3,
+            minimum_similarity=0.35,
+        )
+        if not matches:
+            return []
+
+        document_ids = list(dict.fromkeys(match.document_id for match in matches))
+        response = (
+            supabase.table("documents")
+            .select("id,organization_id,department_code")
+            .eq("organization_id", organization_id)
+            .in_("id", document_ids)
+            .execute()
+        )
+        authorized_document_ids = {
+            str(row["id"])
+            for row in (response.data or [])
+            if str(row.get("organization_id")) == str(organization_id)
+            and row.get("department_code") == "road_asset"
+        }
+        return [
+            f"{match.content[:240].strip()} (similarity {match.similarity:.2f})"
+            for match in matches
+            if str(match.document_id) in authorized_document_ids
+        ]
+    except Exception:
+        # Missing/failed metadata verification must never fall back to raw chunks.
+        return []
 
 
 def generate_ranking_ai_explanations(
@@ -132,7 +191,7 @@ def generate_ranking_ai_explanations(
 @router.post("/road-priority", response_model=RoadPriorityRecommendation)
 def analyze_road_priority(
     request: RoadPriorityRequest,
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_department_access("road_asset", ['department_manager', 'officer', 'read_only'])),
 ):
     supabase = current_user["client"]
     section = (
@@ -188,42 +247,31 @@ def analyze_road_priority(
 
     document_evidence: list[str] = []
     if request.include_document_evidence:
-        try:
-            org_id = resolve_organization_id(supabase, current_user["id"])
-            query_bits = [
-                data.get("section_code") or "",
-                road_meta.get("road_name") or "",
-                road_meta.get("road_code") or "",
-                "maintenance",
+        org_id = _best_effort_organization_id(supabase, current_user["id"])
+        query_bits = [
+            data.get("section_code") or "",
+            road_meta.get("road_name") or "",
+            road_meta.get("road_code") or "",
+            "maintenance",
+        ]
+        query = " ".join(bit for bit in query_bits if bit).strip() or "road maintenance"
+        if org_id:
+            document_evidence = _road_document_evidence(
+                supabase, current_user, str(org_id), query
+            )
+        if document_evidence:
+            evidence_list = list(priority.evidence) + [
+                f"Related road-department document snippets retrieved: {len(document_evidence)}."
             ]
-            query = " ".join(bit for bit in query_bits if bit).strip() or "road maintenance"
-            if org_id and current_user.get("access_token"):
-                matches = search_document_chunks(
-                    query,
-                    organization_id=org_id,
-                    access_token=current_user["access_token"],
-                    limit=3,
-                    minimum_similarity=0.35,
-                )
-                document_evidence = [
-                    f"{match.content[:240].strip()} (similarity {match.similarity:.2f})"
-                    for match in matches
-                ]
-                if document_evidence:
-                    evidence_list = list(priority.evidence) + [
-                        f"Related document snippets retrieved: {len(document_evidence)}."
-                    ]
-                    priority = PriorityResult(
-                        score=priority.score,
-                        level=priority.level,
-                        confidence=priority.confidence,
-                        reasons=list(priority.reasons),
-                        evidence=evidence_list,
-                        active_work_orders=priority.active_work_orders,
-                        urgent_work_orders=priority.urgent_work_orders,
-                    )
-        except Exception:
-            document_evidence = []
+            priority = PriorityResult(
+                score=priority.score,
+                level=priority.level,
+                confidence=priority.confidence,
+                reasons=list(priority.reasons),
+                evidence=evidence_list,
+                active_work_orders=priority.active_work_orders,
+                urgent_work_orders=priority.urgent_work_orders,
+            )
 
     explanation = (
         generate_ai_explanation(
@@ -250,7 +298,7 @@ def analyze_road_priority(
         recommended_action=action,
     )
 
-    org_id = resolve_organization_id(supabase, current_user["id"])
+    org_id = _best_effort_organization_id(supabase, current_user["id"])
     if org_id:
         log_analysis_run(
             supabase,
@@ -279,7 +327,7 @@ def analyze_road_priority(
 @router.get("/road-ranking", response_model=RoadRankingResponse)
 def rank_road_sections(
     limit: int = Query(default=10, ge=1, le=100),
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_department_access("road_asset", ['department_manager', 'officer', 'read_only'])),
 ):
     supabase = current_user["client"]
 
@@ -421,7 +469,7 @@ def rank_road_sections(
         ai_generated=ai_generated,
     )
 
-    org_id = resolve_organization_id(supabase, current_user["id"])
+    org_id = _best_effort_organization_id(supabase, current_user["id"])
     if org_id:
         log_analysis_run(
             supabase,
@@ -443,7 +491,7 @@ def rank_road_sections(
 @router.post("/office-assistant", response_model=OfficeAssistantResponse)
 def office_assistant(
     request: OfficeAssistantRequest,
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_org_admin()),
 ):
     """Cross-module assistant: RAMS + MMMS + Finance + HR + Assets + Documents."""
     supabase = current_user["client"]
@@ -456,7 +504,7 @@ def office_assistant(
 
     if request.include_documents:
         try:
-            org_id = resolve_organization_id(supabase, current_user["id"])
+            org_id = _best_effort_organization_id(supabase, current_user["id"])
             if org_id and current_user.get("access_token"):
                 matches = search_document_chunks(
                     question,
@@ -465,10 +513,28 @@ def office_assistant(
                     limit=4,
                     minimum_similarity=0.35,
                 )
-                document_evidence = [
-                    f"{m.content[:280].strip()} (similarity {m.similarity:.2f})"
-                    for m in matches
-                ]
+                # Verify every semantic match against authoritative document metadata
+                # using the caller's JWT-scoped client. Never send raw vector-RPC
+                # snippets to the model when the parent document cannot be verified.
+                document_ids = list(dict.fromkeys(str(match.document_id) for match in matches))
+                if document_ids:
+                    metadata = (
+                        supabase.table("documents")
+                        .select("id,organization_id")
+                        .eq("organization_id", str(org_id))
+                        .in_("id", document_ids)
+                        .execute()
+                    )
+                    verified_ids = {
+                        str(row["id"])
+                        for row in (metadata.data or [])
+                        if str(row.get("organization_id")) == str(org_id)
+                    }
+                    document_evidence = [
+                        f"{match.content[:280].strip()} (similarity {match.similarity:.2f})"
+                        for match in matches
+                        if str(match.document_id) in verified_ids
+                    ]
                 if document_evidence:
                     modules.append("Document Intelligence")
                     evidence.append(
@@ -534,7 +600,7 @@ def office_assistant(
         )
     )
 
-    org_id = resolve_organization_id(supabase, current_user["id"])
+    org_id = _best_effort_organization_id(supabase, current_user["id"])
     if org_id:
         log_analysis_run(
             supabase,

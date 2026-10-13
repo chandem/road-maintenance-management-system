@@ -4,7 +4,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from app.api.dependencies import get_current_user
+from app.api.dependencies import get_current_user, require_department_access
 from app.schemas.assets import Asset, AssetCreate, AssetSummary, AssetUpdate
 from app.services.ai_audit import resolve_organization_id
 
@@ -26,7 +26,7 @@ def _org_id(current_user) -> str:
 
 @router.get("", response_model=list[Asset])
 def list_assets(
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_department_access("general_assets", ['department_manager', 'officer', 'read_only'])),
     limit: int = Query(default=100, ge=1, le=200),
     status: str | None = Query(default=None, max_length=50),
     category: str | None = Query(default=None, max_length=100),
@@ -47,7 +47,7 @@ def list_assets(
 
 
 @router.get("/summary", response_model=AssetSummary)
-def asset_summary(current_user=Depends(get_current_user)):
+def asset_summary(current_user=Depends(require_department_access("general_assets", ['department_manager', 'officer', 'read_only']))):
     """General asset portfolio summary."""
     rows = (
         current_user["client"]
@@ -73,7 +73,7 @@ def asset_summary(current_user=Depends(get_current_user)):
 @router.get("/{asset_id}", response_model=Asset)
 def get_asset(
     asset_id: UUID,
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_department_access("general_assets", ['department_manager', 'officer', 'read_only'])),
 ):
     response = (
         current_user["client"]
@@ -91,7 +91,7 @@ def get_asset(
 @router.post("", response_model=Asset, status_code=201)
 def create_asset(
     payload: AssetCreate,
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_department_access("general_assets", ['department_manager', 'officer'])),
 ):
     """Register a general organizational asset."""
     organization_id = _org_id(current_user)
@@ -106,7 +106,7 @@ def create_asset(
 def update_asset(
     asset_id: UUID,
     payload: AssetUpdate,
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_department_access("general_assets", ['department_manager', 'officer'])),
 ):
     updates = {
         k: v for k, v in payload.model_dump(mode="json", exclude_unset=True).items()

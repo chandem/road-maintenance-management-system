@@ -42,7 +42,7 @@ def test_embedding_response_is_normalized(monkeypatch):
     monkeypatch.setattr("google.genai.Client", lambda **kwargs: FakeClient())
     monkeypatch.setattr(
         "app.services.document_embeddings.get_settings",
-        lambda: SimpleNamespace(gemini_api_key="test-key"),
+        lambda: SimpleNamespace(gemini_api_key="test-key", gemini_embedding_model="gemini-embedding-2"),
     )
 
     result = generate_embedding("Road maintenance")
@@ -63,7 +63,7 @@ def test_provider_failure_is_wrapped(monkeypatch):
     monkeypatch.setattr("google.genai.Client", lambda **kwargs: FakeClient())
     monkeypatch.setattr(
         "app.services.document_embeddings.get_settings",
-        lambda: SimpleNamespace(gemini_api_key="test-key"),
+        lambda: SimpleNamespace(gemini_api_key="test-key", gemini_embedding_model="gemini-embedding-2"),
     )
 
     with pytest.raises(EmbeddingProviderError):

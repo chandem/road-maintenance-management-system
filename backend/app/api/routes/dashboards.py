@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends
 
-from app.api.dependencies import get_current_user
+from app.api.dependencies import get_current_user, require_department_access, require_org_admin
 from app.schemas.dashboards import (
     AlertItem,
     ExecutiveDashboard,
@@ -69,7 +69,7 @@ def _alerts_from_summary(summary: dict) -> list[AlertItem]:
 
 
 @router.get("/executive", response_model=ExecutiveDashboard)
-def executive_dashboard(current_user=Depends(get_current_user)):
+def executive_dashboard(current_user=Depends(require_org_admin())):
     """Organization-wide KPI snapshot for executives."""
     ctx = collect_cross_module_context(current_user["client"])
     s = ctx.summary
@@ -101,10 +101,10 @@ def executive_dashboard(current_user=Depends(get_current_user)):
 
 
 @router.get("/maintenance", response_model=ModuleDashboard)
-def maintenance_dashboard(current_user=Depends(get_current_user)):
+def maintenance_dashboard(current_user=Depends(require_department_access("road_asset", ['department_manager', 'officer', 'read_only']))):
     """Maintenance operations dashboard (plans + work orders + sections)."""
     client = current_user["client"]
-    ctx = collect_cross_module_context(client)
+    ctx = collect_cross_module_context(client, allowed_modules={"road_asset"})
     orders = ctx.samples.get("work_orders") or []
     try:
         all_orders = (
@@ -153,9 +153,9 @@ def maintenance_dashboard(current_user=Depends(get_current_user)):
 
 
 @router.get("/financial", response_model=ModuleDashboard)
-def financial_dashboard(current_user=Depends(get_current_user)):
+def financial_dashboard(current_user=Depends(require_department_access("finance", ['department_manager', 'officer', 'read_only']))):
     """Financial management dashboard."""
-    ctx = collect_cross_module_context(current_user["client"])
+    ctx = collect_cross_module_context(current_user["client"], allowed_modules={"finance"})
     s = ctx.summary
     allocated = float(s.get("budget_allocated") or 0)
     spent = float(s.get("budget_spent") or 0)
@@ -181,10 +181,10 @@ def financial_dashboard(current_user=Depends(get_current_user)):
 
 
 @router.get("/machinery", response_model=ModuleDashboard)
-def machinery_dashboard(current_user=Depends(get_current_user)):
+def machinery_dashboard(current_user=Depends(require_department_access("machinery_maintenance", ['department_manager', 'officer', 'read_only']))):
     """MMMS machinery dashboard."""
     client = current_user["client"]
-    ctx = collect_cross_module_context(client)
+    ctx = collect_cross_module_context(client, allowed_modules={"machinery_maintenance"})
     try:
         rows = (
             client.table("machinery")
@@ -225,10 +225,10 @@ def machinery_dashboard(current_user=Depends(get_current_user)):
 
 
 @router.get("/hr", response_model=ModuleDashboard)
-def hr_dashboard(current_user=Depends(get_current_user)):
+def hr_dashboard(current_user=Depends(require_department_access("human_resources", ['department_manager', 'officer', 'read_only']))):
     """HR workforce dashboard."""
     client = current_user["client"]
-    ctx = collect_cross_module_context(client)
+    ctx = collect_cross_module_context(client, allowed_modules={"human_resources"})
     try:
         rows = (
             client.table("employees")
@@ -262,7 +262,7 @@ def hr_dashboard(current_user=Depends(get_current_user)):
 
 
 @router.get("/report/operational")
-def operational_report(current_user=Depends(get_current_user)) -> dict:
+def operational_report(current_user=Depends(require_org_admin())) -> dict:
     """Structured operational report combining all module KPIs and alerts."""
     ctx = collect_cross_module_context(current_user["client"])
     alerts = _alerts_from_summary(ctx.summary)

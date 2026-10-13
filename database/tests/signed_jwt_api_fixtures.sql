@@ -1,0 +1,67 @@
+-- Public-schema fixtures for signed-JWT/PostgREST tests.
+-- Auth users must already exist (created via local Supabase Auth Admin API).
+-- Runs only in disposable local Supabase CI after a clean database reset.
+-- Never run against a shared or production database.
+
+INSERT INTO public.organizations (id, name, code) VALUES
+  ('b2000000-0000-4000-8000-000000000001', 'Signed JWT Test Organization A', 'JWT-TEST-A'),
+  ('b2000000-0000-4000-8000-000000000002', 'Signed JWT Test Organization B', 'JWT-TEST-B')
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO public.organization_members (organization_id, user_id, role, is_active) VALUES
+  ('b2000000-0000-4000-8000-000000000001', 'a2000000-0000-4000-8000-000000000001', 'admin', true),
+  ('b2000000-0000-4000-8000-000000000001', 'a2000000-0000-4000-8000-000000000002', 'member', true),
+  ('b2000000-0000-4000-8000-000000000001', 'a2000000-0000-4000-8000-000000000003', 'member', true),
+  ('b2000000-0000-4000-8000-000000000001', 'a2000000-0000-4000-8000-000000000004', 'member', true),
+  ('b2000000-0000-4000-8000-000000000002', 'a2000000-0000-4000-8000-000000000005', 'member', true)
+ON CONFLICT (organization_id, user_id) DO NOTHING;
+
+INSERT INTO public.departments (id, organization_id, name, code) VALUES
+  ('c2000000-0000-4000-8000-000000000001', 'b2000000-0000-4000-8000-000000000001', 'JWT Road Asset', 'road_asset'),
+  ('c2000000-0000-4000-8000-000000000002', 'b2000000-0000-4000-8000-000000000001', 'JWT Finance', 'finance')
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO public.user_department_roles (organization_id, user_id, department_id, role, is_active) VALUES
+  ('b2000000-0000-4000-8000-000000000001', 'a2000000-0000-4000-8000-000000000002', 'c2000000-0000-4000-8000-000000000001', 'department_manager', true),
+  ('b2000000-0000-4000-8000-000000000001', 'a2000000-0000-4000-8000-000000000003', 'c2000000-0000-4000-8000-000000000001', 'read_only', true),
+  ('b2000000-0000-4000-8000-000000000001', 'a2000000-0000-4000-8000-000000000004', 'c2000000-0000-4000-8000-000000000002', 'department_manager', true)
+ON CONFLICT (organization_id, user_id, department_id) DO NOTHING;
+
+INSERT INTO public.roads (id, organization_id, road_code, name) VALUES
+  ('d2000000-0000-4000-8000-000000000001', 'b2000000-0000-4000-8000-000000000001', 'JWT-A-ROAD', 'Signed JWT Road A'),
+  ('d2000000-0000-4000-8000-000000000002', 'b2000000-0000-4000-8000-000000000002', 'JWT-B-ROAD', 'Signed JWT Road B')
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO public.documents (
+  id, organization_id, title, document_type, status, uploaded_by, department_code
+) VALUES
+  ('e2000000-0000-4000-8000-000000000001', 'b2000000-0000-4000-8000-000000000001', 'JWT Road Document', 'maintenance_plan', 'processed', 'a2000000-0000-4000-8000-000000000002', 'road_asset'),
+  ('e2000000-0000-4000-8000-000000000002', 'b2000000-0000-4000-8000-000000000001', 'JWT Finance Document', 'financial_report', 'processed', 'a2000000-0000-4000-8000-000000000004', 'finance'),
+  ('e2000000-0000-4000-8000-000000000003', 'b2000000-0000-4000-8000-000000000002', 'JWT Other Organization Document', 'maintenance_plan', 'processed', 'a2000000-0000-4000-8000-000000000005', 'road_asset')
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO public.document_chunks (
+  id, document_id, organization_id, chunk_index, content, embedding_status
+) VALUES
+  ('f2000000-0000-4000-8000-000000000001', 'e2000000-0000-4000-8000-000000000001', 'b2000000-0000-4000-8000-000000000001', 0, 'Synthetic road maintenance content', 'complete'),
+  ('f2000000-0000-4000-8000-000000000002', 'e2000000-0000-4000-8000-000000000002', 'b2000000-0000-4000-8000-000000000001', 0, 'Synthetic finance content', 'complete'),
+  ('f2000000-0000-4000-8000-000000000003', 'e2000000-0000-4000-8000-000000000003', 'b2000000-0000-4000-8000-000000000002', 0, 'Synthetic other organization content', 'complete')
+ON CONFLICT (id) DO NOTHING;
+
+-- The org admin already belongs to an organization; onboarding must reject a second one.
+INSERT INTO public.user_profiles (id, organization_id, full_name, is_active)
+VALUES ('a2000000-0000-4000-8000-000000000001', 'b2000000-0000-4000-8000-000000000001', 'JWT Org Admin', true)
+ON CONFLICT (id) DO NOTHING;
+
+-- Existing conversations/messages exercise ownership and append-only policy paths.
+INSERT INTO public.ai_conversations (id, organization_id, created_by, title, status)
+VALUES
+  ('72000000-0000-4000-8000-000000000001', 'b2000000-0000-4000-8000-000000000001', 'a2000000-0000-4000-8000-000000000003', 'Read-only owner conversation', 'active'),
+  ('72000000-0000-4000-8000-000000000002', 'b2000000-0000-4000-8000-000000000001', 'a2000000-0000-4000-8000-000000000002', 'Archived manager conversation', 'archived')
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO public.ai_messages (id, conversation_id, role, content)
+VALUES
+  ('82000000-0000-4000-8000-000000000001', '72000000-0000-4000-8000-000000000001', 'user', 'Synthetic private conversation message'),
+  ('82000000-0000-4000-8000-000000000002', '72000000-0000-4000-8000-000000000002', 'user', 'Synthetic archived conversation message')
+ON CONFLICT (id) DO NOTHING;

@@ -30,6 +30,7 @@ class DocumentIngestionResponse(BaseModel):
 class DocumentSummary(BaseModel):
     id: str
     title: str
+    department_code: str | None = None
     document_type: str | None = None
     status: str
     extraction_status: str
@@ -41,6 +42,7 @@ class DocumentSummary(BaseModel):
 
 class DocumentSearchRequest(BaseModel):
     query: str = Field(min_length=2, max_length=500)
+    department_code: str | None = Field(default=None, max_length=50)
     document_type: str | None = Field(default=None, max_length=100)
     limit: int = Field(default=10, ge=1, le=50)
 
@@ -62,6 +64,7 @@ class DocumentSearchResponse(BaseModel):
 
 class SemanticSearchRequest(BaseModel):
     query: str = Field(min_length=2, max_length=2_000)
+    department_code: str | None = Field(default=None, max_length=50)
     limit: int = Field(default=5, ge=1, le=20)
     minimum_similarity: float = Field(default=0.35, ge=0.0, le=1.0)
 
@@ -83,6 +86,7 @@ class SemanticSearchResponse(BaseModel):
 
 class DocumentQuestionRequest(BaseModel):
     question: str = Field(min_length=3, max_length=2_000)
+    department_code: str | None = Field(default=None, max_length=50)
     document_type: str | None = Field(default=None, max_length=100)
     limit: int = Field(default=5, ge=1, le=10)
 

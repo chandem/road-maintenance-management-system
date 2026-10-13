@@ -1,0 +1,77 @@
+name: Database SQL syntax checks
+
+on:
+  pull_request:
+    branches:
+      - main
+      - feature/department-role-management
+    paths:
+      - "database/migrations/**/*.sql"
+      - "database/tests/**/*.sql"
+      - ".github/workflows/database-sql-syntax.yml"
+  push:
+    branches:
+      - feature/department-role-management
+    paths:
+      - "database/migrations/**/*.sql"
+      - "database/tests/**/*.sql"
+      - ".github/workflows/database-sql-syntax.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  parse-postgresql-sql:
+    name: Parse PostgreSQL SQL files (syntax only)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install PostgreSQL parser
+        run: python -m pip install --disable-pip-version-check pglast
+
+      - name: Parse migrations and database test scripts
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from pglast import parse_sql
+
+          roots = [Path("database/migrations"), Path("database/tests")]
+          files = sorted(
+              path
+              for root in roots
+              if root.exists()
+              for path in root.rglob("*.sql")
+          )
+
+          if not files:
+              raise SystemExit("ERROR: No SQL files found in database/migrations or database/tests.")
+
+          failed = []
+          for path in files:
+              try:
+                  parse_sql(path.read_text(encoding="utf-8"))
+                  print(f"PASS syntax: {path}")
+              except Exception as exc:
+                  failed.append((path, exc))
+                  print(f"FAIL syntax: {path}: {exc}")
+
+          print(f"\nParsed {len(files)} SQL file(s); {len(failed)} failure(s).")
+          if failed:
+              raise SystemExit(1)
+          PY
+
+      - name: State validation limits
+        run: |
+          echo "This job checks PostgreSQL parser syntax only."
+          echo "It does not execute migrations, validate Supabase-specific runtime behavior,"
+          echo "test grants/RLS with real JWTs, or authorize production deployment."

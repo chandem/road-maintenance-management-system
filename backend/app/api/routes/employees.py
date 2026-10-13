@@ -3,7 +3,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from app.api.dependencies import get_current_user
+from app.api.dependencies import get_current_user, require_department_access
 from app.schemas.employees import (
     Employee,
     EmployeeCreate,
@@ -30,7 +30,7 @@ def _org_id(current_user) -> str:
 
 @router.get("", response_model=list[Employee])
 def list_employees(
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_department_access("human_resources", ['department_manager', 'officer', 'read_only'])),
     limit: int = Query(default=100, ge=1, le=200),
     status: str | None = Query(default=None, max_length=50),
     department_id: UUID | None = Query(default=None),
@@ -51,7 +51,7 @@ def list_employees(
 
 
 @router.get("/summary", response_model=EmployeeSummary)
-def employee_summary(current_user=Depends(get_current_user)):
+def employee_summary(current_user=Depends(require_department_access("human_resources", ['department_manager', 'officer', 'read_only']))):
     """Workforce summary for HR Management."""
     rows = (
         current_user["client"]
@@ -75,7 +75,7 @@ def employee_summary(current_user=Depends(get_current_user)):
 @router.get("/{employee_id}", response_model=Employee)
 def get_employee(
     employee_id: UUID,
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_department_access("human_resources", ['department_manager', 'officer', 'read_only'])),
 ):
     response = (
         current_user["client"]
@@ -93,7 +93,7 @@ def get_employee(
 @router.post("", response_model=Employee, status_code=201)
 def create_employee(
     payload: EmployeeCreate,
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_department_access("human_resources", ['department_manager', 'officer'])),
 ):
     """Register an employee record (HR)."""
     organization_id = _org_id(current_user)
@@ -108,7 +108,7 @@ def create_employee(
 def update_employee(
     employee_id: UUID,
     payload: EmployeeUpdate,
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_department_access("human_resources", ['department_manager', 'officer'])),
 ):
     updates = {
         k: v for k, v in payload.model_dump(mode="json", exclude_unset=True).items()
