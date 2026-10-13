@@ -48,6 +48,11 @@ INSERT INTO public.document_chunks (
   ('f2000000-0000-4000-8000-000000000003', 'e2000000-0000-4000-8000-000000000003', 'b2000000-0000-4000-8000-000000000002', 0, 'Synthetic other organization content', 'complete')
 ON CONFLICT (id) DO NOTHING;
 
+-- The org admin already belongs to an organization; onboarding must reject a second one.
+INSERT INTO public.user_profiles (id, organization_id, full_name, is_active)
+VALUES ('a2000000-0000-4000-8000-000000000001', 'b2000000-0000-4000-8000-000000000001', 'JWT Org Admin', true)
+ON CONFLICT (id) DO NOTHING;
+
 -- Existing conversations/messages exercise ownership and append-only policy paths.
 INSERT INTO public.ai_conversations (id, organization_id, created_by, title, status)
 VALUES
