@@ -324,3 +324,37 @@ button:disabled {
   .form-grid .span-two { grid-column: auto; }
   .module-nav { position: static; }
 }
+
+
+/* Department dashboard navigation and workspace */
+.department-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 0.75rem;
+  margin: 0.75rem 0 1.25rem;
+}
+.department-card {
+  display: grid;
+  gap: 0.35rem;
+  text-align: left;
+  min-height: 76px;
+  padding: 0.9rem;
+  color: #1e293b;
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+}
+.department-card span {
+  color: #64748b;
+  font-size: 0.8rem;
+  text-transform: capitalize;
+}
+.department-card:hover,
+.department-card.selected {
+  background: #eff6ff;
+  border: 2px solid #2563eb;
+}
+.department-dashboard {
+  border-top: 1px solid #e2e8f0;
+  padding-top: 1rem;
+}
+.department-dashboard h3 { margin-top: 0; }
