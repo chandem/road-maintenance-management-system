@@ -151,6 +151,29 @@ jobs:
           python -m py_compile database/tests/onboarding_rpc_regression.py
           python database/tests/onboarding_rpc_regression.py
 
+      - name: Run private document Storage API authorization tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          supabase status -o env > "$RUNNER_TEMP/supabase.env"
+          set -a
+          source "$RUNNER_TEMP/supabase.env"
+          set +a
+
+          for name in API_URL ANON_KEY; do
+            if [ -z "${!name:-}" ]; then
+              echo "::error::Local Supabase CLI did not provide required $name for Storage API tests."
+              exit 1
+            fi
+          done
+
+          psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" \
+            -v ON_ERROR_STOP=1 \
+            -f database/tests/private_document_storage_api_fixtures.sql
+
+          python -m py_compile database/tests/private_document_storage_api_smoke.py
+          python database/tests/private_document_storage_api_smoke.py
+
       - name: Run read-only migration release preflight
         shell: bash
         run: |
