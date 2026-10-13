@@ -113,6 +113,9 @@ function App() {
   const [password, setPassword] = useState("");
   const [authLoading, setAuthLoading] = useState(false);
   const [organizationId, setOrganizationId] = useState<string | null>(null);
+  const [organizationCode, setOrganizationCode] = useState("");
+  const [selectedDepartment, setSelectedDepartment] = useState("");
+  const [workspaceReady, setWorkspaceReady] = useState(false);
   const [organizationName, setOrganizationName] = useState<string | null>(null);
   const [organizationLoading, setOrganizationLoading] = useState(false);
   const [organizationNameInput, setOrganizationNameInput] = useState("");
@@ -144,7 +147,7 @@ function App() {
     setOrganizationId(profile.organization_id);
     const { data: org, error: orgError } = await supabase
       .from("organizations")
-      .select("name")
+      .select("name, code")
       .eq("id", profile.organization_id)
       .maybeSingle();
     if (orgError) throw orgError;
@@ -234,6 +237,10 @@ function App() {
 
   const handleSignIn = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (!organizationCode.trim() || !selectedDepartment) {
+      setError("Enter your organization code and select a department first.");
+      return;
+    }
     setAuthLoading(true);
     setError(null);
     const { error: signInError } = await supabase.auth.signInWithPassword({
@@ -242,11 +249,33 @@ function App() {
     });
     if (signInError) setError(signInError.message);
     else {
-      await loadOrganization().catch((err) =>
+      const { data: profile, error: profileError } = await supabase
+        .from("user_profiles")
+        .select("organization_id")
+        .maybeSingle();
+      if (profileError || !profile?.organization_id) {
+        setError(profileError?.message ?? "Your account is not linked to an organization.");
+        await supabase.auth.signOut();
+      } else {
+        const { data: org, error: orgError } = await supabase
+          .from("organizations")
+          .select("id, name, code")
+          .eq("id", profile.organization_id)
+          .maybeSingle();
+        if (orgError || !org || String(org.code ?? "").trim().toLowerCase() !== organizationCode.trim().toLowerCase()) {
+          setError(orgError?.message ?? "The organization code does not match your account's organization.");
+          await supabase.auth.signOut();
+        } else {
+          await loadOrganization().catch((err) =>
         setError(
           err instanceof Error ? err.message : "Unable to load organization.",
         ),
       );
+          setOrganizationName(org.name);
+          setOrganizationId(org.id);
+          setWorkspaceReady(true);
+        }
+      }
     }
     setAuthLoading(false);
   };
@@ -387,7 +416,55 @@ function App() {
       </header>
 
       <main className="content">
-        {authReady && user && organizationId && (
+        {authReady && (!user || !workspaceReady) && (
+          <section className="entry-panel">
+            <p className="eyebrow">YOUR WORKSPACE</p>
+            <h2>Choose your organization</h2>
+            <p>Enter the organization code provided by your organization administrator.</p>
+            <label htmlFor="organization-code">Organization code</label>
+            <input id="organization-code" value={organizationCode}
+              onChange={(e) => setOrganizationCode(e.target.value)}
+              placeholder="e.g. GUJI-RMB" autoComplete="organization" />
+            <h2>Choose a department</h2>
+            <p>Select the department you want to work in. Access is verified after sign-in.</p>
+            <div className="department-grid" role="group" aria-label="Select department">
+              {DOCUMENT_DEPARTMENTS.map((department) => (
+                <button type="button" key={department.code}
+                  className={`department-card ${selectedDepartment === department.code ? "selected" : ""}`}
+                  aria-pressed={selectedDepartment === department.code}
+                  onClick={() => setSelectedDepartment(department.code)}>
+                  <strong>{department.label}</strong>
+                  <span>{selectedDepartment === department.code ? "Selected" : "Select department"}</span>
+                </button>
+              ))}
+            </div>
+            {user && (
+              <button type="button" disabled={!organizationCode.trim() || !selectedDepartment || authLoading}
+                onClick={async () => {
+                  setAuthLoading(true); setError(null);
+                  try {
+                    const { data: profile, error: profileError } = await supabase.from("user_profiles").select("organization_id").maybeSingle();
+                    if (profileError || !profile?.organization_id) throw new Error(profileError?.message ?? "Your account is not linked to an organization.");
+                    const { data: org, error: orgError } = await supabase.from("organizations").select("id,name,code").eq("id", profile.organization_id).maybeSingle();
+                    if (orgError || !org || String(org.code ?? "").trim().toLowerCase() !== organizationCode.trim().toLowerCase()) throw new Error(orgError?.message ?? "The organization code does not match your account.");
+                    const token = await authToken();
+                    const response = await fetch(`${API_BASE_URL}/departments/me/roles`, { headers: { Authorization: `Bearer ${token}` } });
+                    if (!response.ok) throw new Error(response.status === 403 ? "You do not have access to department assignments." : `Unable to verify department access (${response.status}).`);
+                    const roles = await response.json();
+                    const assignments = Array.isArray(roles) ? roles : (roles.roles ?? roles.items ?? []);
+                    const allowed = assignments.some((item: any) => (item.department_code ?? item.departments?.code) === selectedDepartment && item.is_active !== false);
+                    if (!allowed) throw new Error("You do not have an active role in this department. Contact your organization administrator.");
+                    setOrganizationId(org.id); setOrganizationName(org.name); setWorkspaceReady(true);
+                  } catch (err) { setError(err instanceof Error ? err.message : "Unable to verify workspace access."); }
+                  finally { setAuthLoading(false); }
+                }}>
+                {authLoading ? "Verifying access…" : "Continue to selected department"}
+              </button>
+            )}
+            {error && <div className="error-message" role="alert">{error}</div>}
+          </section>
+        )}
+        {authReady && user && organizationId && workspaceReady && (
           <nav className="module-nav" aria-label="AI-RMMS modules">
             <a href="#dashboard">Dashboard</a>
             <a href="#road-ranking">Road ranking</a>
@@ -397,10 +474,10 @@ function App() {
             <a href="#office-assistant">AI assistant</a>
           </nav>
         )}
-        {authReady && user && organizationId && <DepartmentDashboards />}
+        {authReady && user && organizationId && workspaceReady && <DepartmentDashboards /> }
         {!authReady && <div className="empty-state">Checking session…</div>}
 
-        {authReady && !user && (
+        {authReady && !user && workspaceReady === false && organizationCode.trim() && selectedDepartment && (
           <section className="auth-panel">
             <h2>Sign in</h2>
             <form onSubmit={handleSignIn}>
@@ -426,7 +503,7 @@ function App() {
           </section>
         )}
 
-        {authReady && user && !organizationId && (
+        {authReady && user && workspaceReady && !organizationId && (
           <section className="auth-panel">
             <h2>Create organization</h2>
             <form onSubmit={handleCreateOrganization}>
@@ -449,7 +526,7 @@ function App() {
           </section>
         )}
 
-        {authReady && user && organizationId && (
+        {authReady && user && organizationId && workspaceReady && (
           <>
             <section id="dashboard" className="dashboard-panel">
               <div className="section-heading">
