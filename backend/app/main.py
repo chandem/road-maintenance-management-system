@@ -12,6 +12,7 @@ from app.api.routes.finance import router as finance_router
 from app.api.routes.health import router as health_router
 from app.api.routes.inspections import router as inspections_router
 from app.api.routes.machinery import router as machinery_router
+from app.api.routes.machinery_fleet_report import router as machinery_fleet_report_router
 from app.api.routes.machinery_fuel import router as machinery_fuel_router
 from app.api.routes.machinery_schedules import router as machinery_schedules_router
 from app.api.routes.machinery_work_orders import router as machinery_work_orders_router
@@ -50,6 +51,7 @@ app.include_router(inspections_router, prefix="/api/v1")
 app.include_router(work_orders_router, prefix="/api/v1")
 app.include_router(maintenance_plans_router, prefix="/api/v1")
 app.include_router(machinery_router, prefix="/api/v1")
+app.include_router(machinery_fleet_report_router, prefix="/api/v1")
 app.include_router(machinery_work_orders_router, prefix="/api/v1")
 app.include_router(machinery_schedules_router, prefix="/api/v1")
 app.include_router(machinery_fuel_router, prefix="/api/v1")
