@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
 import MachineryRegisterModule from "./MachineryRegisterModule";
+import MachineryWorkOrdersModule from "./MachineryWorkOrdersModule";
 
 type Metric = { label: string; value: string | number; unit?: string };
 type ModuleInfo = { title: string; description: string; status?: "planned" | "partial" | "live" };
@@ -16,9 +17,9 @@ const CONFIG: Record<string, DepartmentConfig> = {
     modules: [
       { title: "Equipment register", description: "Equipment identity, specifications, status and assigned location.", status: "live" },
       { title: "Maintenance planning", description: "Preventive schedules, service intervals and upcoming maintenance.", status: "planned" },
-      { title: "Breakdowns and work orders", description: "Report faults, assign repairs and track work through completion.", status: "planned" },
+      { title: "Breakdowns and work orders", description: "Report faults, assign repairs and track work through completion.", status: "live" },
       { title: "Spare parts", description: "Inventory levels, part requests and maintenance-related consumption.", status: "planned" },
-      { title: "Fuel and operating hours", description: "Track fuel issues, meter readings, utilization and operating costs.", status: "planned" },
+      { title: "Fuel and operating hours", description: "Track fuel issues, meter readings, utilization and operating costs.", status: "partial" },
       { title: "Fleet reports", description: "Availability, downtime, repair costs and equipment utilization.", status: "planned" },
     ],
   },
@@ -186,7 +187,12 @@ export default function DepartmentWorkspace({ departmentCode }: { departmentCode
           )}
         </section>
 
-        {departmentCode === "machinery_maintenance" && <MachineryRegisterModule />}
+        {departmentCode === "machinery_maintenance" && (
+          <>
+            <MachineryRegisterModule />
+            <MachineryWorkOrdersModule />
+          </>
+        )}
 
         <section className="ranking-panel">
           <div className="section-heading">
