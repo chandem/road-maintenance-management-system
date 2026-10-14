@@ -549,7 +549,6 @@ function App() {
                 {authLoading ? "Signing in…" : "Sign in"}
               </button>
             </form>
-            {error && <div className="error-message">{error}</div>}
           </section>
         )}
 
