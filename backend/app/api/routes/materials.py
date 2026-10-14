@@ -4,7 +4,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from app.api.dependencies import get_current_user, require_department_access
+from app.api.dependencies import require_any_department_access
 from app.schemas.materials import (
     Material,
     MaterialCreate,
@@ -20,6 +20,20 @@ SELECT_COLS = (
     "reorder_level,unit_cost,location,status,created_at,updated_at"
 )
 
+# Shared inventory: road materials and machinery spare parts.
+_READ = require_any_department_access(
+    [
+        ("road_asset", ["department_manager", "officer", "read_only"]),
+        ("machinery_maintenance", ["department_manager", "officer", "read_only"]),
+    ]
+)
+_WRITE = require_any_department_access(
+    [
+        ("road_asset", ["department_manager", "officer"]),
+        ("machinery_maintenance", ["department_manager", "officer"]),
+    ]
+)
+
 
 def _org_id(current_user) -> str:
     org_id = resolve_organization_id(current_user["client"], current_user["id"])
@@ -32,7 +46,7 @@ def _org_id(current_user) -> str:
 
 @router.get("", response_model=list[Material])
 def list_materials(
-    current_user=Depends(require_department_access("road_asset", ['department_manager', 'officer', 'read_only'])),
+    current_user=Depends(_READ),
     limit: int = Query(default=100, ge=1, le=200),
     status: str | None = Query(default=None, max_length=50),
     category: str | None = Query(default=None, max_length=100),
@@ -53,7 +67,7 @@ def list_materials(
 
 
 @router.get("/summary", response_model=MaterialSummary)
-def materials_summary(current_user=Depends(require_department_access("road_asset", ['department_manager', 'officer', 'read_only']))):
+def materials_summary(current_user=Depends(_READ)):
     """Inventory health: active items, low stock, value by category."""
     rows = (
         current_user["client"]
@@ -85,7 +99,7 @@ def materials_summary(current_user=Depends(require_department_access("road_asset
 
 
 @router.get("/{material_id}", response_model=Material)
-def get_material(material_id: UUID, current_user=Depends(require_department_access("road_asset", ['department_manager', 'officer', 'read_only']))):
+def get_material(material_id: UUID, current_user=Depends(_READ)):
     response = (
         current_user["client"]
         .table("materials")
@@ -102,7 +116,7 @@ def get_material(material_id: UUID, current_user=Depends(require_department_acce
 @router.post("", response_model=Material, status_code=201)
 def create_material(
     payload: MaterialCreate,
-    current_user=Depends(require_department_access("road_asset", ['department_manager', 'officer'])),
+    current_user=Depends(_WRITE),
 ):
     organization_id = _org_id(current_user)
     row = {"organization_id": organization_id, **payload.model_dump(mode="json")}
@@ -116,7 +130,7 @@ def create_material(
 def update_material(
     material_id: UUID,
     payload: MaterialUpdate,
-    current_user=Depends(require_department_access("road_asset", ['department_manager', 'officer'])),
+    current_user=Depends(_WRITE),
 ):
     updates = {
         k: v for k, v in payload.model_dump(mode="json", exclude_unset=True).items()

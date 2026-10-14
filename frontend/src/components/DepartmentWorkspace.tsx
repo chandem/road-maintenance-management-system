@@ -3,6 +3,7 @@ import { supabase } from "../lib/supabase";
 import MachineryRegisterModule from "./MachineryRegisterModule";
 import MachinerySchedulesModule from "./MachinerySchedulesModule";
 import MachineryWorkOrdersModule from "./MachineryWorkOrdersModule";
+import SparePartsModule from "./SparePartsModule";
 
 type Metric = { label: string; value: string | number; unit?: string };
 type ModuleInfo = { title: string; description: string; status?: "planned" | "partial" | "live" };
@@ -19,7 +20,7 @@ const CONFIG: Record<string, DepartmentConfig> = {
       { title: "Equipment register", description: "Equipment identity, specifications, status and assigned location.", status: "live" },
       { title: "Maintenance planning", description: "Preventive schedules, service intervals and upcoming maintenance.", status: "live" },
       { title: "Breakdowns and work orders", description: "Report faults, assign repairs and track work through completion.", status: "live" },
-      { title: "Spare parts", description: "Inventory levels, part requests and maintenance-related consumption.", status: "planned" },
+      { title: "Spare parts", description: "Inventory levels, part requests and maintenance-related consumption.", status: "live" },
       { title: "Fuel and operating hours", description: "Track fuel issues, meter readings, utilization and operating costs.", status: "partial" },
       { title: "Fleet reports", description: "Availability, downtime, repair costs and equipment utilization.", status: "planned" },
     ],
@@ -193,6 +194,7 @@ export default function DepartmentWorkspace({ departmentCode }: { departmentCode
             <MachineryRegisterModule />
             <MachinerySchedulesModule />
             <MachineryWorkOrdersModule />
+            <SparePartsModule />
           </>
         )}
 

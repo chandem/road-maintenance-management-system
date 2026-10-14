@@ -89,6 +89,77 @@ def require_department_access(department_code: str, allowed_roles: list[str]):
     return _check
 
 
+def require_any_department_access(
+    options: list[tuple[str, list[str]]],
+):
+    """Allow access if the caller matches any (department_code, roles) option.
+
+    Organization owners/admins are always allowed. Fails closed on lookup errors.
+    """
+    from app.services.ai_audit import resolve_organization_id
+
+    def _check(current_user=Depends(get_current_user)):
+        try:
+            organization_id = resolve_organization_id(
+                current_user["client"], current_user["id"]
+            )
+        except Exception as exc:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Organization membership could not be verified.",
+            ) from exc
+        if not organization_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Active organization membership is required.",
+            )
+        try:
+            membership = (
+                current_user["client"]
+                .table("organization_members")
+                .select("role")
+                .eq("organization_id", organization_id)
+                .eq("user_id", current_user["id"])
+                .eq("is_active", True)
+                .maybe_single()
+                .execute()
+            )
+            is_org_admin = bool(
+                membership.data
+                and membership.data.get("role") in {"owner", "admin"}
+            )
+            if is_org_admin:
+                return current_user
+
+            for department_code, allowed_roles in options:
+                result = (
+                    current_user["client"]
+                    .rpc(
+                        "has_department_role",
+                        {
+                            "p_organization_id": organization_id,
+                            "p_department_code": department_code,
+                            "p_allowed_roles": allowed_roles,
+                        },
+                    )
+                    .execute()
+                )
+                if result.data is True:
+                    return current_user
+        except Exception as exc:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Department authorization could not be verified.",
+            ) from exc
+
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have the required department permissions.",
+        )
+
+    return _check
+
+
 def require_org_admin():
     """Require an active organization owner/admin for cross-department features.
 
