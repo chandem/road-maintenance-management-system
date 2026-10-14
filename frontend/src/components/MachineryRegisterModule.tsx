@@ -43,6 +43,32 @@ function statusBadgeClass(status: string): string {
   return "badge";
 }
 
+function resetFormFields(
+  setters: {
+    setAssetCode: (v: string) => void;
+    setName: (v: string) => void;
+    setMachineryType: (v: string) => void;
+    setMake: (v: string) => void;
+    setModel: (v: string) => void;
+    setSerialNumber: (v: string) => void;
+    setStatus: (v: string) => void;
+    setCurrentHours: (v: string) => void;
+    setPurchaseDate: (v: string) => void;
+    setPurchaseCost: (v: string) => void;
+  },
+) {
+  setters.setAssetCode("");
+  setters.setName("");
+  setters.setMachineryType("");
+  setters.setMake("");
+  setters.setModel("");
+  setters.setSerialNumber("");
+  setters.setStatus("available");
+  setters.setCurrentHours("0");
+  setters.setPurchaseDate("");
+  setters.setPurchaseCost("");
+}
+
 export default function MachineryRegisterModule() {
   const [items, setItems] = useState<MachineryItem[]>([]);
   const [summary, setSummary] = useState<Summary | null>(null);
@@ -50,6 +76,7 @@ export default function MachineryRegisterModule() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   const [assetCode, setAssetCode] = useState("");
   const [name, setName] = useState("");
@@ -61,6 +88,19 @@ export default function MachineryRegisterModule() {
   const [currentHours, setCurrentHours] = useState("0");
   const [purchaseDate, setPurchaseDate] = useState("");
   const [purchaseCost, setPurchaseCost] = useState("");
+
+  const formSetters = {
+    setAssetCode,
+    setName,
+    setMachineryType,
+    setMake,
+    setModel,
+    setSerialNumber,
+    setStatus,
+    setCurrentHours,
+    setPurchaseDate,
+    setPurchaseCost,
+  };
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -100,6 +140,28 @@ export default function MachineryRegisterModule() {
     void load();
   }, [load]);
 
+  const startEdit = (item: MachineryItem) => {
+    setEditingId(item.id);
+    setAssetCode(item.asset_code);
+    setName(item.name);
+    setMachineryType(item.machinery_type ?? "");
+    setMake(item.make ?? "");
+    setModel(item.model ?? "");
+    setSerialNumber(item.serial_number ?? "");
+    setStatus(item.status || "available");
+    setCurrentHours(item.current_hours == null ? "" : String(item.current_hours));
+    setPurchaseDate(item.purchase_date ? item.purchase_date.slice(0, 10) : "");
+    setPurchaseCost(item.purchase_cost == null ? "" : String(item.purchase_cost));
+    setError("");
+    const el = document.getElementById("equipment-form");
+    el?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    resetFormFields(formSetters);
+  };
+
   const save = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setSaving(true);
@@ -107,44 +169,60 @@ export default function MachineryRegisterModule() {
     try {
       const { data } = await supabase.auth.getSession();
       const token = data.session?.access_token;
-      if (!token) throw new Error("Please sign in to register equipment.");
-      const body: Record<string, unknown> = {
-        asset_code: assetCode.trim(),
-        name: name.trim(),
-        machinery_type: machineryType.trim() || null,
-        make: make.trim() || null,
-        model: model.trim() || null,
-        serial_number: serialNumber.trim() || null,
-        status: status || "available",
-        current_hours: currentHours === "" ? null : Number(currentHours),
-        purchase_date: purchaseDate || null,
-        purchase_cost: purchaseCost === "" ? null : Number(purchaseCost),
-      };
-      const response = await fetch(`${API}/machinery`, {
-        method: "POST",
+      if (!token) throw new Error("Please sign in to save equipment.");
+
+      const isEdit = Boolean(editingId);
+      const body: Record<string, unknown> = isEdit
+        ? {
+            name: name.trim(),
+            machinery_type: machineryType.trim() || null,
+            make: make.trim() || null,
+            model: model.trim() || null,
+            serial_number: serialNumber.trim() || null,
+            status: status || "available",
+            current_hours: currentHours === "" ? null : Number(currentHours),
+            purchase_date: purchaseDate || null,
+            purchase_cost: purchaseCost === "" ? null : Number(purchaseCost),
+          }
+        : {
+            asset_code: assetCode.trim(),
+            name: name.trim(),
+            machinery_type: machineryType.trim() || null,
+            make: make.trim() || null,
+            model: model.trim() || null,
+            serial_number: serialNumber.trim() || null,
+            status: status || "available",
+            current_hours: currentHours === "" ? null : Number(currentHours),
+            purchase_date: purchaseDate || null,
+            purchase_cost: purchaseCost === "" ? null : Number(purchaseCost),
+          };
+
+      const url = isEdit ? `${API}/machinery/${editingId}` : `${API}/machinery`;
+      const response = await fetch(url, {
+        method: isEdit ? "PATCH" : "POST",
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify(body),
       });
+
       if (!response.ok) {
         const detail = (await response.text()).slice(0, 220);
         if (response.status === 403) {
-          throw new Error("Read-only accounts cannot register equipment.");
+          throw new Error(
+            isEdit
+              ? "Read-only accounts cannot update equipment."
+              : "Read-only accounts cannot register equipment.",
+          );
         }
-        throw new Error(`Could not save equipment (${response.status}): ${detail}`);
+        throw new Error(
+          `Could not ${isEdit ? "update" : "save"} equipment (${response.status}): ${detail}`,
+        );
       }
-      setAssetCode("");
-      setName("");
-      setMachineryType("");
-      setMake("");
-      setModel("");
-      setSerialNumber("");
-      setStatus("available");
-      setCurrentHours("0");
-      setPurchaseDate("");
-      setPurchaseCost("");
+
+      setEditingId(null);
+      resetFormFields(formSetters);
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Unable to save equipment.");
@@ -160,7 +238,7 @@ export default function MachineryRegisterModule() {
           <p className="eyebrow">MMMS · FLEET</p>
           <h2>Equipment register</h2>
           <p className="panel-help">
-            Register and view machinery identity, type, status and meter hours. Backed by authorized
+            Register, update and view machinery identity, type, status and meter hours via authorized
             `/machinery` APIs.
           </p>
         </div>
@@ -192,9 +270,12 @@ export default function MachineryRegisterModule() {
         </div>
       )}
 
-      <form className="module-form" onSubmit={save}>
-        <h3>Register equipment</h3>
-        <p className="panel-help">Requires department manager or officer role. Read-only users can view the list only.</p>
+      <form id="equipment-form" className="module-form" onSubmit={save}>
+        <h3>{editingId ? "Edit equipment" : "Register equipment"}</h3>
+        <p className="panel-help">
+          Requires department manager or officer role. Read-only users can view the list only.
+          {editingId ? " Asset code cannot be changed after registration." : ""}
+        </p>
         <div className="form-grid">
           <label>
             Asset code
@@ -202,8 +283,9 @@ export default function MachineryRegisterModule() {
               value={assetCode}
               onChange={(e) => setAssetCode(e.target.value)}
               placeholder="e.g. EQ-EXC-01"
-              required
+              required={!editingId}
               maxLength={100}
+              disabled={Boolean(editingId)}
             />
           </label>
           <label>
@@ -245,11 +327,7 @@ export default function MachineryRegisterModule() {
           </label>
           <label>
             Serial number
-            <input
-              value={serialNumber}
-              onChange={(e) => setSerialNumber(e.target.value)}
-              maxLength={100}
-            />
+            <input value={serialNumber} onChange={(e) => setSerialNumber(e.target.value)} maxLength={100} />
           </label>
           <label>
             Current hours
@@ -276,9 +354,16 @@ export default function MachineryRegisterModule() {
             />
           </label>
         </div>
-        <button type="submit" disabled={saving}>
-          {saving ? "Saving…" : "Register equipment"}
-        </button>
+        <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
+          <button type="submit" disabled={saving}>
+            {saving ? "Saving…" : editingId ? "Save changes" : "Register equipment"}
+          </button>
+          {editingId && (
+            <button type="button" className="btn-secondary" onClick={cancelEdit} disabled={saving}>
+              Cancel edit
+            </button>
+          )}
+        </div>
       </form>
 
       <div className="section-heading" style={{ marginTop: "1.25rem" }}>
@@ -306,7 +391,7 @@ export default function MachineryRegisterModule() {
           <span>Type</span>
           <span>Make / Model</span>
           <span>Hours</span>
-          <span>Status</span>
+          <span>Status / actions</span>
         </div>
         {loading && <div className="empty-state">Loading equipment…</div>}
         {!loading && items.length === 0 && (
@@ -326,12 +411,19 @@ export default function MachineryRegisterModule() {
               ) : null}
             </span>
             <span>{item.machinery_type || "—"}</span>
-            <span>
-              {[item.make, item.model].filter(Boolean).join(" ") || "—"}
-            </span>
+            <span>{[item.make, item.model].filter(Boolean).join(" ") || "—"}</span>
             <span>{item.current_hours == null ? "—" : Number(item.current_hours).toLocaleString()}</span>
             <span>
               <span className={statusBadgeClass(item.status)}>{item.status.replaceAll("_", " ")}</span>
+              <br />
+              <button
+                type="button"
+                className="btn-ghost"
+                style={{ marginTop: "0.35rem", minHeight: "36px", padding: "0.35rem 0.65rem" }}
+                onClick={() => startEdit(item)}
+              >
+                {editingId === item.id ? "Editing…" : "Edit"}
+              </button>
             </span>
           </div>
         ))}
