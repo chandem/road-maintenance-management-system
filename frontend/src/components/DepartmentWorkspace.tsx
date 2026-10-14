@@ -6,6 +6,7 @@ import MachineryRegisterModule from "./MachineryRegisterModule";
 import MachinerySchedulesModule from "./MachinerySchedulesModule";
 import MachineryWorkOrdersModule from "./MachineryWorkOrdersModule";
 import SparePartsModule from "./SparePartsModule";
+import FinanceModule from "./FinanceModule";
 
 type Metric = { label: string; value: string | number; unit?: string };
 type ModuleInfo = { title: string; description: string; status?: "planned" | "partial" | "live" };
@@ -32,7 +33,7 @@ const CONFIG: Record<string, DepartmentConfig> = {
     description: "Control budgets, expenditure, commitments, approvals and financial reporting.",
     endpoint: "/dashboards/financial",
     modules: [
-      { title: "Budget management", description: "Annual budgets, allocations, revisions and available balances.", status: "partial" },
+      { title: "Budget management", description: "Annual budgets, allocations, revisions and available balances.", status: "live" },
       { title: "Expenses", description: "Record expenditure with categories, projects and supporting documents.", status: "partial" },
       { title: "Payment requests", description: "Review, approve and track payment requests and commitments.", status: "planned" },
       { title: "Project cost control", description: "Compare planned budgets with actual costs and commitments.", status: "planned" },
@@ -190,6 +191,8 @@ export default function DepartmentWorkspace({ departmentCode }: { departmentCode
             </p>
           )}
         </section>
+
+        {departmentCode === "finance" && <FinanceModule />}
 
         {departmentCode === "machinery_maintenance" && (
           <>
