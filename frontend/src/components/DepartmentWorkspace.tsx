@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
+import FleetReportsModule from "./FleetReportsModule";
 import MachineryFuelModule from "./MachineryFuelModule";
 import MachineryRegisterModule from "./MachineryRegisterModule";
 import MachinerySchedulesModule from "./MachinerySchedulesModule";
@@ -23,7 +24,7 @@ const CONFIG: Record<string, DepartmentConfig> = {
       { title: "Breakdowns and work orders", description: "Report faults, assign repairs and track work through completion.", status: "live" },
       { title: "Spare parts", description: "Inventory levels, part requests and maintenance-related consumption.", status: "live" },
       { title: "Fuel and operating hours", description: "Track fuel issues, meter readings, utilization and operating costs.", status: "live" },
-      { title: "Fleet reports", description: "Availability, downtime, repair costs and equipment utilization.", status: "planned" },
+      { title: "Fleet reports", description: "Availability, downtime, repair costs and equipment utilization.", status: "live" },
     ],
   },
   finance: {
@@ -197,6 +198,7 @@ export default function DepartmentWorkspace({ departmentCode }: { departmentCode
             <MachineryWorkOrdersModule />
             <SparePartsModule />
             <MachineryFuelModule />
+            <FleetReportsModule />
           </>
         )}
 
