@@ -234,12 +234,12 @@ function App() {
 
   useEffect(() => {
     let active = true;
-    supabase.auth.getUser().then(({ data: result, error: userError }) => {
+    supabase.auth.getSession().then(({ data: sessionData, error: sessionError }) => {
       if (!active) return;
-      if (userError) setError(userError.message);
-      setUser(result.user ?? null);
+      if (sessionError) setError(sessionError.message);
+      setUser(sessionData.session?.user ?? null);
       setAuthReady(true);
-      if (result.user) {
+      if (sessionData.session?.user) {
         void loadOrganization().catch((err) =>
           setError(
             err instanceof Error ? err.message : "Unable to load organization.",
