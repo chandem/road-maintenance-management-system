@@ -502,7 +502,7 @@ function App() {
                     const { data: profile, error: profileError } = await supabase.from("user_profiles").select("organization_id").maybeSingle();
                     if (profileError || !profile?.organization_id) throw new Error(profileError?.message ?? "Your account is not linked to an organization.");
                     const { data: org, error: orgError } = await supabase.from("organizations").select("id,name,code").eq("id", profile.organization_id).maybeSingle();
-                    if (orgError || !org || String(org.code ?? "").trim().toLowerCase() !== organizationCode.trim().toLowerCase()) throw new Error(orgError?.message ?? "The organization code does not match your account.");
+                    if (orgError || !org || String(org.code ?? "").trim().toLowerCase() !== organizationCode.trim().toLowerCase()) throw new Error(orgError?.message ?? "The organization code does[...]");
                     const token = await authToken();
                     await verifyDepartmentAccess(token, selectedDepartment);
                     setOrganizationId(org.id); setOrganizationName(org.name); setWorkspaceReady(true);
@@ -512,7 +512,7 @@ function App() {
                 {authLoading ? "Verifying access…" : "Continue to selected department"}
               </button>
             )}
-            {error && <div className="error-message" role="alert">{error}</div>}
+            {/* Entry-panel no longer renders the global `error` to avoid duplicate messages when the sign-in panel is visible. */}
           </section>
         )}
         {authReady && user && organizationId && workspaceReady && selectedDepartment === "road_asset" && (
@@ -549,6 +549,8 @@ function App() {
                 {authLoading ? "Signing in…" : "Sign in"}
               </button>
             </form>
+            {/* Show sign-in related errors only inside the sign-in panel so the department selection doesn't also display the same message. */}
+            {error && <div className="error-message" role="alert">{error}</div>}
           </section>
         )}
 
@@ -819,8 +821,7 @@ function App() {
                         )}
                         {docAnswer.evidence.map((item) => (
                           <span
-                            key={`${item.document_id}-${item.snippet.slice(0, 40)}`}
-                          >
+                            key={`${item.document_id}-${item.snippet.slice(0, 40)}`}>
                             • {item.title}: {item.snippet}
                           </span>
                         ))}
