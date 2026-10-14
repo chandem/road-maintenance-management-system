@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
 import MachineryRegisterModule from "./MachineryRegisterModule";
+import MachinerySchedulesModule from "./MachinerySchedulesModule";
 import MachineryWorkOrdersModule from "./MachineryWorkOrdersModule";
 
 type Metric = { label: string; value: string | number; unit?: string };
@@ -16,7 +17,7 @@ const CONFIG: Record<string, DepartmentConfig> = {
     endpoint: "/dashboards/machinery",
     modules: [
       { title: "Equipment register", description: "Equipment identity, specifications, status and assigned location.", status: "live" },
-      { title: "Maintenance planning", description: "Preventive schedules, service intervals and upcoming maintenance.", status: "planned" },
+      { title: "Maintenance planning", description: "Preventive schedules, service intervals and upcoming maintenance.", status: "live" },
       { title: "Breakdowns and work orders", description: "Report faults, assign repairs and track work through completion.", status: "live" },
       { title: "Spare parts", description: "Inventory levels, part requests and maintenance-related consumption.", status: "planned" },
       { title: "Fuel and operating hours", description: "Track fuel issues, meter readings, utilization and operating costs.", status: "partial" },
@@ -190,6 +191,7 @@ export default function DepartmentWorkspace({ departmentCode }: { departmentCode
         {departmentCode === "machinery_maintenance" && (
           <>
             <MachineryRegisterModule />
+            <MachinerySchedulesModule />
             <MachineryWorkOrdersModule />
           </>
         )}
