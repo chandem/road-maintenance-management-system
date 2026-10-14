@@ -22,6 +22,28 @@ declare
   v_expense public.expenses%rowtype;
   v_status text := lower(trim(coalesce(p_status, 'recorded')));
 begin
+  if auth.uid() is null or auth.uid() <> p_created_by then
+    raise exception 'Expense creator must match the authenticated user';
+  end if;
+
+  if not exists (
+    select 1
+      from public.organization_members om
+     where om.organization_id = p_organization_id
+       and om.user_id = auth.uid()
+       and om.is_active = true
+       and om.role in ('owner', 'admin')
+  ) and coalesce(
+    public.has_department_role(
+      p_organization_id,
+      'finance',
+      array['department_manager', 'officer']::text[]
+    ),
+    false
+  ) is not true then
+    raise exception 'Finance expense recording permission is required';
+  end if;
+
   if p_amount is null or p_amount <= 0 then
     raise exception 'Expense amount must be greater than zero';
   end if;
