@@ -285,12 +285,24 @@ function App() {
     }
     setAuthLoading(true);
     setError(null);
-    const { error: signInError } = await supabase.auth.signInWithPassword({
-      email,
+    const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+      email: email.trim(),
       password,
     });
-    if (signInError) setError(signInError.message);
-    else {
+    if (signInError) {
+      setError(signInError.message);
+      setAuthLoading(false);
+      return;
+    }
+    if (!signInData.session?.access_token) {
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError || !sessionData.session?.access_token) {
+        setError(sessionError?.message ?? "Sign-in succeeded but no session was created. Please try again.");
+        setAuthLoading(false);
+        return;
+      }
+    }
+    {
       const { data: profile, error: profileError } = await supabase
         .from("user_profiles")
         .select("organization_id")
