@@ -15,6 +15,7 @@ type Budget = {
 
 type Expense = {
   id: string;
+  budget_id: string | null;
   expense_date: string;
   description: string;
   category: string | null;
@@ -58,6 +59,16 @@ export default function FinanceModule() {
   const [notice, setNotice] = useState("");
   const [fiscalYear, setFiscalYear] = useState(String(new Date().getFullYear()));
   const [showForm, setShowForm] = useState(false);
+  const [showExpenseForm, setShowExpenseForm] = useState(false);
+  const [expenseForm, setExpenseForm] = useState({
+    budget_id: "",
+    expense_date: new Date().toISOString().slice(0, 10),
+    description: "",
+    category: "",
+    amount: "",
+    reference_no: "",
+    status: "paid",
+  });
   const [form, setForm] = useState({
     fiscal_year: String(new Date().getFullYear()),
     budget_code: "",
@@ -134,6 +145,50 @@ export default function FinanceModule() {
       await loadFinanceData();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Budget could not be created.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function createExpense(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSaving(true);
+    setError("");
+    setNotice("");
+    try {
+      const token = await getAccessToken();
+      const response = await fetch(`${API_BASE_URL}/finance/expenses`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          budget_id: expenseForm.budget_id || null,
+          expense_date: expenseForm.expense_date,
+          description: expenseForm.description.trim(),
+          category: expenseForm.category.trim() || null,
+          amount: Number(expenseForm.amount),
+          reference_no: expenseForm.reference_no.trim() || null,
+          status: expenseForm.status,
+        }),
+      });
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({})) as { detail?: string };
+        if (response.status === 403) throw new Error("Your Finance role does not permit expense recording.");
+        throw new Error(payload.detail || `Expense could not be recorded (${response.status}).`);
+      }
+      setExpenseForm({
+        budget_id: "",
+        expense_date: new Date().toISOString().slice(0, 10),
+        description: "",
+        category: "",
+        amount: "",
+        reference_no: "",
+        status: "paid",
+      });
+      setShowExpenseForm(false);
+      setNotice("Expense recorded. Linked budget totals have been updated when applicable.");
+      await loadFinanceData();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Expense could not be recorded.");
     } finally {
       setSaving(false);
     }
@@ -222,6 +277,41 @@ export default function FinanceModule() {
               })}
             </div>
           </div>
+        )}
+      </section>
+
+      <section aria-labelledby="record-expense-title">
+        <div className="section-heading">
+          <div><p className="eyebrow">EXPENDITURE CONTROL</p><h3 id="record-expense-title">Record an expense</h3><p className="panel-help">Paid expenses increase spent; committed expenses increase commitments. Recorded or rejected entries do not deduct budget.</p></div>
+          <button type="button" onClick={() => setShowExpenseForm((value) => !value)}>{showExpenseForm ? "Cancel" : "＋ Record expense"}</button>
+        </div>
+        {showExpenseForm && (
+          <form className="module-form" onSubmit={createExpense}>
+            <h3>New expense record</h3>
+            <div className="form-grid">
+              <label>Charge to budget
+                <select value={expenseForm.budget_id} onChange={(e) => setExpenseForm({ ...expenseForm, budget_id: e.target.value })}>
+                  <option value="">No linked budget</option>
+                  {budgets.map((budget) => <option key={budget.id} value={budget.id}>{budget.budget_code || budget.category || "Budget"} · {budget.fiscal_year} · balance {amount(numberValue(budget.allocated_amount) - numberValue(budget.spent_amount) - numberValue(budget.committed_amount))}</option>)}
+                </select>
+              </label>
+              <label>Expense date<input required type="date" value={expenseForm.expense_date} onChange={(e) => setExpenseForm({ ...expenseForm, expense_date: e.target.value })} /></label>
+              <label>Description<input required maxLength={500} value={expenseForm.description} onChange={(e) => setExpenseForm({ ...expenseForm, description: e.target.value })} placeholder="What was purchased or paid for?" /></label>
+              <label>Category<input maxLength={100} value={expenseForm.category} onChange={(e) => setExpenseForm({ ...expenseForm, category: e.target.value })} placeholder="e.g. Fuel, materials, labour" /></label>
+              <label>Amount<input required type="number" min="0.01" step="0.01" value={expenseForm.amount} onChange={(e) => setExpenseForm({ ...expenseForm, amount: e.target.value })} placeholder="0.00" /></label>
+              <label>Reference number<input maxLength={100} value={expenseForm.reference_no} onChange={(e) => setExpenseForm({ ...expenseForm, reference_no: e.target.value })} placeholder="Receipt / voucher number" /></label>
+              <label>Expense status
+                <select value={expenseForm.status} onChange={(e) => setExpenseForm({ ...expenseForm, status: e.target.value })}>
+                  <option value="paid">Paid — deduct from spent balance</option>
+                  <option value="committed">Committed — reserve budget</option>
+                  <option value="recorded">Recorded — no deduction yet</option>
+                  <option value="rejected">Rejected — no deduction</option>
+                </select>
+              </label>
+            </div>
+            <p className="panel-help">Select Paid only after payment has occurred. Amounts are recorded in the organization’s configured currency/unit. Confirm the budget and amount before saving.</p>
+            <div className="finance-form-actions"><button type="submit" disabled={saving}>{saving ? "Saving…" : "Save expense"}</button><button type="button" className="finance-secondary-button" onClick={() => setShowExpenseForm(false)} disabled={saving}>Cancel</button></div>
+          </form>
         )}
       </section>
 

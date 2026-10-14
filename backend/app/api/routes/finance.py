@@ -198,14 +198,26 @@ def create_expense(
     payload: ExpenseCreate,
     current_user=Depends(require_department_access("finance", ['department_manager', 'officer'])),
 ):
-    """Record an expense. Does not approve payments — advisory record only."""
+    """Record an expense and atomically update the linked budget totals."""
     organization_id = _org_id(current_user)
-    row = {
-        "organization_id": organization_id,
-        "created_by": current_user["id"],
-        **payload.model_dump(mode="json"),
-    }
-    response = current_user["client"].table("expenses").insert(row).execute()
-    if not response.data:
-        raise HTTPException(status_code=500, detail="Expense could not be created")
-    return response.data[0]
+    result = current_user["client"].rpc(
+        "record_finance_expense",
+        {
+            "p_organization_id": organization_id,
+            "p_created_by": current_user["id"],
+            "p_budget_id": str(payload.budget_id) if payload.budget_id else None,
+            "p_work_order_id": str(payload.work_order_id) if payload.work_order_id else None,
+            "p_expense_date": payload.expense_date.isoformat(),
+            "p_description": payload.description.strip(),
+            "p_category": payload.category,
+            "p_amount": str(payload.amount),
+            "p_reference_no": payload.reference_no,
+            "p_status": payload.status,
+        },
+    ).execute()
+    data = result.data
+    if isinstance(data, list):
+        data = data[0] if data else None
+    if not data:
+        raise HTTPException(status_code=500, detail="Expense could not be recorded")
+    return data
