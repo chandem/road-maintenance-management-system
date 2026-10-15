@@ -13,6 +13,9 @@ import MachineryRegisterModule from "./MachineryRegisterModule";
 import MachinerySchedulesModule from "./MachinerySchedulesModule";
 import MachineryWorkOrdersModule from "./MachineryWorkOrdersModule";
 import OrganizationStaffingModule from "./OrganizationStaffingModule";
+import RoadInspectionsModule from "./RoadInspectionsModule";
+import RoadSectionsModule from "./RoadSectionsModule";
+import RoadsModule from "./RoadsModule";
 import SparePartsModule from "./SparePartsModule";
 import TrainingLicensesModule from "./TrainingLicensesModule";
 
@@ -23,6 +26,19 @@ type DepartmentConfig = { name: string; description: string; endpoint: string; m
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL_RMMS ?? "https://ai-rmms-backend.onrender.com/api/v1";
 
 const CONFIG: Record<string, DepartmentConfig> = {
+  road_asset: {
+    name: "Road Asset Management",
+    description: "Manage road inventory, sections, inspections, maintenance planning and work orders.",
+    endpoint: "/dashboards/maintenance",
+    modules: [
+      { title: "Road inventory", description: "Road corridors, codes, class, surface and operational status.", status: "live" },
+      { title: "Sections and chainage", description: "Section breakdowns and condition ratings.", status: "live" },
+      { title: "Inspections", description: "Condition surveys, defects and recommended actions.", status: "live" },
+      { title: "Maintenance planning", description: "Plans linked to sections and priorities.", status: "partial" },
+      { title: "Work orders", description: "Execution of road maintenance activities.", status: "partial" },
+      { title: "AI priority support", description: "Ranking and evidence-backed prioritization.", status: "partial" },
+    ],
+  },
   machinery_maintenance: {
     name: "Machinery Maintenance",
     description: "Manage fleet availability, preventive maintenance, breakdowns, repairs and equipment performance.",
@@ -199,6 +215,14 @@ export default function DepartmentWorkspace({ departmentCode }: { departmentCode
             </p>
           )}
         </section>
+
+        {departmentCode === "road_asset" && (
+          <>
+            <RoadsModule />
+            <RoadSectionsModule />
+            <RoadInspectionsModule />
+          </>
+        )}
 
         {departmentCode === "finance" && <FinanceModule />}
 
