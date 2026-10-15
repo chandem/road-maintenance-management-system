@@ -2,6 +2,7 @@ from decimal import Decimal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from postgrest.exceptions import APIError
 
 from app.api.dependencies import get_current_user, require_department_access
 from app.schemas.finance import (
@@ -200,21 +201,34 @@ def create_expense(
 ):
     """Record an expense and atomically update the linked budget totals."""
     organization_id = _org_id(current_user)
-    result = current_user["client"].rpc(
-        "record_finance_expense",
-        {
-            "p_organization_id": organization_id,
-            "p_created_by": current_user["id"],
-            "p_budget_id": str(payload.budget_id) if payload.budget_id else None,
-            "p_work_order_id": str(payload.work_order_id) if payload.work_order_id else None,
-            "p_expense_date": payload.expense_date.isoformat(),
-            "p_description": payload.description.strip(),
-            "p_category": payload.category,
-            "p_amount": str(payload.amount),
-            "p_reference_no": payload.reference_no,
-            "p_status": payload.status,
-        },
-    ).execute()
+    try:
+        result = current_user["client"].rpc(
+            "record_finance_expense",
+            {
+                "p_organization_id": organization_id,
+                "p_created_by": current_user["id"],
+                "p_budget_id": str(payload.budget_id) if payload.budget_id else None,
+                "p_work_order_id": str(payload.work_order_id) if payload.work_order_id else None,
+                "p_expense_date": payload.expense_date.isoformat(),
+                "p_description": payload.description.strip(),
+                "p_category": payload.category,
+                "p_amount": str(payload.amount),
+                "p_reference_no": payload.reference_no,
+                "p_status": payload.status,
+            },
+        ).execute()
+    except APIError as exc:
+        # PostgreSQL business-rule exceptions (for example, insufficient budget)
+        # should be returned as a clear client error instead of an unhandled 500.
+        if getattr(exc, "code", None) == "P0001":
+            raise HTTPException(
+                status_code=409,
+                detail=getattr(exc, "message", None) or "Expense conflicts with the budget rules.",
+            ) from exc
+        raise HTTPException(
+            status_code=400,
+            detail=getattr(exc, "message", None) or "Expense could not be recorded.",
+        ) from exc
     data = result.data
     if isinstance(data, list):
         data = data[0] if data else None
