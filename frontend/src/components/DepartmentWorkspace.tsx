@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
 import EmployeesModule from "./EmployeesModule";
 import FinanceModule from "./FinanceModule";
+import GeneralAssetsModule from "./GeneralAssetsModule";
 import FleetReportsModule from "./FleetReportsModule";
 import LeaveRequestsModule from "./LeaveRequestsModule";
 import MachineryFuelModule from "./MachineryFuelModule";
@@ -195,6 +196,8 @@ export default function DepartmentWorkspace({ departmentCode }: { departmentCode
         </section>
 
         {departmentCode === "finance" && <FinanceModule />}
+
+        {departmentCode === "general_assets" && <GeneralAssetsModule />}
 
         {departmentCode === "human_resources" && (
           <>
