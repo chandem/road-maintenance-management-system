@@ -168,6 +168,19 @@ export default function AssetMaintenanceModule() {
     });
   }
 
+  const today = new Date().toISOString().slice(0, 10);
+  const alertHorizon = new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10);
+  const serviceAlerts = orders.filter((order) => {
+    const dueDate = order.next_service_date || (["requested", "approved", "in_progress"].includes(order.status) ? order.scheduled_date : null);
+    return Boolean(dueDate && dueDate <= alertHorizon);
+  }).sort((a, b) => {
+    const dateA = a.next_service_date || a.scheduled_date || "9999-12-31";
+    const dateB = b.next_service_date || b.scheduled_date || "9999-12-31";
+    return dateA.localeCompare(dateB);
+  });
+  const warrantyAlerts = warranties.filter((warranty) => warranty.end_date <= alertHorizon)
+    .sort((a, b) => a.end_date.localeCompare(b.end_date));
+
   return <section id="module-repairs-and-warranties" className="module-panel">
     <div className="section-heading">
       <div><p className="eyebrow">GENERAL ASSETS · MAINTENANCE</p><h2>Maintenance, repairs and warranties</h2>
@@ -182,6 +195,51 @@ export default function AssetMaintenanceModule() {
       <div className="metric-card"><span className="metric-label">Completed repairs</span><strong className="metric-value">{orders.filter((o) => o.status === "completed").length}</strong></div>
       <div className="metric-card"><span className="metric-label">Active warranties</span><strong className="metric-value">{warranties.filter((w) => w.end_date >= new Date().toISOString().slice(0, 10)).length}</strong></div>
       <div className="metric-card"><span className="metric-label">Recorded repair cost (ETB)</span><strong className="metric-value">{orders.filter((o) => o.status === "completed").reduce((sum, o) => sum + Number(o.cost || 0), 0).toLocaleString()}</strong></div>
+    </div>
+
+    <div className="module-form service-alert-panel">
+      <div className="section-heading">
+        <div>
+          <h3>Upcoming service and warranty alerts</h3>
+          <p className="panel-help">Items due now or within the next 30 days. Refresh records after updates to recalculate alerts.</p>
+        </div>
+        <span className="badge">{serviceAlerts.length + warrantyAlerts.length} alert{serviceAlerts.length + warrantyAlerts.length === 1 ? "" : "s"}</span>
+      </div>
+      <div className="form-grid">
+        <div>
+          <h4>Maintenance and service dates</h4>
+          {serviceAlerts.length === 0 ? <p className="empty-state">No upcoming or overdue service dates.</p> : (
+            <ul className="alert-list">
+              {serviceAlerts.map((order) => {
+                const dueDate = order.next_service_date || order.scheduled_date || "";
+                const overdue = dueDate < today;
+                return <li key={order.id}>
+                  <strong>{order.title}</strong>
+                  <span>{assetName(order.asset_id)}</span>
+                  <span className="badge">{overdue ? "Overdue" : dueDate === today ? "Due today" : "Due soon"}</span>
+                  <small>{dueDate}{order.status !== "completed" ? ` · ${order.status.replaceAll("_", " ")}` : " · next service"}</small>
+                </li>;
+              })}
+            </ul>
+          )}
+        </div>
+        <div>
+          <h4>Warranty expiry</h4>
+          {warrantyAlerts.length === 0 ? <p className="empty-state">No expired or soon-to-expire warranties.</p> : (
+            <ul className="alert-list">
+              {warrantyAlerts.map((warranty) => {
+                const expired = warranty.end_date < today;
+                return <li key={warranty.id}>
+                  <strong>{assetName(warranty.asset_id)}</strong>
+                  <span>{warranty.provider || "Provider not recorded"}</span>
+                  <span className="badge">{expired ? "Expired" : warranty.end_date === today ? "Expires today" : "Expires soon"}</span>
+                  <small>Expiry: {warranty.end_date}{warranty.reference_number ? ` · ${warranty.reference_number}` : ""}</small>
+                </li>;
+              })}
+            </ul>
+          )}
+        </div>
+      </div>
     </div>
 
     {canManage && <form className="module-form" onSubmit={createOrder}>
