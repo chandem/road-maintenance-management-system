@@ -6,6 +6,7 @@ import EmployeesModule from "./EmployeesModule";
 import FinanceModule from "./FinanceModule";
 import FleetReportsModule from "./FleetReportsModule";
 import GeneralAssetsModule from "./GeneralAssetsModule";
+import HrReportsModule from "./HrReportsModule";
 import LeaveRequestsModule from "./LeaveRequestsModule";
 import MachineryFuelModule from "./MachineryFuelModule";
 import MachineryRegisterModule from "./MachineryRegisterModule";
@@ -57,7 +58,7 @@ const CONFIG: Record<string, DepartmentConfig> = {
       { title: "Attendance and leave", description: "Attendance records, leave requests, balances and approvals.", status: "live" },
       { title: "Training and licenses", description: "Training history, qualifications and certificate-expiry reminders.", status: "live" },
       { title: "Performance", description: "Appraisals, objectives and review history.", status: "planned" },
-      { title: "HR reports", description: "Workforce totals, staffing gaps and authorized HR summaries.", status: "partial" },
+      { title: "HR reports", description: "Workforce totals, staffing gaps and authorized HR summaries.", status: "live" },
     ],
   },
   general_assets: {
@@ -213,6 +214,7 @@ export default function DepartmentWorkspace({ departmentCode }: { departmentCode
             <EmployeesModule />
             <LeaveRequestsModule />
             <TrainingLicensesModule />
+            <HrReportsModule />
           </>
         )}
 
