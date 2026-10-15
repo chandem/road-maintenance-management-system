@@ -14,6 +14,7 @@ import MachinerySchedulesModule from "./MachinerySchedulesModule";
 import MachineryWorkOrdersModule from "./MachineryWorkOrdersModule";
 import MaintenancePlansModule from "./MaintenancePlansModule";
 import OrganizationStaffingModule from "./OrganizationStaffingModule";
+import RoadAiPriorityModule from "./RoadAiPriorityModule";
 import RoadInspectionsModule from "./RoadInspectionsModule";
 import RoadSectionsModule from "./RoadSectionsModule";
 import RoadWorkOrdersModule from "./RoadWorkOrdersModule";
@@ -38,7 +39,7 @@ const CONFIG: Record<string, DepartmentConfig> = {
       { title: "Inspections", description: "Condition surveys, defects and recommended actions.", status: "live" },
       { title: "Maintenance planning", description: "Plans linked to sections and priorities.", status: "live" },
       { title: "Work orders", description: "Execution of road maintenance activities.", status: "live" },
-      { title: "AI priority support", description: "Ranking and evidence-backed prioritization.", status: "partial" },
+      { title: "AI priority support", description: "Ranking and evidence-backed prioritization.", status: "live" },
     ],
   },
   machinery_maintenance: {
@@ -225,6 +226,7 @@ export default function DepartmentWorkspace({ departmentCode }: { departmentCode
             <RoadInspectionsModule />
             <MaintenancePlansModule />
             <RoadWorkOrdersModule />
+            <RoadAiPriorityModule />
           </>
         )}
 
