@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import type { FormEvent } from "react";
 import { supabase } from "../lib/supabase";
 
 type Asset = { id: string; asset_code: string; name: string; location: string | null; assigned_to: string | null };
@@ -64,7 +65,7 @@ export default function AssetTransfersModule() {
           .eq("user_id", userId)
           .eq("is_active", true)
           .eq("departments.code", "general_assets");
-        if (active) setCanDecide(Boolean(roles?.some((role: { role: string }) => role.role === "department_manager")));
+        if (active) setCanDecide(Boolean(roles?.some((entry) => entry.role === "department_manager")));
       } catch { if (active) setCanDecide(false); }
     })();
     return () => { active = false; };
@@ -72,7 +73,7 @@ export default function AssetTransfersModule() {
 
   useEffect(() => { void load(); }, [load]);
 
-  async function create(event: React.FormEvent<HTMLFormElement>) {
+  async function create(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); setSaving(true); setError(""); setNotice("");
     try {
       await request("/asset-transfers", { method: "POST", body: JSON.stringify({
