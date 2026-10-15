@@ -3,6 +3,7 @@ import { supabase } from "../lib/supabase";
 import EmployeesModule from "./EmployeesModule";
 import FinanceModule from "./FinanceModule";
 import GeneralAssetsModule from "./GeneralAssetsModule";
+import AssetTransfersModule from "./AssetTransfersModule";
 import FleetReportsModule from "./FleetReportsModule";
 import LeaveRequestsModule from "./LeaveRequestsModule";
 import MachineryFuelModule from "./MachineryFuelModule";
@@ -64,7 +65,7 @@ const CONFIG: Record<string, DepartmentConfig> = {
     modules: [
       { title: "Asset register", description: "Asset identifiers, categories, serial numbers, values and condition.", status: "partial" },
       { title: "Acquisition and registration", description: "Register new assets and retain purchase and warranty records.", status: "planned" },
-      { title: "Assignments and transfers", description: "Track custodians, locations and interdepartmental transfers.", status: "planned" },
+      { title: "Assignments and transfers", description: "Track custodians, locations and approved transfer history.", status: "live" },
       { title: "Inspection and verification", description: "Perform physical checks and reconcile the asset register.", status: "planned" },
       { title: "Repairs and warranties", description: "Track service requests, warranties and asset maintenance history.", status: "planned" },
       { title: "Disposal and reports", description: "Manage retirement approvals, valuation records and inventory reports.", status: "planned" },
@@ -197,7 +198,7 @@ export default function DepartmentWorkspace({ departmentCode }: { departmentCode
 
         {departmentCode === "finance" && <FinanceModule />}
 
-        {departmentCode === "general_assets" && <GeneralAssetsModule />}
+        {departmentCode === "general_assets" && <><GeneralAssetsModule /><AssetTransfersModule /></>}
 
         {departmentCode === "human_resources" && (
           <>
