@@ -76,3 +76,37 @@ class FinanceSummary(BaseModel):
     total_committed: Decimal
     remaining: Decimal
     utilization_percent: float
+
+
+class BudgetLineReport(BaseModel):
+    budget_id: UUID
+    fiscal_year: str | None = None
+    budget_code: str | None = None
+    category: str | None = None
+    status: str | None = None
+    allocated: Decimal
+    spent: Decimal
+    committed: Decimal
+    remaining: Decimal
+    utilization_percent: float
+
+
+class PaymentRequestStatusCount(BaseModel):
+    status: str
+    count: int
+    total_amount: Decimal
+
+
+class FinanceReport(BaseModel):
+    fiscal_year: str | None = None
+    total_allocated: Decimal
+    total_spent: Decimal
+    total_committed: Decimal
+    remaining: Decimal
+    utilization_percent: float
+    expense_count: int
+    expense_total: Decimal
+    payment_request_open_count: int
+    payment_request_open_amount: Decimal
+    payment_requests_by_status: list[PaymentRequestStatusCount]
+    budgets: list[BudgetLineReport]

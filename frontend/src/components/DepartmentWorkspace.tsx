@@ -4,6 +4,7 @@ import AssetMaintenanceModule from "./AssetMaintenanceModule";
 import AssetTransfersModule from "./AssetTransfersModule";
 import EmployeesModule from "./EmployeesModule";
 import FinanceModule from "./FinanceModule";
+import FinancialReportsModule from "./FinancialReportsModule";
 import FleetReportsModule from "./FleetReportsModule";
 import GeneralAssetsModule from "./GeneralAssetsModule";
 import HrReportsModule from "./HrReportsModule";
@@ -66,7 +67,7 @@ const CONFIG: Record<string, DepartmentConfig> = {
       { title: "Payment requests", description: "Review, approve and track payment requests and commitments.", status: "live" },
       { title: "Project cost control", description: "Compare planned budgets with actual costs and commitments.", status: "planned" },
       { title: "Suppliers and contracts", description: "Maintain supplier records and track contract-related payments.", status: "planned" },
-      { title: "Financial reports", description: "Period-based reports, budget variance and audit-ready exports.", status: "planned" },
+      { title: "Financial reports", description: "Period-based reports, budget variance and audit-ready exports.", status: "live" },
     ],
   },
   human_resources: {
@@ -235,6 +236,7 @@ export default function DepartmentWorkspace({ departmentCode }: { departmentCode
           <>
             <FinanceModule />
             <PaymentRequestsModule />
+            <FinancialReportsModule />
           </>
         )}
 
