@@ -12,9 +12,11 @@ import MachineryFuelModule from "./MachineryFuelModule";
 import MachineryRegisterModule from "./MachineryRegisterModule";
 import MachinerySchedulesModule from "./MachinerySchedulesModule";
 import MachineryWorkOrdersModule from "./MachineryWorkOrdersModule";
+import MaintenancePlansModule from "./MaintenancePlansModule";
 import OrganizationStaffingModule from "./OrganizationStaffingModule";
 import RoadInspectionsModule from "./RoadInspectionsModule";
 import RoadSectionsModule from "./RoadSectionsModule";
+import RoadWorkOrdersModule from "./RoadWorkOrdersModule";
 import RoadsModule from "./RoadsModule";
 import SparePartsModule from "./SparePartsModule";
 import TrainingLicensesModule from "./TrainingLicensesModule";
@@ -34,8 +36,8 @@ const CONFIG: Record<string, DepartmentConfig> = {
       { title: "Road inventory", description: "Road corridors, codes, class, surface and operational status.", status: "live" },
       { title: "Sections and chainage", description: "Section breakdowns and condition ratings.", status: "live" },
       { title: "Inspections", description: "Condition surveys, defects and recommended actions.", status: "live" },
-      { title: "Maintenance planning", description: "Plans linked to sections and priorities.", status: "partial" },
-      { title: "Work orders", description: "Execution of road maintenance activities.", status: "partial" },
+      { title: "Maintenance planning", description: "Plans linked to sections and priorities.", status: "live" },
+      { title: "Work orders", description: "Execution of road maintenance activities.", status: "live" },
       { title: "AI priority support", description: "Ranking and evidence-backed prioritization.", status: "partial" },
     ],
   },
@@ -221,6 +223,8 @@ export default function DepartmentWorkspace({ departmentCode }: { departmentCode
             <RoadsModule />
             <RoadSectionsModule />
             <RoadInspectionsModule />
+            <MaintenancePlansModule />
+            <RoadWorkOrdersModule />
           </>
         )}
 
