@@ -14,6 +14,7 @@ import MachinerySchedulesModule from "./MachinerySchedulesModule";
 import MachineryWorkOrdersModule from "./MachineryWorkOrdersModule";
 import MaintenancePlansModule from "./MaintenancePlansModule";
 import OrganizationStaffingModule from "./OrganizationStaffingModule";
+import PaymentRequestsModule from "./PaymentRequestsModule";
 import RoadAiPriorityModule from "./RoadAiPriorityModule";
 import RoadInspectionsModule from "./RoadInspectionsModule";
 import RoadSectionsModule from "./RoadSectionsModule";
@@ -62,7 +63,7 @@ const CONFIG: Record<string, DepartmentConfig> = {
     modules: [
       { title: "Budget management", description: "Annual budgets, allocations, revisions and available balances.", status: "live" },
       { title: "Expenses", description: "Record expenditure with categories, projects and supporting documents.", status: "live" },
-      { title: "Payment requests", description: "Review, approve and track payment requests and commitments.", status: "planned" },
+      { title: "Payment requests", description: "Review, approve and track payment requests and commitments.", status: "live" },
       { title: "Project cost control", description: "Compare planned budgets with actual costs and commitments.", status: "planned" },
       { title: "Suppliers and contracts", description: "Maintain supplier records and track contract-related payments.", status: "planned" },
       { title: "Financial reports", description: "Period-based reports, budget variance and audit-ready exports.", status: "planned" },
@@ -230,7 +231,12 @@ export default function DepartmentWorkspace({ departmentCode }: { departmentCode
           </>
         )}
 
-        {departmentCode === "finance" && <FinanceModule />}
+        {departmentCode === "finance" && (
+          <>
+            <FinanceModule />
+            <PaymentRequestsModule />
+          </>
+        )}
 
         {departmentCode === "general_assets" && (
           <>
