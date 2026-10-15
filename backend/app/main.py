@@ -22,6 +22,7 @@ from app.api.routes.machinery_schedules import router as machinery_schedules_rou
 from app.api.routes.machinery_work_orders import router as machinery_work_orders_router
 from app.api.routes.maintenance_plans import router as maintenance_plans_router
 from app.api.routes.materials import router as materials_router
+from app.api.routes.payment_requests import router as payment_requests_router
 from app.api.routes.road_sections import router as road_sections_router
 from app.api.routes.roads import router as roads_router
 from app.api.routes.system import router as system_router
@@ -66,6 +67,7 @@ app.include_router(hr_workforce_report_router, prefix="/api/v1")
 app.include_router(leave_requests_router, prefix="/api/v1")
 app.include_router(training_records_router, prefix="/api/v1")
 app.include_router(finance_router, prefix="/api/v1")
+app.include_router(payment_requests_router, prefix="/api/v1")
 app.include_router(assets_router, prefix="/api/v1")
 app.include_router(asset_transfers_router, prefix="/api/v1")
 app.include_router(asset_maintenance_router, prefix="/api/v1")
