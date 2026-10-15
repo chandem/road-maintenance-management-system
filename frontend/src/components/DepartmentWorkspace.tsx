@@ -6,6 +6,7 @@ import EmployeesModule from "./EmployeesModule";
 import FinanceModule from "./FinanceModule";
 import FleetReportsModule from "./FleetReportsModule";
 import GeneralAssetsModule from "./GeneralAssetsModule";
+import HrReportsModule from "./HrReportsModule";
 import LeaveRequestsModule from "./LeaveRequestsModule";
 import MachineryFuelModule from "./MachineryFuelModule";
 import MachineryRegisterModule from "./MachineryRegisterModule";
@@ -57,7 +58,7 @@ const CONFIG: Record<string, DepartmentConfig> = {
       { title: "Attendance and leave", description: "Attendance records, leave requests, balances and approvals.", status: "live" },
       { title: "Training and licenses", description: "Training history, qualifications and certificate-expiry reminders.", status: "live" },
       { title: "Performance", description: "Appraisals, objectives and review history.", status: "planned" },
-      { title: "HR reports", description: "Workforce totals, staffing gaps and authorized HR summaries.", status: "partial" },
+      { title: "HR reports", description: "Workforce totals, staffing gaps and authorized HR summaries.", status: "live" },
     ],
   },
   general_assets: {
@@ -69,7 +70,7 @@ const CONFIG: Record<string, DepartmentConfig> = {
       { title: "Acquisition and registration", description: "Register new assets and retain purchase and warranty records.", status: "planned" },
       { title: "Assignments and transfers", description: "Track custodians, locations and approved transfer history.", status: "live" },
       { title: "Inspection and verification", description: "Perform physical checks and reconcile the asset register.", status: "planned" },
-      { title: "Repairs and warranties", description: "Track service requests, warranties and asset maintenance history.", status: "live" },
+      { title: "Repairs and warranties", description: "Track service requests, warranties and asset maintenance history.", status: "planned" },
       { title: "Disposal and reports", description: "Manage retirement approvals, valuation records and inventory reports.", status: "planned" },
     ],
   },
@@ -213,6 +214,7 @@ export default function DepartmentWorkspace({ departmentCode }: { departmentCode
             <EmployeesModule />
             <LeaveRequestsModule />
             <TrainingLicensesModule />
+            <HrReportsModule />
           </>
         )}
 
