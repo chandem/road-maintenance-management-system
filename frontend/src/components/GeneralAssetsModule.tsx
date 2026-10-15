@@ -128,7 +128,7 @@ export default function GeneralAssetsModule() {
           <label>Category<input value={category} onChange={e => setCategory(e.target.value)} placeholder="Furniture, IT, office equipment…" maxLength={100}/></label>
           <label>Location<input value={location} onChange={e => setLocation(e.target.value)} placeholder="Office, store or site" maxLength={255}/></label>
           <label>Status<select value={status} onChange={e => setStatus(e.target.value)}>{STATUSES.map(s => <option key={s} value={s}>{s.replaceAll("_", " ")}</option>)}</select></label>
-          <label>Acquisition date<input type="date" value={acquisitionDate} onChange={e => setAcquisitionDate(e.target.value}/></label>
+          <label>Acquisition date<input type="date" value={acquisitionDate} onChange={e => setAcquisitionDate(e.target.value)}/></label>
           <label>Acquisition cost (ETB)<input type="number" min="0" step="0.01" value={acquisitionCost} onChange={e => setAcquisitionCost(e.target.value)} /></label>
           <label>Current value (ETB)<input type="number" min="0" step="0.01" value={currentValue} onChange={e => setCurrentValue(e.target.value)} /></label>
           <label>Assigned employee ID (optional)<input value={assignedTo} onChange={e => setAssignedTo(e.target.value)} placeholder="Employee UUID" /></label>
