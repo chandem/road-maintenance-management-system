@@ -24,6 +24,7 @@ from app.api.routes.materials import router as materials_router
 from app.api.routes.road_sections import router as road_sections_router
 from app.api.routes.roads import router as roads_router
 from app.api.routes.system import router as system_router
+from app.api.routes.training_records import router as training_records_router
 from app.api.routes.work_orders import router as work_orders_router
 
 app = FastAPI(title="AI-RMMS API", version="0.1.0")
@@ -61,6 +62,7 @@ app.include_router(machinery_fuel_router, prefix="/api/v1")
 app.include_router(materials_router, prefix="/api/v1")
 app.include_router(employees_router, prefix="/api/v1")
 app.include_router(leave_requests_router, prefix="/api/v1")
+app.include_router(training_records_router, prefix="/api/v1")
 app.include_router(finance_router, prefix="/api/v1")
 app.include_router(assets_router, prefix="/api/v1")
 app.include_router(asset_transfers_router, prefix="/api/v1")
