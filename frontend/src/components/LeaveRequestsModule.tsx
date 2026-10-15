@@ -92,6 +92,14 @@ export default function LeaveRequestsModule() {
 
   const createRequest = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (!startDate || !endDate) {
+      setError("Please enter both the start date and end date.");
+      return;
+    }
+    if (endDate < startDate) {
+      setError("End date must be on or after the start date.");
+      return;
+    }
     setSaving(true);
     setError("");
     try {
@@ -159,8 +167,7 @@ export default function LeaveRequestsModule() {
           <p className="eyebrow">HR · LEAVE</p>
           <h2>Attendance and leave</h2>
           <p className="panel-help">
-            Record leave requests and approve or reject them. Requires migration{" "}
-            <code>028_hr_leave_requests.sql</code> and API redeploy.
+            Record leave requests and approve or reject them. End date must be on or after start date.
           </p>
         </div>
         <button type="button" onClick={() => void load()} disabled={loading}>
@@ -221,11 +228,28 @@ export default function LeaveRequestsModule() {
           </label>
           <label>
             Start date
-            <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} required />
+            <input
+              type="date"
+              value={startDate}
+              onChange={(e) => {
+                const nextStartDate = e.target.value;
+                setStartDate(nextStartDate);
+                if (endDate && nextStartDate && endDate < nextStartDate) {
+                  setEndDate(nextStartDate);
+                }
+              }}
+              required
+            />
           </label>
           <label>
             End date
-            <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} required />
+            <input
+              type="date"
+              min={startDate || undefined}
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              required
+            />
           </label>
           <label>
             Days requested
