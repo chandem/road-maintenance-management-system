@@ -51,8 +51,25 @@ export default function FleetReportsModule() {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!response.ok) {
-        if (response.status === 403) throw new Error("Not authorized for fleet reports.");
-        throw new Error(`Fleet report failed (${response.status}). Redeploy the API if this route is missing.`);
+        let detail = "";
+        try {
+          const body: unknown = await response.json();
+          if (body && typeof body === "object" && "detail" in body) {
+            const value = (body as { detail?: unknown }).detail;
+            detail = typeof value === "string" ? value : JSON.stringify(value ?? "");
+          }
+        } catch {
+          // Some proxy and server errors return a non-JSON response.
+        }
+        if (response.status === 401) {
+          throw new Error("Your session may have expired. Sign in again and retry.");
+        }
+        if (response.status === 403) {
+          throw new Error(detail || "Not authorized for fleet reports. Check your Machinery Maintenance department role.");
+        }
+        throw new Error(
+          `Fleet report request failed (${response.status})${detail ? `: ${detail}` : ""}. Check the API response before redeploying.`,
+        );
       }
       setReport(await response.json());
     } catch (e) {
