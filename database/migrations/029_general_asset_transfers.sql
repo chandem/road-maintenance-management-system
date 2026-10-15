@@ -43,6 +43,11 @@ create policy asset_transfers_org_member_insert on public.asset_transfers
   for insert to authenticated with check (
     organization_id in (select organization_id from public.user_profiles where id = auth.uid())
   );
+drop policy if exists asset_transfers_org_member_update on public.asset_transfers;
+create policy asset_transfers_org_member_update on public.asset_transfers
+  for update to authenticated
+  using (organization_id in (select organization_id from public.user_profiles where id = auth.uid()))
+  with check (organization_id in (select organization_id from public.user_profiles where id = auth.uid()));
 
 create or replace function public.apply_approved_asset_transfer()
 returns trigger
