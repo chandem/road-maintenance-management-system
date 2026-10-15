@@ -1,17 +1,18 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
+import AssetMaintenanceModule from "./AssetMaintenanceModule";
+import AssetTransfersModule from "./AssetTransfersModule";
 import EmployeesModule from "./EmployeesModule";
 import FinanceModule from "./FinanceModule";
-import GeneralAssetsModule from "./GeneralAssetsModule";
-import AssetTransfersModule from "./AssetTransfersModule";
-import AssetMaintenanceModule from "./AssetMaintenanceModule";
 import FleetReportsModule from "./FleetReportsModule";
+import GeneralAssetsModule from "./GeneralAssetsModule";
 import LeaveRequestsModule from "./LeaveRequestsModule";
 import MachineryFuelModule from "./MachineryFuelModule";
 import MachineryRegisterModule from "./MachineryRegisterModule";
 import MachinerySchedulesModule from "./MachinerySchedulesModule";
 import MachineryWorkOrdersModule from "./MachineryWorkOrdersModule";
 import SparePartsModule from "./SparePartsModule";
+import TrainingLicensesModule from "./TrainingLicensesModule";
 
 type Metric = { label: string; value: string | number; unit?: string };
 type ModuleInfo = { title: string; description: string; status?: "planned" | "partial" | "live" };
@@ -54,7 +55,7 @@ const CONFIG: Record<string, DepartmentConfig> = {
       { title: "Employee records", description: "Personnel profiles, positions, qualifications and employment documents.", status: "live" },
       { title: "Organization and staffing", description: "Department structure, positions, assignments and vacancies.", status: "planned" },
       { title: "Attendance and leave", description: "Attendance records, leave requests, balances and approvals.", status: "live" },
-      { title: "Training and licenses", description: "Training history, qualifications and certificate-expiry reminders.", status: "planned" },
+      { title: "Training and licenses", description: "Training history, qualifications and certificate-expiry reminders.", status: "live" },
       { title: "Performance", description: "Appraisals, objectives and review history.", status: "planned" },
       { title: "HR reports", description: "Workforce totals, staffing gaps and authorized HR summaries.", status: "partial" },
     ],
@@ -199,12 +200,19 @@ export default function DepartmentWorkspace({ departmentCode }: { departmentCode
 
         {departmentCode === "finance" && <FinanceModule />}
 
-        {departmentCode === "general_assets" && <><GeneralAssetsModule /><AssetTransfersModule /><AssetMaintenanceModule /></>}
+        {departmentCode === "general_assets" && (
+          <>
+            <GeneralAssetsModule />
+            <AssetTransfersModule />
+            <AssetMaintenanceModule />
+          </>
+        )}
 
         {departmentCode === "human_resources" && (
           <>
             <EmployeesModule />
             <LeaveRequestsModule />
+            <TrainingLicensesModule />
           </>
         )}
 
