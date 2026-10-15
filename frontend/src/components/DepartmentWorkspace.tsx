@@ -12,6 +12,7 @@ import MachineryFuelModule from "./MachineryFuelModule";
 import MachineryRegisterModule from "./MachineryRegisterModule";
 import MachinerySchedulesModule from "./MachinerySchedulesModule";
 import MachineryWorkOrdersModule from "./MachineryWorkOrdersModule";
+import OrganizationStaffingModule from "./OrganizationStaffingModule";
 import SparePartsModule from "./SparePartsModule";
 import TrainingLicensesModule from "./TrainingLicensesModule";
 
@@ -54,7 +55,7 @@ const CONFIG: Record<string, DepartmentConfig> = {
     endpoint: "/dashboards/hr",
     modules: [
       { title: "Employee records", description: "Personnel profiles, positions, qualifications and employment documents.", status: "live" },
-      { title: "Organization and staffing", description: "Department structure, positions, assignments and vacancies.", status: "planned" },
+      { title: "Organization and staffing", description: "Department structure, positions, assignments and vacancies.", status: "live" },
       { title: "Attendance and leave", description: "Attendance records, leave requests, balances and approvals.", status: "live" },
       { title: "Training and licenses", description: "Training history, qualifications and certificate-expiry reminders.", status: "live" },
       { title: "Performance", description: "Appraisals, objectives and review history.", status: "planned" },
@@ -212,6 +213,7 @@ export default function DepartmentWorkspace({ departmentCode }: { departmentCode
         {departmentCode === "human_resources" && (
           <>
             <EmployeesModule />
+            <OrganizationStaffingModule />
             <LeaveRequestsModule />
             <TrainingLicensesModule />
             <HrReportsModule />
