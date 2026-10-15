@@ -3,6 +3,7 @@ import { supabase } from "../lib/supabase";
 import EmployeesModule from "./EmployeesModule";
 import FinanceModule from "./FinanceModule";
 import FleetReportsModule from "./FleetReportsModule";
+import LeaveRequestsModule from "./LeaveRequestsModule";
 import MachineryFuelModule from "./MachineryFuelModule";
 import MachineryRegisterModule from "./MachineryRegisterModule";
 import MachinerySchedulesModule from "./MachinerySchedulesModule";
@@ -49,7 +50,7 @@ const CONFIG: Record<string, DepartmentConfig> = {
     modules: [
       { title: "Employee records", description: "Personnel profiles, positions, qualifications and employment documents.", status: "live" },
       { title: "Organization and staffing", description: "Department structure, positions, assignments and vacancies.", status: "planned" },
-      { title: "Attendance and leave", description: "Attendance records, leave requests, balances and approvals.", status: "planned" },
+      { title: "Attendance and leave", description: "Attendance records, leave requests, balances and approvals.", status: "live" },
       { title: "Training and licenses", description: "Training history, qualifications and certificate-expiry reminders.", status: "planned" },
       { title: "Performance", description: "Appraisals, objectives and review history.", status: "planned" },
       { title: "HR reports", description: "Workforce totals, staffing gaps and authorized HR summaries.", status: "partial" },
@@ -195,7 +196,12 @@ export default function DepartmentWorkspace({ departmentCode }: { departmentCode
 
         {departmentCode === "finance" && <FinanceModule />}
 
-        {departmentCode === "human_resources" && <EmployeesModule />}
+        {departmentCode === "human_resources" && (
+          <>
+            <EmployeesModule />
+            <LeaveRequestsModule />
+          </>
+        )}
 
         {departmentCode === "machinery_maintenance" && (
           <>
