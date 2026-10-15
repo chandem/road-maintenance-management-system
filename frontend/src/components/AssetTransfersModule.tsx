@@ -59,10 +59,12 @@ export default function AssetTransfersModule() {
         const { data } = await supabase.auth.getUser();
         const userId = data.user?.id;
         if (!userId) return;
-        const { data: profile } = await supabase.from("user_profiles").select("id,department_id").eq("id", userId).maybeSingle();
-        if (!profile?.department_id) return;
-        const { data: role } = await supabase.from("user_department_roles").select("role").eq("user_id", userId).eq("department_id", profile.department_id).maybeSingle();
-        if (active) setCanDecide(role?.role === "department_manager");
+        const { data: roles } = await supabase.from("user_department_roles")
+          .select("role, departments!inner(code)")
+          .eq("user_id", userId)
+          .eq("is_active", true)
+          .eq("departments.code", "general_assets");
+        if (active) setCanDecide(Boolean(roles?.some((role: { role: string }) => role.role === "department_manager")));
       } catch { if (active) setCanDecide(false); }
     })();
     return () => { active = false; };
