@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.routes.ai import router as ai_router
 from app.api.routes.assets import router as assets_router
 from app.api.routes.asset_transfers import router as asset_transfers_router
+from app.api.routes.asset_maintenance import router as asset_maintenance_router
 from app.api.routes.conversations import router as conversations_router
 from app.api.routes.dashboards import router as dashboards_router
 from app.api.routes.documents import router as documents_router
@@ -63,6 +64,7 @@ app.include_router(leave_requests_router, prefix="/api/v1")
 app.include_router(finance_router, prefix="/api/v1")
 app.include_router(assets_router, prefix="/api/v1")
 app.include_router(asset_transfers_router, prefix="/api/v1")
+app.include_router(asset_maintenance_router, prefix="/api/v1")
 app.include_router(conversations_router, prefix="/api/v1")
 
 
