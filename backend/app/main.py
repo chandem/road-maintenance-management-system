@@ -56,8 +56,11 @@ app.include_router(road_sections_router, prefix="/api/v1")
 app.include_router(inspections_router, prefix="/api/v1")
 app.include_router(work_orders_router, prefix="/api/v1")
 app.include_router(maintenance_plans_router, prefix="/api/v1")
-app.include_router(machinery_router, prefix="/api/v1")
+
+# Register the static fleet-report route before /machinery/{machinery_id}.
+# Otherwise "fleet-report" is parsed as a UUID path parameter and returns 422.
 app.include_router(machinery_fleet_report_router, prefix="/api/v1")
+app.include_router(machinery_router, prefix="/api/v1")
 app.include_router(machinery_work_orders_router, prefix="/api/v1")
 app.include_router(machinery_schedules_router, prefix="/api/v1")
 app.include_router(machinery_fuel_router, prefix="/api/v1")
