@@ -22,6 +22,7 @@ import RoadSectionsModule from "./RoadSectionsModule";
 import RoadWorkOrdersModule from "./RoadWorkOrdersModule";
 import RoadsModule from "./RoadsModule";
 import RoadAssetDashboard from "./RoadAssetDashboard";
+import RoadAssetRegisterModule from "./RoadAssetRegisterModule";
 import SparePartsModule from "./SparePartsModule";
 import TrainingLicensesModule from "./TrainingLicensesModule";
 
@@ -38,6 +39,7 @@ const CONFIG: Record<string, DepartmentConfig> = {
     endpoint: "/dashboards/maintenance",
     modules: [
       { title: "Road inventory", description: "Road corridors, codes, class, surface and operational status.", status: "live" },
+      { title: "Road asset register", description: "Bridges, culverts, drainage, signs and infrastructure condition.", status: "live" },
       { title: "Sections and chainage", description: "Section breakdowns and condition ratings.", status: "live" },
       { title: "Inspections", description: "Condition surveys, defects and recommended actions.", status: "live" },
       { title: "Maintenance planning", description: "Plans linked to sections and priorities.", status: "live" },
@@ -234,6 +236,7 @@ export default function DepartmentWorkspace({ departmentCode }: { departmentCode
         {departmentCode === "road_asset" && (
           <>
             <RoadsModule />
+            <RoadAssetRegisterModule />
             <RoadSectionsModule />
             <RoadInspectionsModule />
             <MaintenancePlansModule />
