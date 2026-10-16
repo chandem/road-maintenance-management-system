@@ -39,7 +39,7 @@ app.add_middleware(
         "http://localhost:5173",
         "http://localhost:4173",
     ],
-    allow_origin_regex=r"https://[a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)*\.vercel\.app",
+    allow_origin_regex=r"https://[a-zA-Z0-9-]+(?:\\.[a-zA-Z0-9-]+)*\\.vercel\\.app",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -57,16 +57,17 @@ app.include_router(inspections_router, prefix="/api/v1")
 app.include_router(work_orders_router, prefix="/api/v1")
 app.include_router(maintenance_plans_router, prefix="/api/v1")
 
-# Register the static fleet-report route before /machinery/{machinery_id}.
-# Otherwise "fleet-report" is parsed as a UUID path parameter and returns 422.
+# Register static report routes before dynamic UUID routes. Otherwise paths such
+# as "fleet-report" or "workforce-report" may be parsed as UUID parameters and
+# return 422 validation errors instead of reaching their intended handlers.
 app.include_router(machinery_fleet_report_router, prefix="/api/v1")
 app.include_router(machinery_router, prefix="/api/v1")
 app.include_router(machinery_work_orders_router, prefix="/api/v1")
 app.include_router(machinery_schedules_router, prefix="/api/v1")
 app.include_router(machinery_fuel_router, prefix="/api/v1")
 app.include_router(materials_router, prefix="/api/v1")
-app.include_router(employees_router, prefix="/api/v1")
 app.include_router(hr_workforce_report_router, prefix="/api/v1")
+app.include_router(employees_router, prefix="/api/v1")
 app.include_router(leave_requests_router, prefix="/api/v1")
 app.include_router(training_records_router, prefix="/api/v1")
 app.include_router(finance_router, prefix="/api/v1")
