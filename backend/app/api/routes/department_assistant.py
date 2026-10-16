@@ -168,7 +168,7 @@ def department_assistant(
             client,
             organization_id=str(organization_id),
             analysis_type="department_assistant",
-            status="completed" if result else "fallback",
+            status="completed",
             result={
                 "ai_generated": bool(result),
                 "authorized_departments": [
