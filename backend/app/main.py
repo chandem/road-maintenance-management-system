@@ -9,6 +9,7 @@ from app.api.routes.conversations import router as conversations_router
 from app.api.routes.dashboards import router as dashboards_router
 from app.api.routes.documents import router as documents_router
 from app.api.routes.departments import router as departments_router
+from app.api.routes.department_assistant import router as department_assistant_router
 from app.api.routes.employees import router as employees_router
 from app.api.routes.finance import router as finance_router
 from app.api.routes.health import router as health_router
@@ -47,6 +48,7 @@ app.add_middleware(
 
 app.include_router(health_router, prefix="/api/v1")
 app.include_router(ai_router, prefix="/api/v1")
+app.include_router(department_assistant_router, prefix="/api/v1")
 app.include_router(documents_router, prefix="/api/v1")
 app.include_router(departments_router, prefix="/api/v1")
 app.include_router(dashboards_router, prefix="/api/v1")
