@@ -143,8 +143,7 @@ export default function MachineryFuelModule() {
           <p className="eyebrow">MMMS · UTILIZATION</p>
           <h2>Fuel and operating hours</h2>
           <p className="panel-help">
-            Log fuel issues and meter readings. Optional update of equipment <code>current_hours</code>. Requires
-            migration <code>027_machinery_fuel_logs.sql</code> and API redeploy.
+            Log fuel issues and meter readings. Optionally update equipment operating hours.
           </p>
         </div>
         <button type="button" onClick={() => void load()} disabled={loading}>

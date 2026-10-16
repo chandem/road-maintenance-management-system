@@ -163,8 +163,7 @@ export default function SparePartsModule() {
           <p className="eyebrow">MMMS · INVENTORY</p>
           <h2>Spare parts</h2>
           <p className="panel-help">
-            Uses the shared materials inventory filtered to category &quot;spare parts&quot;. Requires migration{" "}
-            <code>026_materials_machinery_department_access.sql</code> so machinery staff can access materials.
+            Uses the shared materials inventory filtered to the “spare parts” category.
           </p>
         </div>
         <button type="button" onClick={() => void load()} disabled={loading}>

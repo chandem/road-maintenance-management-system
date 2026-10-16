@@ -185,8 +185,7 @@ export default function MachinerySchedulesModule() {
           <p className="eyebrow">MMMS · PLANNING</p>
           <h2>Maintenance planning</h2>
           <p className="panel-help">
-            Preventive service intervals by hours and/or calendar days. Requires migration{" "}
-            <code>025_machinery_maintenance_schedules.sql</code> and API redeploy.
+            Preventive service intervals by hours and/or calendar days.
           </p>
         </div>
         <button type="button" onClick={() => void load()} disabled={loading}>

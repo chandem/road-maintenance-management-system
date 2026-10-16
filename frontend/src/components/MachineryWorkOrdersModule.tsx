@@ -210,8 +210,7 @@ export default function MachineryWorkOrdersModule() {
           <p className="eyebrow">MMMS · REPAIRS</p>
           <h2>Breakdowns and work orders</h2>
           <p className="panel-help">
-            Report faults against registered equipment and track repair status. Requires migration{" "}
-            <code>024_machinery_work_orders.sql</code> on the database and API redeploy.
+            Report faults against registered equipment and track repair status.
           </p>
         </div>
         <button type="button" onClick={() => void load()} disabled={loading}>
