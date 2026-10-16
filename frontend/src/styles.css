@@ -735,3 +735,108 @@ input:focus, textarea:focus, select:focus {
     transition: none;
   }
 }
+
+
+/* RAMS-style Road Asset dashboard */
+.rams-dashboard {
+  display: grid;
+  gap: 1.35rem;
+  padding: 0 !important;
+  overflow: hidden;
+  background: #f8faff;
+}
+.rams-dashboard-hero {
+  display: grid;
+  gap: 1.25rem;
+  padding: clamp(1.2rem, 3vw, 2rem);
+  color: #f8fbff;
+  background: linear-gradient(118deg, #10264a 0%, #17467a 57%, #1d6590 100%);
+  border-radius: 18px;
+}
+.rams-hero-copy .eyebrow { color: #a8d8ff; font-weight: 750; letter-spacing: .12em; }
+.rams-hero-copy h2 {
+  color: #fff;
+  margin: .45rem 0 .6rem;
+  font-size: clamp(1.65rem, 3vw, 2.45rem);
+  line-height: 1.12;
+  letter-spacing: -.045em;
+}
+.rams-hero-copy > p:not(.eyebrow) { color: #d5e6f7; max-width: 72ch; margin: 0; }
+.rams-hero-actions { display: flex; flex-wrap: wrap; gap: .7rem; margin-top: 1.25rem; }
+.rams-primary-link, .rams-secondary-link {
+  display: inline-flex; align-items: center; justify-content: center; gap: .55rem;
+  min-height: 42px; padding: .65rem .95rem; border-radius: 10px; text-decoration: none; font-weight: 700;
+}
+.rams-primary-link { background: #fff; color: #12345a; }
+.rams-primary-link:hover { background: #eaf4ff; }
+.rams-secondary-link { color: #fff; border: 1px solid rgba(255,255,255,.32); background: rgba(255,255,255,.08); }
+.rams-secondary-link:hover { background: rgba(255,255,255,.16); }
+.rams-hero-status {
+  display: grid; grid-template-columns: auto minmax(0,1fr) auto; align-items: center; gap: .75rem;
+  padding: .9rem 1rem; border: 1px solid rgba(255,255,255,.2); border-radius: 13px;
+  background: rgba(7,23,45,.24);
+}
+.rams-status-dot { width: 10px; height: 10px; border-radius: 50%; background: #5ee0a0; box-shadow: 0 0 0 4px rgba(94,224,160,.13); }
+.rams-hero-status strong, .rams-hero-status span { display: block; }
+.rams-hero-status strong { color: #fff; font-size: .9rem; }
+.rams-hero-status div span { color: #d2e3f5; font-size: .8rem; margin-top: .12rem; }
+.rams-hero-status button { background: #fff; color: #12345a; white-space: nowrap; }
+.rams-overview-heading { padding: 0 clamp(1rem, 2vw, 1.5rem); }
+.rams-overview-heading .eyebrow { margin-bottom: .25rem; color: #2563eb; }
+.rams-overview-heading h3 { margin: 0; font-size: 1.25rem; font-weight: 780; }
+.rams-overview-heading p:not(.eyebrow) { margin: .25rem 0 0; color: #64748b; font-size: .9rem; }
+.rams-metric-grid { padding: 0 clamp(1rem, 2vw, 1.5rem); }
+.rams-metric-card { position: relative; overflow: hidden; min-height: 126px; border-top: 3px solid #2563eb; }
+.rams-metric-1 { border-top-color: #0d9488; }
+.rams-metric-2 { border-top-color: #d97706; }
+.rams-metric-3 { border-top-color: #7c3aed; }
+.rams-metric-foot { display: block; margin-top: .55rem; color: #94a3b8; font-size: .72rem; }
+.rams-shortcuts-heading { margin-top: .35rem; }
+.rams-shortcut-grid {
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .85rem;
+  padding: 0 clamp(1rem, 2vw, 1.5rem);
+}
+.rams-shortcut-card {
+  display: flex; flex-direction: column; align-items: flex-start; min-width: 0; min-height: 188px;
+  padding: 1rem; border: 1px solid #e1e8f2; border-radius: 15px; background: #fff;
+  color: #17243b; text-decoration: none; box-shadow: 0 3px 12px rgba(15,23,42,.025);
+  transition: transform .16s ease, box-shadow .16s ease, border-color .16s ease;
+}
+.rams-shortcut-card:hover, .rams-shortcut-card:focus-visible {
+  border-color: #b7cff5; box-shadow: 0 10px 25px rgba(30,64,175,.09); transform: translateY(-2px); outline: none;
+}
+.rams-shortcut-icon {
+  display: grid; place-items: center; width: 38px; height: 38px; border-radius: 11px;
+  background: #edf5ff; color: #1d4ed8; font-size: 1.25rem; font-weight: 800;
+}
+.rams-shortcut-tag { margin-top: .8rem; color: #64748b; font-size: .65rem; font-weight: 800; letter-spacing: .1em; }
+.rams-shortcut-card > strong { margin-top: .25rem; font-size: 1rem; font-weight: 760; }
+.rams-shortcut-description { margin-top: .35rem; color: #64748b; font-size: .82rem; line-height: 1.5; }
+.rams-shortcut-open { display: flex; justify-content: space-between; width: 100%; margin-top: auto; padding-top: .8rem; color: #1d4ed8; font-size: .8rem; font-weight: 750; }
+.rams-advisory-note {
+  display: flex; align-items: flex-start; gap: .75rem; margin: 0 clamp(1rem, 2vw, 1.5rem) 1.25rem;
+  padding: .9rem 1rem; border: 1px solid #dbeafe; border-radius: 12px; background: #eff6ff;
+}
+.rams-advisory-mark { display: grid; place-items: center; flex: 0 0 22px; height: 22px; border-radius: 50%; background: #dbeafe; color: #1d4ed8; font-weight: 800; }
+.rams-advisory-note p { margin: 0; color: #475569; font-size: .82rem; }
+.rams-advisory-note strong { color: #1e3a8a; }
+@media (min-width: 1000px) {
+  .rams-dashboard-hero { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 900px) {
+  .rams-shortcut-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 600px) {
+  .rams-dashboard { gap: 1rem; }
+  .rams-dashboard-hero { padding: 1rem; border-radius: 14px; }
+  .rams-hero-status { grid-template-columns: auto minmax(0,1fr); }
+  .rams-hero-status button { grid-column: 1 / -1; width: 100%; }
+  .rams-hero-actions > a { flex: 1 1 100%; }
+  .rams-shortcut-grid { grid-template-columns: minmax(0,1fr); gap: .65rem; }
+  .rams-shortcut-card { min-height: 160px; }
+  .rams-metric-grid { grid-template-columns: repeat(2, minmax(0,1fr)); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rams-shortcut-card { transition: none; }
+  .rams-shortcut-card:hover { transform: none; }
+}
