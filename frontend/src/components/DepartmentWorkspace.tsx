@@ -21,6 +21,7 @@ import RoadInspectionsModule from "./RoadInspectionsModule";
 import RoadSectionsModule from "./RoadSectionsModule";
 import RoadWorkOrdersModule from "./RoadWorkOrdersModule";
 import RoadsModule from "./RoadsModule";
+import RoadAssetDashboard from "./RoadAssetDashboard";
 import SparePartsModule from "./SparePartsModule";
 import TrainingLicensesModule from "./TrainingLicensesModule";
 
@@ -185,6 +186,14 @@ export default function DepartmentWorkspace({ departmentCode }: { departmentCode
         </nav>
       </aside>
       <div className="department-main">
+        {departmentCode === "road_asset" ? (
+          <RoadAssetDashboard
+            metrics={metrics}
+            loading={loading}
+            error={error}
+            onRefresh={() => window.location.reload()}
+          />
+        ) : (
         <section id="department-overview" className="dashboard-panel">
           <p className="eyebrow">DEPARTMENT OVERVIEW</p>
           <h2>{config.name}</h2>
@@ -220,6 +229,7 @@ export default function DepartmentWorkspace({ departmentCode }: { departmentCode
             </p>
           )}
         </section>
+        )}
 
         {departmentCode === "road_asset" && (
           <>
