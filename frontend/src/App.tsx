@@ -364,7 +364,7 @@ function App() {
     setAssistantAnswer(null);
     try {
       const token = await authToken();
-      const response = await fetch(`${API_BASE_URL}/ai/office-assistant`, {
+      const response = await fetch(`${API_BASE_URL}/ai/department-assistant`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -373,12 +373,12 @@ function App() {
         body: JSON.stringify({ question: assistantQuestion.trim() }),
       });
       if (!response.ok) {
-        throw new Error(`Office assistant request failed (${response.status})`);
+        throw new Error(`Department AI assistant request failed (${response.status})`);
       }
       setAssistantAnswer((await response.json()) as AssistantResponse);
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "Unable to reach office assistant.",
+        err instanceof Error ? err.message : "Unable to reach the department AI assistant.",
       );
     } finally {
       setAssistantLoading(false);
@@ -837,8 +837,7 @@ function App() {
                 <p className="eyebrow">AI OFFICE ASSISTANT</p>
                 <h2>Ask about your maintenance office</h2>
                 <p>
-                  Questions can span roads, machinery, budgets, staff, and
-                  documents. Answers stay advisory and evidence-based.
+                  The assistant uses only departments and documents your account is authorized to access. Answers are evidence-based and advisory.
                 </p>
               </div>
               <div className="assistant-chat">
@@ -846,7 +845,7 @@ function App() {
                   <textarea
                     value={assistantQuestion}
                     onChange={(e) => setAssistantQuestion(e.target.value)}
-                    placeholder="Which road should we prioritize, and do we have machinery and budget?"
+                    placeholder="Ask about your department data, risks, priorities, or recommended next actions…"
                     rows={4}
                     maxLength={2000}
                     required
