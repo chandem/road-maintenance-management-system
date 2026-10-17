@@ -4,6 +4,7 @@ import type { User } from "@supabase/supabase-js";
 import { supabase } from "./lib/supabase";
 import MaterialsModule from "./components/MaterialsModule";
 import RoadInspectionsModule from "./components/RoadInspectionsModule";
+import RoadAssetRegisterModule from "./components/RoadAssetRegisterModule";
 import DepartmentWorkspace from "./components/DepartmentWorkspace";
 
 type Priority = "Critical" | "High" | "Medium" | "Low";
@@ -521,6 +522,7 @@ function App() {
             <a href="#road-ranking">Road ranking</a>
             <a href="#materials">Materials</a>
             <a href="#inspections">Road inspections</a>
+            <a href="#module-road-asset-register">Road Asset Register</a>
             <a href="#documents">Documents</a>
             <a href="#office-assistant">AI assistant</a>
           </nav>
@@ -700,6 +702,7 @@ function App() {
 
             <MaterialsModule />
             <RoadInspectionsModule />
+            <RoadAssetRegisterModule />
 
             <section id="documents" className="documents-panel">
               <div className="section-heading">
