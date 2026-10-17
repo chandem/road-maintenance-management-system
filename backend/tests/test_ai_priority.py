@@ -35,3 +35,35 @@ def test_calculate_priority_without_condition_data():
     assert level == "low"
     assert confidence == Decimal("0.70")
     assert any("neutral score" in item for item in reasons)
+
+
+
+def test_recent_inspection_critical_hazard_raises_priority():
+    data = {
+        "condition_rating": 4,
+        "status": "active",
+        "inspection_surface_condition": "fair",
+        "inspection_defects_summary": "Road washout near the culvert",
+    }
+
+    score, level, confidence, reasons, evidence = calculate_priority(data, [])
+
+    assert score >= Decimal("85.00")
+    assert level == "critical"
+    assert any("critical road hazard" in reason for reason in reasons)
+    assert any("critical defect keyword" in item for item in evidence)
+
+
+def test_recent_inspection_poor_surface_raises_priority():
+    data = {
+        "condition_rating": 4,
+        "status": "active",
+        "inspection_surface_condition": "poor",
+        "inspection_defects_summary": None,
+    }
+
+    score, level, confidence, reasons, evidence = calculate_priority(data, [])
+
+    assert score >= Decimal("60.00")
+    assert level == "high"
+    assert any("poor surface condition" in reason for reason in reasons)

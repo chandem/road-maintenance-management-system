@@ -127,6 +127,40 @@ def calculate_priority(
         )
         score = clamp(raw_score / Decimal("0.85"))
 
+    # Recent field observations add deterministic risk signals. The language model
+    # explains these results but never changes the numeric score.
+    inspection_text = " ".join(
+        str(data.get(key) or "")
+        for key in ("inspection_surface_condition", "inspection_defects_summary")
+    ).lower()
+    critical_defects = (
+        "washout", "road blocked", "bridge failure", "collapse",
+        "landslide", "road collapsed", "major flood"
+    )
+    high_risk_defects = (
+        "pothole", "erosion", "blocked drainage", "drainage blocked",
+        "cracking", "rutting", "shoulder failure", "flooding",
+        "scouring", "deep rut"
+    )
+    if any(term in inspection_text for term in critical_defects):
+        score = max(score, Decimal("85.00"))
+        reasons.append("Latest inspection records a potentially critical road hazard.")
+        evidence.append("Inspection hazard signal: critical defect keyword recorded.")
+    elif any(term in inspection_text for term in high_risk_defects):
+        score = max(score, Decimal("65.00"))
+        reasons.append("Latest inspection records a defect requiring prompt review.")
+        evidence.append("Inspection hazard signal: significant defect keyword recorded.")
+
+    surface_condition = str(data.get("inspection_surface_condition") or "").lower()
+    if surface_condition in {"failed", "very poor"}:
+        score = max(score, Decimal("80.00"))
+        reasons.append(f"Latest inspection surface condition is {surface_condition}.")
+        evidence.append(f"Latest inspection surface condition: {surface_condition}.")
+    elif surface_condition == "poor":
+        score = max(score, Decimal("60.00"))
+        reasons.append("Latest inspection records poor surface condition.")
+        evidence.append("Latest inspection surface condition: poor.")
+
     level = (
         "critical"
         if score >= 80

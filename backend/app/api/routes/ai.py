@@ -208,7 +208,24 @@ def analyze_road_priority(
     if not section.data:
         raise HTTPException(status_code=404, detail="Road section not found")
 
-    data = section.data
+    data = dict(section.data)
+    latest_inspection = (
+        supabase.table("road_inspections")
+        .select("inspection_date,surface_condition,defects_summary,condition_rating")
+        .eq("road_section_id", str(request.road_section_id))
+        .order("inspection_date", desc=True)
+        .limit(1)
+        .execute()
+        .data
+        or []
+    )
+    if latest_inspection:
+        inspection = latest_inspection[0]
+        data["inspection_surface_condition"] = inspection.get("surface_condition")
+        data["inspection_defects_summary"] = inspection.get("defects_summary")
+        if inspection.get("condition_rating") is not None:
+            data["condition_rating"] = inspection["condition_rating"]
+
     work_orders = (
         supabase.table("work_orders")
         .select("id,work_order_no,title,priority,status,planned_cost,actual_cost")
@@ -351,6 +368,22 @@ def rank_road_sections(
         )
 
     section_ids = [str(section["id"]) for section in sections]
+    inspections = (
+        supabase.table("road_inspections")
+        .select("id,road_section_id,inspection_date,surface_condition,defects_summary,condition_rating")
+        .in_("road_section_id", section_ids)
+        .order("inspection_date", desc=True)
+        .limit(10000)
+        .execute()
+        .data
+        or []
+    )
+    latest_inspection_by_section: dict[str, dict] = {}
+    for inspection in inspections:
+        section_id = str(inspection.get("road_section_id") or "")
+        if section_id and section_id not in latest_inspection_by_section:
+            latest_inspection_by_section[section_id] = inspection
+
     work_orders = (
         supabase.table("work_orders")
         .select("id,road_section_id,priority,status")
@@ -391,7 +424,14 @@ def rank_road_sections(
     rows = []
 
     for section in sections:
-        orders = orders_by_section.get(str(section["id"]), [])
+        section_id = str(section["id"])
+        inspection = latest_inspection_by_section.get(section_id)
+        if inspection:
+            section["inspection_surface_condition"] = inspection.get("surface_condition")
+            section["inspection_defects_summary"] = inspection.get("defects_summary")
+            if inspection.get("condition_rating") is not None:
+                section["condition_rating"] = inspection["condition_rating"]
+        orders = orders_by_section.get(section_id, [])
         priority = score_road_section(section, orders, related_plans=plans)
         road = roads_by_id.get(str(section.get("road_id") or ""), {})
 
