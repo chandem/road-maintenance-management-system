@@ -527,6 +527,7 @@ function App() {
             <a href="#materials">Materials</a>
             <a href="#inspections">Road inspections</a>
             <a href="#module-road-asset-register">Road Asset Register</a>
+            <a href="#module-maintenance-planning">Maintenance planning</a>
             <a href="#documents">Documents</a>
             <a href="#office-assistant">AI assistant</a>
           </nav>
