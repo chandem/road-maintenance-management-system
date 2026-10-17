@@ -527,7 +527,14 @@ function App() {
             <a href="#materials">Materials</a>
             <a href="#inspections">Road inspections</a>
             <a href="#module-road-asset-register">Road Asset Register</a>
-            <a href="#module-maintenance-planning">Maintenance planning</a>
+            <a href="#module-maintenance-planning" onClick={(event) => {
+              event.preventDefault();
+              const target = document.getElementById("module-maintenance-planning");
+              if (target) {
+                window.history.replaceState(null, "", "#module-maintenance-planning");
+                target.scrollIntoView({ behavior: "smooth", block: "start" });
+              }
+            }}>Maintenance planning</a>
             <a href="#documents">Documents</a>
             <a href="#office-assistant">AI assistant</a>
           </nav>
