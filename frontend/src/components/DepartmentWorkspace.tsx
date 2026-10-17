@@ -177,14 +177,35 @@ export default function DepartmentWorkspace({ departmentCode }: { departmentCode
         <p className="eyebrow">AI-RMMS WORKSPACE</p>
         <h2>{config.name}</h2>
         <p className="panel-help">Department modules</p>
-        <nav aria-label={config.name + " navigation"}>
-          <a href="#department-overview">Overview</a>
-          {config.modules.map((m) => (
-            <a key={m.title} href={"#module-" + m.title.toLowerCase().replaceAll(" ", "-")}>
-              {m.title}
-            </a>
-          ))}
-          <a href="#department-reports">Reports and analytics</a>
+        <nav aria-label={config.name + " navigation"} className={departmentCode === "road_asset" ? "department-nav department-nav-road-asset" : "department-nav"}>
+          <a className="department-nav-overview" href="#department-overview">
+            <span aria-hidden="true">⌂</span><span>Overview</span>
+          </a>
+          {config.modules.map((m) => {
+            const slug = m.title.toLowerCase().replaceAll(" ", "-");
+            const roadAssetTargets: Record<string, string> = {
+              "road-inventory": "#module-road-inventory",
+              "road-asset-register": "#module-road-asset-register",
+              "sections-and-chainage": "#module-sections-and-chainage",
+              inspections: "#inspections",
+              "maintenance-planning": "#module-maintenance-planning",
+              "work-orders": "#module-work-orders",
+              "ai-priority-support": "#module-ai-priority-support",
+            };
+            const href = departmentCode === "road_asset"
+              ? roadAssetTargets[slug] ?? ("#module-" + slug)
+              : "#module-" + slug;
+            const icon = departmentCode === "road_asset"
+              ? ({ "road-inventory": "▤", "road-asset-register": "◈", "sections-and-chainage": "⇄", inspections: "✓", "maintenance-planning": "▦", "work-orders": "⚙", "ai-priority-support": "✦" } as Record<string, string>)[slug]
+              : undefined;
+            return (
+              <a key={m.title} href={href}>
+                {icon && <span className="department-nav-icon" aria-hidden="true">{icon}</span>}
+                <span>{m.title}</span>
+              </a>
+            );
+          })}
+          <a href="#department-reports"><span aria-hidden="true">▥</span><span>Reports and analytics</span></a>
         </nav>
       </aside>
       <div className="department-main">
