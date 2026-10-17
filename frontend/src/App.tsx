@@ -5,6 +5,8 @@ import { supabase } from "./lib/supabase";
 import MaterialsModule from "./components/MaterialsModule";
 import RoadInspectionsModule from "./components/RoadInspectionsModule";
 import RoadAssetRegisterModule from "./components/RoadAssetRegisterModule";
+import RoadsModule from "./components/RoadsModule";
+import RoadSectionsModule from "./components/RoadSectionsModule";
 import DepartmentWorkspace from "./components/DepartmentWorkspace";
 
 type Priority = "Critical" | "High" | "Medium" | "Low";
@@ -520,6 +522,8 @@ function App() {
           <nav className="module-nav" aria-label="AI-RMMS modules">
             <a href="#dashboard">Dashboard</a>
             <a href="#road-ranking">Road ranking</a>
+            <a href="#module-road-inventory">Road inventory</a>
+            <a href="#module-sections-and-chainage">Road sections</a>
             <a href="#materials">Materials</a>
             <a href="#inspections">Road inspections</a>
             <a href="#module-road-asset-register">Road Asset Register</a>
@@ -700,6 +704,8 @@ function App() {
               )}
             </section>
 
+            <RoadsModule />
+            <RoadSectionsModule />
             <MaterialsModule />
             <RoadInspectionsModule />
             <RoadAssetRegisterModule />
