@@ -25,7 +25,7 @@ def _org_id(current_user) -> str:
 def list_road_sections(
     current_user=Depends(require_department_access("road_asset", ['department_manager', 'officer', 'read_only'])),
     road_id: str | None = Query(default=None),
-    limit: int = Query(default=100, ge=1, le=200),
+    limit: int = Query(default=100, ge=1, le=2000),
 ):
     query = (
         current_user["client"]
