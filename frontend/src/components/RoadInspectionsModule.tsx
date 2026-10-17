@@ -30,7 +30,7 @@ export default function RoadInspectionsModule() {
       const headers = { Authorization: `Bearer ${token}` };
       const [inspectionResponse, sectionResponse] = await Promise.all([
         fetch(`${API}/inspections?limit=100`, { headers }),
-        fetch(`${API}/road-sections?limit=200`, { headers }),
+        fetch(`${API}/road-sections?limit=2000`, { headers }),
       ]);
       if (!inspectionResponse.ok) throw new Error(`Inspections load failed (${inspectionResponse.status}): ${(await inspectionResponse.text()).slice(0,180)}`);
       if (!sectionResponse.ok) throw new Error(`Road sections load failed (${sectionResponse.status}): ${(await sectionResponse.text()).slice(0,180)}`);
