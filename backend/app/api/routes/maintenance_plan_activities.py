@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
@@ -122,7 +123,7 @@ def update_plan_activity(
         )
         if not section.data:
             raise HTTPException(status_code=404, detail="Road section not found in this organization.")
-    updates["updated_at"] = "now()"
+    updates["updated_at"] = datetime.now(timezone.utc).isoformat()
     response = (
         client.table("maintenance_plan_activities").update(updates)
         .eq("id", str(activity_id)).eq("organization_id", organization_id).execute()
