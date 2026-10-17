@@ -1008,3 +1008,60 @@ button:focus-visible, a:focus-visible {
   .rams-metric-card .metric-value { font-size: 1.25rem; }
   .rams-hero-actions { gap: .5rem; }
 }
+
+/* Road Asset navigation: persistent, clearly grouped module list */
+.department-sidebar .department-nav-road-asset {
+  display: grid;
+  gap: .35rem;
+  margin-top: 1rem;
+}
+.department-sidebar .department-nav-road-asset a {
+  display: flex;
+  align-items: center;
+  gap: .7rem;
+  min-height: 44px;
+  padding: .68rem .75rem;
+  border: 1px solid transparent;
+  border-radius: 11px;
+  color: #41516a;
+  font-size: .9rem;
+  font-weight: 620;
+  text-decoration: none;
+}
+.department-sidebar .department-nav-road-asset a > span:first-child {
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 28px;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: #f0f5fc;
+  color: #365b9d;
+  font-size: 1rem;
+}
+.department-sidebar .department-nav-road-asset a .department-nav-icon {
+  background: #edf4ff;
+  color: #2457c5;
+}
+.department-sidebar .department-nav-road-asset a:hover,
+.department-sidebar .department-nav-road-asset a:focus-visible {
+  border-color: #d6e5ff;
+  background: #edf4ff;
+  color: #1d4ed8;
+}
+.department-sidebar .department-nav-road-asset .department-nav-overview {
+  margin-bottom: .25rem;
+  border-color: #dbe7f8;
+  background: linear-gradient(110deg, #f0f6ff, #ffffff);
+  color: #1e40af;
+  font-weight: 750;
+}
+@media (min-width: 901px) {
+  .department-sidebar {
+    position: sticky;
+    align-self: start;
+    max-height: calc(100vh - 2rem);
+    overflow-y: auto;
+    scrollbar-width: thin;
+  }
+}
