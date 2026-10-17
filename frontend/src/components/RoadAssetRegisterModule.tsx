@@ -44,7 +44,7 @@ export default function RoadAssetRegisterModule() {
       const [assetRes, roadRes, sectionRes] = await Promise.all([
         fetch(`${API}/road-assets?limit=200`, { headers }),
         fetch(`${API}/roads?limit=200`, { headers }),
-        fetch(`${API}/road-sections?limit=200`, { headers }),
+        fetch(`${API}/road-sections?limit=2000`, { headers }),
       ]);
       if (!assetRes.ok) throw new Error(assetRes.status === 403 ? "You are not authorized for road assets." : `Road assets failed (${assetRes.status}).`);
       if (!roadRes.ok) throw new Error(`Road list failed (${roadRes.status}).`);
