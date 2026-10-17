@@ -4,6 +4,20 @@ import { supabase } from "../lib/supabase";
 
 type Section = { id: string; section_code: string | null; start_chainage_km: number; end_chainage_km: number; condition_rating: number | null };
 type Inspection = { id: string; road_section_id: string; inspection_date: string; inspector_name: string | null; condition_rating: number | null; surface_condition: string | null; defects_summary: string | null; recommended_action: string | null; status: string };
+type PriorityRecommendation = {
+  road_section_id: string;
+  section_code: string | null;
+  road_code: string | null;
+  road_name: string | null;
+  priority_score: number;
+  priority_level: string;
+  reasons: string[];
+  evidence: string[];
+  document_evidence: string[];
+  confidence: number;
+  explanation: string;
+  recommended_action: string;
+};
 const API = import.meta.env.VITE_API_BASE_URL_RMMS ?? "https://ai-rmms-backend.onrender.com/api/v1";
 
 export default function RoadInspectionsModule() {
@@ -20,6 +34,9 @@ export default function RoadInspectionsModule() {
   const [defects, setDefects] = useState("");
   const [action, setAction] = useState("");
   const [status, setStatus] = useState("recorded");
+  const [priorityLoading, setPriorityLoading] = useState(false);
+  const [priorityError, setPriorityError] = useState("");
+  const [recommendation, setRecommendation] = useState<PriorityRecommendation | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true); setError("");
@@ -64,6 +81,32 @@ export default function RoadInspectionsModule() {
     finally { setSaving(false); }
   };
 
+  const analyzePriority = async () => {
+    if (!sectionId) return;
+    setPriorityLoading(true);
+    setPriorityError("");
+    setRecommendation(null);
+    try {
+      const { data } = await supabase.auth.getSession();
+      const token = data.session?.access_token;
+      if (!token) throw new Error("Please sign in to run AI road prioritization.");
+      const response = await fetch(`${API}/ai/road-priority`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ road_section_id: sectionId, include_document_evidence: true }),
+      });
+      if (!response.ok) {
+        const detail = await response.text();
+        throw new Error(`AI prioritization failed (${response.status}): ${detail.slice(0, 220)}`);
+      }
+      setRecommendation(await response.json() as PriorityRecommendation);
+    } catch (e) {
+      setPriorityError(e instanceof Error ? e.message : "Unable to analyze this road section.");
+    } finally {
+      setPriorityLoading(false);
+    }
+  };
+
   const sectionLabel = (id: string) => {
     const s = sections.find(row=>row.id===id);
     return s ? `${s.section_code || s.id.slice(0,8)} (${Number(s.start_chainage_km).toFixed(2)}–${Number(s.end_chainage_km).toFixed(2)} km)` : id.slice(0,8);
@@ -86,6 +129,32 @@ export default function RoadInspectionsModule() {
       </div>
       <button type="submit" disabled={saving || !sectionId}>{saving ? "Saving…" : "Save inspection"}</button>
     </form>
+    <section className="module-form" aria-labelledby="ai-road-priority-heading">
+      <div className="section-heading">
+        <div><p className="eyebrow">AI ROAD INTELLIGENCE</p><h3 id="ai-road-priority-heading">Maintenance priority assessment</h3></div>
+        <button type="button" onClick={() => void analyzePriority()} disabled={priorityLoading || !sectionId}>
+          {priorityLoading ? "Analyzing…" : "Analyze selected section"}
+        </button>
+      </div>
+      <p className="panel-help">Uses recorded section condition, work-order signals, and—when available—verified road-department document evidence. Scores are rule-based; AI explanations are advisory.</p>
+      {priorityError && <div className="error-message" role="alert">{priorityError}</div>}
+      {recommendation && (
+        <div className="assistant-answer">
+          <div className="metric-grid">
+            <div className="metric-card"><span className="metric-label">Priority score</span><strong className="metric-value">{Math.round(Number(recommendation.priority_score))}/100</strong></div>
+            <div className="metric-card"><span className="metric-label">Priority level</span><strong className="metric-value">{recommendation.priority_level}</strong></div>
+            <div className="metric-card"><span className="metric-label">Confidence</span><strong className="metric-value">{Math.round(Number(recommendation.confidence) * 100)}%</strong></div>
+          </div>
+          <p><strong>{recommendation.road_name || "Road"}{recommendation.road_code ? ` (${recommendation.road_code})` : ""}</strong> · Section {recommendation.section_code || recommendation.road_section_id.slice(0, 8)}</p>
+          <p><strong>AI explanation</strong><br />{recommendation.explanation}</p>
+          <p><strong>Suggested next action</strong><br />{recommendation.recommended_action}</p>
+          {recommendation.reasons.length > 0 && <div className="evidence-list"><strong>Priority factors</strong>{recommendation.reasons.map((item, index) => <span key={`reason-${index}`}>• {item}</span>)}</div>}
+          {recommendation.evidence.length > 0 && <div className="evidence-list"><strong>Recorded evidence</strong>{recommendation.evidence.map((item, index) => <span key={`evidence-${index}`}>• {item}</span>)}</div>}
+          {recommendation.document_evidence.length > 0 && <div className="evidence-list"><strong>Related document evidence</strong>{recommendation.document_evidence.map((item, index) => <span key={`document-${index}`}>• {item}</span>)}</div>}
+          <p className="panel-help">Decision support only: verify findings on site. This recommendation does not approve spending, contracts, or work execution.</p>
+        </div>
+      )}
+    </section>
     <h3>Inspection history</h3>
     <div className="table module-table"><div className="table-row table-head"><span>Date / Section</span><span>Inspector</span><span>Rating</span><span>Surface</span><span>Status</span></div>
       {loading && <div className="empty-state">Loading inspections…</div>}
