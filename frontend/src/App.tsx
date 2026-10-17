@@ -7,6 +7,7 @@ import RoadInspectionsModule from "./components/RoadInspectionsModule";
 import RoadAssetRegisterModule from "./components/RoadAssetRegisterModule";
 import RoadsModule from "./components/RoadsModule";
 import RoadSectionsModule from "./components/RoadSectionsModule";
+import MaintenancePlansModule from "./components/MaintenancePlansModule";
 import DepartmentWorkspace from "./components/DepartmentWorkspace";
 
 type Priority = "Critical" | "High" | "Medium" | "Low";
@@ -717,6 +718,7 @@ function App() {
             <MaterialsModule />
             <RoadInspectionsModule />
             <RoadAssetRegisterModule />
+            <MaintenancePlansModule />
 
             <section id="documents" className="documents-panel">
               <div className="section-heading">
