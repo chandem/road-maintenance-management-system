@@ -48,8 +48,8 @@ export default function RoadSectionsModule() {
       if (!token) throw new Error("Please sign in to access road sections.");
       const headers = { Authorization: `Bearer ${token}` };
       const sectionsUrl = filterRoad
-        ? `${API}/road-sections?limit=200&road_id=${encodeURIComponent(filterRoad)}`
-        : `${API}/road-sections?limit=200`;
+        ? `${API}/road-sections?limit=2000&road_id=${encodeURIComponent(filterRoad)}`
+        : `${API}/road-sections?limit=2000`;
       const [secRes, roadRes] = await Promise.all([
         fetch(sectionsUrl, { headers }),
         fetch(`${API}/roads?limit=200`, { headers }),
