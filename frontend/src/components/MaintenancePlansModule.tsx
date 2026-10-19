@@ -61,15 +61,30 @@ function optimizeBudgetPlan(
   criticalIds: string[],
   budget: number,
 ): BudgetPlanResult {
-  const candidates = recommendations.slice(0, 20).filter((item) => {
+  const criticalSet = new Set(criticalIds);
+  const queue = recommendations.slice(0, 20);
+  const missingCriticalCosts = queue.filter((item) =>
+    criticalSet.has(item.road_section_id) &&
+    (!Number.isFinite(Number(costInputs[item.road_section_id])) || Number(costInputs[item.road_section_id]) <= 0)
+  );
+  const candidates = queue.filter((item) => {
     const cost = Number(costInputs[item.road_section_id]);
     return Number.isFinite(cost) && cost > 0;
   });
-  const criticalSet = new Set(criticalIds);
   const costOf = (item: PlanningRecommendation) => Number(costInputs[item.road_section_id]);
   const mandatory = candidates.filter((item) => criticalSet.has(item.road_section_id));
   const optional = candidates.filter((item) => !criticalSet.has(item.road_section_id));
   const mandatoryCost = mandatory.reduce((sum, item) => sum + costOf(item), 0);
+  if (missingCriticalCosts.length > 0) {
+    return {
+      selected: [...mandatory, ...missingCriticalCosts],
+      deferred: recommendations.filter((item) => !criticalSet.has(item.road_section_id)),
+      totalCost: mandatoryCost,
+      totalPriority: [...mandatory, ...missingCriticalCosts].reduce((sum, item) => sum + item.priority_score, 0),
+      feasible: false,
+      message: "At least one safety-critical section has no valid cost estimate. Enter a reviewed estimate before calculating a feasible budget scenario; the displayed cost excludes missing estimates.",
+    };
+  }
   if (mandatoryCost > budget) {
     return {
       selected: mandatory,
@@ -368,7 +383,7 @@ export default function MaintenancePlansModule() {
             {budgetPlan.selected.map((item) => (
               <div className="table-row" key={item.road_section_id}>
                 <span><strong>{item.section_code || item.road_section_id.slice(0, 8)}</strong><br />{item.priority_level} · {item.priority_score}/100{ safetyCriticalIds.includes(item.road_section_id) ? " · Safety-critical" : ""}</span>
-                <span>{Number(estimatedCosts[item.road_section_id]).toLocaleString()} birr</span>
+                <span>{Number(estimatedCosts[item.road_section_id]) > 0 ? `${Number(estimatedCosts[item.road_section_id]).toLocaleString()} birr` : "Cost estimate missing"}</span>
                 <span>{item.recommended_action || "Engineering review required"}</span>
               </div>
             ))}
