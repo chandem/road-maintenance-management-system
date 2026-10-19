@@ -16,6 +16,24 @@ type Road = {
 
 const API = import.meta.env.VITE_API_BASE_URL_RMMS ?? "https://ai-rmms-backend.onrender.com/api/v1";
 
+async function fetchWithAuthRefresh(
+  url: string,
+  init: RequestInit,
+): Promise<Response> {
+  const response = await fetch(url, init);
+  if (response.status !== 401) return response;
+
+  // A request can race with Supabase token rotation. Refresh once, then retry
+  // with the new access token instead of leaving the road inventory blank.
+  const { data, error } = await supabase.auth.refreshSession();
+  const token = data.session?.access_token;
+  if (error || !token) return response;
+
+  const headers = new Headers(init.headers);
+  headers.set("Authorization", `Bearer ${token}`);
+  return fetch(url, { ...init, headers });
+}
+
 export default function RoadsModule() {
   const [items, setItems] = useState<Road[]>([]);
   const [loading, setLoading] = useState(false);
@@ -50,7 +68,7 @@ export default function RoadsModule() {
       const { data } = await supabase.auth.getSession();
       const token = data.session?.access_token;
       if (!token) throw new Error("Please sign in to access the road inventory.");
-      const response = await fetch(`${API}/roads?limit=100`, {
+      const response = await fetchWithAuthRefresh(`${API}/roads?limit=100`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!response.ok) {
