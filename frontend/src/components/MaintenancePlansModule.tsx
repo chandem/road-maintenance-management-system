@@ -45,6 +45,82 @@ function suggestedPlanType(item: PlanningRecommendation): string {
   return "routine";
 }
 
+
+type BudgetPlanResult = {
+  selected: PlanningRecommendation[];
+  deferred: PlanningRecommendation[];
+  totalCost: number;
+  totalPriority: number;
+  feasible: boolean;
+  message: string;
+};
+
+function optimizeBudgetPlan(
+  recommendations: PlanningRecommendation[],
+  costInputs: Record<string, string>,
+  criticalIds: string[],
+  budget: number,
+): BudgetPlanResult {
+  const candidates = recommendations.slice(0, 20).filter((item) => {
+    const cost = Number(costInputs[item.road_section_id]);
+    return Number.isFinite(cost) && cost > 0;
+  });
+  const criticalSet = new Set(criticalIds);
+  const costOf = (item: PlanningRecommendation) => Number(costInputs[item.road_section_id]);
+  const mandatory = candidates.filter((item) => criticalSet.has(item.road_section_id));
+  const optional = candidates.filter((item) => !criticalSet.has(item.road_section_id));
+  const mandatoryCost = mandatory.reduce((sum, item) => sum + costOf(item), 0);
+  if (mandatoryCost > budget) {
+    return {
+      selected: mandatory,
+      deferred: recommendations.filter((item) => !criticalSet.has(item.road_section_id)),
+      totalCost: mandatoryCost,
+      totalPriority: mandatory.reduce((sum, item) => sum + item.priority_score, 0),
+      feasible: false,
+      message: "Safety-critical selections exceed the budget. Do not silently drop them; review the funding gap and escalate for engineering/management decision.",
+    };
+  }
+
+  let bestItems = [...mandatory];
+  let bestCost = mandatoryCost;
+  const mandatoryScore = mandatory.reduce((sum, item) => sum + item.priority_score, 0);
+  let bestScore = mandatoryScore;
+  const remainingBudget = budget - mandatoryCost;
+  const maxOptional = optional.slice(0, 20 - mandatory.length);
+
+  // Exact subset search for the current, capped queue (at most 20 sections).
+  // Priority score is a transparent proxy objective, not a learned benefit estimate.
+  const visit = (index: number, chosen: PlanningRecommendation[], cost: number, score: number) => {
+    const combinedScore = mandatoryScore + score;
+    const combinedCost = mandatoryCost + cost;
+    if (combinedScore > bestScore || (combinedScore === bestScore && combinedCost < bestCost)) {
+      bestItems = [...mandatory, ...chosen];
+      bestCost = combinedCost;
+      bestScore = combinedScore;
+    }
+    if (index >= maxOptional.length) return;
+    const item = maxOptional[index];
+    const itemCost = costOf(item);
+    if (cost + itemCost <= remainingBudget) {
+      chosen.push(item);
+      visit(index + 1, chosen, cost + itemCost, score + item.priority_score);
+      chosen.pop();
+    }
+    visit(index + 1, chosen, cost, score);
+  };
+  visit(0, [], 0, 0);
+
+  const selectedIds = new Set(bestItems.map((item) => item.road_section_id));
+  return {
+    selected: bestItems.sort((a, b) => a.rank - b.rank),
+    deferred: recommendations.filter((item) => !selectedIds.has(item.road_section_id)),
+    totalCost: bestCost,
+    totalPriority: bestScore,
+    feasible: true,
+    message: "Scenario optimized against entered costs and budget. Priority scores are used as a proxy objective; an engineer must validate scope, benefits, costs, and safety requirements.",
+  };
+}
+
 export default function MaintenancePlansModule() {
   const [items, setItems] = useState<Plan[]>([]);
   const [loading, setLoading] = useState(false);
@@ -54,6 +130,10 @@ export default function MaintenancePlansModule() {
   const [rankingLoading, setRankingLoading] = useState(false);
   const [rankingError, setRankingError] = useState("");
   const [selectedRecommendation, setSelectedRecommendation] = useState<PlanningRecommendation | null>(null);
+  const [annualBudget, setAnnualBudget] = useState("");
+  const [estimatedCosts, setEstimatedCosts] = useState<Record<string, string>>({});
+  const [safetyCriticalIds, setSafetyCriticalIds] = useState<string[]>([]);
+  const [budgetPlan, setBudgetPlan] = useState<BudgetPlanResult | null>(null);
 
   const [name, setName] = useState("");
   const [fiscalYear, setFiscalYear] = useState(String(new Date().getFullYear()));
@@ -232,6 +312,80 @@ export default function MaintenancePlansModule() {
           ))}
         </div>
         {ranking?.methodology && <p className="panel-help" style={{ marginTop: "0.75rem" }}>{ranking.methodology}</p>}
+      </div>
+
+      <div className="dashboard-panel" style={{ marginBottom: "1rem" }}>
+        <div className="section-heading">
+          <div>
+            <p className="eyebrow">ANNUAL PLAN · BUDGET OPTIMIZATION</p>
+            <h3>Build a budget-constrained maintenance scenario</h3>
+            <p className="panel-help">Enter reviewed cost estimates for ranked sections, then mark safety-critical sections for mandatory consideration. Missing costs are excluded from optimization.</p>
+          </div>
+        </div>
+        <div className="form-grid">
+          <label>
+            Available annual budget (birr)
+            <input type="number" min="0" step="0.01" value={annualBudget} onChange={(e) => { setAnnualBudget(e.target.value); setBudgetPlan(null); }} placeholder="e.g. 10000000" />
+          </label>
+        </div>
+        <div className="table module-table" style={{ marginTop: "1rem" }}>
+          <div className="table-row table-head">
+            <span>Road section / priority</span><span>Reviewed estimated cost (birr)</span><span>Safety-critical</span>
+          </div>
+          {(ranking?.rankings ?? []).slice(0, 20).map((item) => (
+            <div className="table-row" key={item.road_section_id}>
+              <span><strong>#{item.rank} · {item.section_code || item.road_section_id.slice(0, 8)}</strong><br />{item.priority_level} · {item.priority_score}/100</span>
+              <span>
+                <input aria-label={`Estimated maintenance cost for ${item.section_code || item.road_section_id}`} type="number" min="0" step="0.01" value={estimatedCosts[item.road_section_id] ?? ""} placeholder="Enter cost" onChange={(e) => { setEstimatedCosts((prev) => ({ ...prev, [item.road_section_id]: e.target.value })); setBudgetPlan(null); }} />
+              </span>
+              <span>
+                <label style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                  <input type="checkbox" checked={safetyCriticalIds.includes(item.road_section_id)} onChange={(e) => { setSafetyCriticalIds((prev) => e.target.checked ? [...prev, item.road_section_id] : prev.filter((id) => id !== item.road_section_id)); setBudgetPlan(null); }} />
+                  Mandatory review
+                </label>
+              </span>
+            </div>
+          ))}
+          {(!ranking || ranking.rankings.length === 0) && <div className="empty-state">Load road priority recommendations before building a budget scenario.</div>}
+        </div>
+        <button type="button" disabled={!ranking?.rankings.length || !annualBudget.trim() || !Number.isFinite(Number(annualBudget)) || Number(annualBudget) <= 0} onClick={() => setBudgetPlan(optimizeBudgetPlan(ranking?.rankings ?? [], estimatedCosts, safetyCriticalIds, Number(annualBudget)))}>
+          Optimize annual scenario
+        </button>
+        {budgetPlan && (
+          <div style={{ marginTop: "1rem" }}>
+            <div className={budgetPlan.feasible ? "success-message" : "error-message"} role={budgetPlan.feasible ? "status" : "alert"}>
+              <strong>{budgetPlan.feasible ? "Scenario ready for engineering review" : "Budget feasibility warning"}</strong>
+              <p>{budgetPlan.message}</p>
+            </div>
+            <div className="metric-grid" style={{ marginTop: "0.75rem" }}>
+              <div className="metric-card"><span className="metric-label">Planned estimated cost</span><strong className="metric-value">{budgetPlan.totalCost.toLocaleString(undefined, { maximumFractionDigits: 2 })} birr</strong></div>
+              <div className="metric-card"><span className="metric-label">Budget remaining / (gap)</span><strong className="metric-value">{(Number(annualBudget) - budgetPlan.totalCost).toLocaleString(undefined, { maximumFractionDigits: 2 })} birr</strong></div>
+              <div className="metric-card"><span className="metric-label">Sections selected</span><strong className="metric-value">{budgetPlan.selected.length}</strong></div>
+              <div className="metric-card"><span className="metric-label">Priority points (proxy)</span><strong className="metric-value">{budgetPlan.totalPriority.toFixed(1)}</strong></div>
+            </div>
+            <h4>Selected for proposed annual plan</h4>
+            {budgetPlan.selected.length === 0 && <p className="empty-state">No sections selected. Enter positive reviewed cost estimates for available sections.</p>}
+            {budgetPlan.selected.map((item) => (
+              <div className="table-row" key={item.road_section_id}>
+                <span><strong>{item.section_code || item.road_section_id.slice(0, 8)}</strong><br />{item.priority_level} · {item.priority_score}/100{ safetyCriticalIds.includes(item.road_section_id) ? " · Safety-critical" : ""}</span>
+                <span>{Number(estimatedCosts[item.road_section_id]).toLocaleString()} birr</span>
+                <span>{item.recommended_action || "Engineering review required"}</span>
+              </div>
+            ))}
+            <h4>Deferred for review / next funding cycle</h4>
+            {budgetPlan.deferred.map((item) => (
+              <div className="table-row" key={item.road_section_id}>
+                <span><strong>{item.section_code || item.road_section_id.slice(0, 8)}</strong><br />{item.priority_level} · {item.priority_score}/100</span>
+                <span>{Number(estimatedCosts[item.road_section_id]) > 0 ? `${Number(estimatedCosts[item.road_section_id]).toLocaleString()} birr` : "Cost estimate missing"}</span>
+                <span>{safetyCriticalIds.includes(item.road_section_id) ? "Safety-critical: escalate; do not treat as an ordinary deferral." : "Review for later funding or revised scope."}</span>
+              </div>
+            ))}
+            <p className="panel-help">This is a planning preview only. It does not save road-section selections as plan activities or approve expenditure. The current workflow saves a plan header; persistence of selected sections depends on the plan-activity API and database migration being active.</p>
+            <button type="button" onClick={() => { setName(`Annual maintenance scenario · ${fiscalYear}`); setBudget(String(Number(annualBudget))); setPlanType("routine"); setStatus("draft"); document.getElementById("maintenance-plan-create-form")?.scrollIntoView({ behavior: "smooth", block: "start" }); }}>
+              Use budget and start a draft plan
+            </button>
+          </div>
+        )}
       </div>
 
       {error && (
