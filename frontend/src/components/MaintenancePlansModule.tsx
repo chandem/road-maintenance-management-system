@@ -149,6 +149,10 @@ export default function MaintenancePlansModule() {
   const [estimatedCosts, setEstimatedCosts] = useState<Record<string, string>>({});
   const [safetyCriticalIds, setSafetyCriticalIds] = useState<string[]>([]);
   const [budgetPlan, setBudgetPlan] = useState<BudgetPlanResult | null>(null);
+  const [createdPlanId, setCreatedPlanId] = useState<string | null>(null);
+  const [createdPlanName, setCreatedPlanName] = useState("");
+  const [savingActivities, setSavingActivities] = useState(false);
+  const [activitySaveMessage, setActivitySaveMessage] = useState("");
 
   const [name, setName] = useState("");
   const [fiscalYear, setFiscalYear] = useState(String(new Date().getFullYear()));
@@ -246,6 +250,11 @@ export default function MaintenancePlansModule() {
         if (response.status === 403) throw new Error("Read-only accounts cannot create plans.");
         throw new Error(`Could not save plan (${response.status}): ${detail}`);
       }
+      const savedPlan = await response.json() as { id?: string; name?: string };
+      if (!savedPlan.id) throw new Error("Plan was saved, but the API did not return its ID. Refresh the plan list before continuing.");
+      setCreatedPlanId(savedPlan.id);
+      setCreatedPlanName(savedPlan.name || name.trim());
+      setActivitySaveMessage("");
       setName("");
       setBudget("");
       setSelectedRecommendation(null);
@@ -254,6 +263,78 @@ export default function MaintenancePlansModule() {
       setError(e instanceof Error ? e.message : "Unable to save plan.");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const saveSelectedSectionsAsActivities = async () => {
+    if (!createdPlanId || !budgetPlan?.feasible || budgetPlan.selected.length === 0) return;
+    setSavingActivities(true);
+    setActivitySaveMessage("");
+    setError("");
+    let created = 0;
+    let skipped = 0;
+    try {
+      const { data } = await supabase.auth.getSession();
+      const token = data.session?.access_token;
+      if (!token) throw new Error("Please sign in again before saving plan activities.");
+
+      const existingResponse = await fetch(
+        `${API}/maintenance-plan-activities?maintenance_plan_id=${encodeURIComponent(createdPlanId)}&limit=500`,
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      if (!existingResponse.ok) {
+        throw new Error(`Could not check existing plan activities (${existingResponse.status}). Confirm the activity API and database migration are deployed.`);
+      }
+      const existing = await existingResponse.json() as Array<{ road_section_id: string | null }>;
+      const existingSectionIds = new Set(existing.map((activity) => activity.road_section_id).filter(Boolean));
+
+      for (const item of budgetPlan.selected) {
+        if (existingSectionIds.has(item.road_section_id)) {
+          skipped += 1;
+          continue;
+        }
+        const cost = Number(estimatedCosts[item.road_section_id]);
+        if (!Number.isFinite(cost) || cost <= 0) {
+          throw new Error(`A valid reviewed cost estimate is missing for section ${item.section_code || item.road_section_id.slice(0, 8)}.`);
+        }
+        const sectionLabel = item.section_code || item.road_section_id.slice(0, 8);
+        const roadLabel = [item.road_code, item.road_name].filter(Boolean).join(" — ");
+        const activityName = (item.recommended_action || `Maintenance allowance for ${sectionLabel}`).trim().slice(0, 255);
+        const description = [
+          `Budget optimizer section-level estimate for ${roadLabel ? `${roadLabel}, ` : ""}section ${sectionLabel}.`,
+          `Recorded priority: ${item.priority_score}/100 (${item.priority_level}); ranking ${item.rank}.`,
+          safetyCriticalIds.includes(item.road_section_id) ? "Marked safety-critical for mandatory engineering review." : "Not marked safety-critical in this scenario.",
+          "The amount is a reviewed section-level allowance, not a measured BOQ activity breakdown. Engineer must confirm detailed scope and quantities before approval.",
+        ].join(" ");
+        const response = await fetch(`${API}/maintenance-plan-activities`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            maintenance_plan_id: createdPlanId,
+            road_section_id: item.road_section_id,
+            activity_name: activityName,
+            description,
+            unit: "section",
+            planned_quantity: 1,
+            unit_rate: cost,
+            status: "planned",
+          }),
+        });
+        if (!response.ok) {
+          const detail = (await response.text()).slice(0, 220);
+          throw new Error(`Saved ${created} activity/activities, then failed for section ${sectionLabel} (${response.status}): ${detail}`);
+        }
+        existingSectionIds.add(item.road_section_id);
+        created += 1;
+      }
+      setActivitySaveMessage(`Saved ${created} selected section activity/activities to “${createdPlanName}”.${skipped ? ` ${skipped} section(s) already existed and were not duplicated.` : ""} The entries are section-level budget allowances and require engineering review before approval.`);
+    } catch (e) {
+      setActivitySaveMessage(e instanceof Error ? e.message : "Unable to save selected sections as plan activities.");
+    } finally {
+      setSavingActivities(false);
     }
   };
 
@@ -396,9 +477,18 @@ export default function MaintenancePlansModule() {
               </div>
             ))}
             <p className="panel-help">This is a planning preview only. It does not save road-section selections as plan activities or approve expenditure. The current workflow saves a plan header; persistence of selected sections depends on the plan-activity API and database migration being active.</p>
-            <button type="button" onClick={() => { setName(`Annual maintenance scenario · ${fiscalYear}`); setBudget(String(Number(annualBudget))); setPlanType("routine"); setStatus("draft"); document.getElementById("maintenance-plan-create-form")?.scrollIntoView({ behavior: "smooth", block: "start" }); }}>
+            <button type="button" onClick={() => { setCreatedPlanId(null); setCreatedPlanName(""); setActivitySaveMessage(""); setName(`Annual maintenance scenario · ${fiscalYear}`); setBudget(String(Number(annualBudget))); setPlanType("routine"); setStatus("draft"); document.getElementById("maintenance-plan-create-form")?.scrollIntoView({ behavior: "smooth", block: "start" }); }}>
               Use budget and start a draft plan
             </button>
+            {createdPlanId && (
+              <div style={{ marginTop: "1rem" }}>
+                <p className="panel-help">Saved draft: <strong>{createdPlanName}</strong>. You can now persist the optimizer's selected sections as plan activities.</p>
+                <button type="button" onClick={() => void saveSelectedSectionsAsActivities()} disabled={savingActivities || !budgetPlan.feasible || budgetPlan.selected.length === 0}>
+                  {savingActivities ? "Saving selected sections…" : "Save selected sections as plan activities"}
+                </button>
+                {activitySaveMessage && <div className={activitySaveMessage.startsWith("Saved ") && activitySaveMessage.includes(" to “") ? "success-message" : "error-message"} role={activitySaveMessage.startsWith("Saved ") && activitySaveMessage.includes(" to “") ? "status" : "alert"} style={{ marginTop: "0.75rem" }}>{activitySaveMessage}</div>}
+              </div>
+            )}
           </div>
         )}
       </div>
