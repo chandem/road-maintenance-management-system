@@ -477,7 +477,7 @@ export default function MaintenancePlansModule() {
               </div>
             ))}
             <p className="panel-help">This is a planning preview only. It does not save road-section selections as plan activities or approve expenditure. The current workflow saves a plan header; persistence of selected sections depends on the plan-activity API and database migration being active.</p>
-            <button type="button" onClick={() => { setName(`Annual maintenance scenario · ${fiscalYear}`); setBudget(String(Number(annualBudget))); setPlanType("routine"); setStatus("draft"); document.getElementById("maintenance-plan-create-form")?.scrollIntoView({ behavior: "smooth", block: "start" }); }}>
+            <button type="button" onClick={() => { setCreatedPlanId(null); setCreatedPlanName(""); setActivitySaveMessage(""); setName(`Annual maintenance scenario · ${fiscalYear}`); setBudget(String(Number(annualBudget))); setPlanType("routine"); setStatus("draft"); document.getElementById("maintenance-plan-create-form")?.scrollIntoView({ behavior: "smooth", block: "start" }); }}>
               Use budget and start a draft plan
             </button>
             {createdPlanId && (
@@ -486,7 +486,7 @@ export default function MaintenancePlansModule() {
                 <button type="button" onClick={() => void saveSelectedSectionsAsActivities()} disabled={savingActivities || !budgetPlan.feasible || budgetPlan.selected.length === 0}>
                   {savingActivities ? "Saving selected sections…" : "Save selected sections as plan activities"}
                 </button>
-                {activitySaveMessage && <div className={activitySaveMessage.startsWith("Saved ") ? "success-message" : "error-message"} role={activitySaveMessage.startsWith("Saved ") ? "status" : "alert"} style={{ marginTop: "0.75rem" }}>{activitySaveMessage}</div>}
+                {activitySaveMessage && <div className={activitySaveMessage.startsWith("Saved ") && activitySaveMessage.includes(" to “") ? "success-message" : "error-message"} role={activitySaveMessage.startsWith("Saved ") && activitySaveMessage.includes(" to “") ? "status" : "alert"} style={{ marginTop: "0.75rem" }}>{activitySaveMessage}</div>}
               </div>
             )}
           </div>
