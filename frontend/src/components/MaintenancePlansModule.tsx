@@ -72,6 +72,11 @@ function optimizeBudgetPlan(
     return Number.isFinite(cost) && cost > 0;
   });
   const costOf = (item: PlanningRecommendation) => Number(costInputs[item.road_section_id]);
+  // API payloads may contain numeric fields serialized as strings; keep all optimizer arithmetic numeric.
+  const scoreOf = (item: PlanningRecommendation) => {
+    const score = Number(item.priority_score);
+    return Number.isFinite(score) ? score : 0;
+  };
   const mandatory = candidates.filter((item) => criticalSet.has(item.road_section_id));
   const optional = candidates.filter((item) => !criticalSet.has(item.road_section_id));
   const mandatoryCost = mandatory.reduce((sum, item) => sum + costOf(item), 0);
@@ -80,7 +85,7 @@ function optimizeBudgetPlan(
       selected: [...mandatory, ...missingCriticalCosts],
       deferred: recommendations.filter((item) => !criticalSet.has(item.road_section_id)),
       totalCost: mandatoryCost,
-      totalPriority: [...mandatory, ...missingCriticalCosts].reduce((sum, item) => sum + item.priority_score, 0),
+      totalPriority: [...mandatory, ...missingCriticalCosts].reduce((sum, item) => sum + scoreOf(item), 0),
       feasible: false,
       message: "At least one safety-critical section has no valid cost estimate. Enter a reviewed estimate before calculating a feasible budget scenario; the displayed cost excludes missing estimates.",
     };
@@ -90,7 +95,7 @@ function optimizeBudgetPlan(
       selected: mandatory,
       deferred: recommendations.filter((item) => !criticalSet.has(item.road_section_id)),
       totalCost: mandatoryCost,
-      totalPriority: mandatory.reduce((sum, item) => sum + item.priority_score, 0),
+      totalPriority: mandatory.reduce((sum, item) => sum + scoreOf(item), 0),
       feasible: false,
       message: "Safety-critical selections exceed the budget. Do not silently drop them; review the funding gap and escalate for engineering/management decision.",
     };
@@ -98,7 +103,7 @@ function optimizeBudgetPlan(
 
   let bestItems = [...mandatory];
   let bestCost = mandatoryCost;
-  const mandatoryScore = mandatory.reduce((sum, item) => sum + item.priority_score, 0);
+  const mandatoryScore = mandatory.reduce((sum, item) => sum + scoreOf(item), 0);
   let bestScore = mandatoryScore;
   const remainingBudget = budget - mandatoryCost;
   const maxOptional = optional.slice(0, 20 - mandatory.length);
@@ -119,7 +124,7 @@ function optimizeBudgetPlan(
           const item = source[bit];
           chosen.push(item);
           cost += costOf(item);
-          score += item.priority_score;
+          score += scoreOf(item);
         }
       }
       subsets.push({ items: chosen, cost, score });
