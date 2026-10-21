@@ -103,27 +103,77 @@ function optimizeBudgetPlan(
   const remainingBudget = budget - mandatoryCost;
   const maxOptional = optional.slice(0, 20 - mandatory.length);
 
-  // Exact subset search for the current, capped queue (at most 20 sections).
+  // Exact meet-in-the-middle subset search: at most 2^10 subsets per half.
+  // This avoids a million recursive visits freezing mobile browsers on click.
   // Priority score is a transparent proxy objective, not a learned benefit estimate.
-  const visit = (index: number, chosen: PlanningRecommendation[], cost: number, score: number) => {
-    const combinedScore = mandatoryScore + score;
-    const combinedCost = mandatoryCost + cost;
-    if (combinedScore > bestScore || (combinedScore === bestScore && combinedCost < bestCost)) {
-      bestItems = [...mandatory, ...chosen];
+  type Subset = { items: PlanningRecommendation[]; cost: number; score: number };
+  const enumerateSubsets = (source: PlanningRecommendation[]): Subset[] => {
+    const subsets: Subset[] = [];
+    const subsetCount = 1 << source.length;
+    for (let mask = 0; mask < subsetCount; mask += 1) {
+      const chosen: PlanningRecommendation[] = [];
+      let cost = 0;
+      let score = 0;
+      for (let bit = 0; bit < source.length; bit += 1) {
+        if ((mask & (1 << bit)) !== 0) {
+          const item = source[bit];
+          chosen.push(item);
+          cost += costOf(item);
+          score += item.priority_score;
+        }
+      }
+      subsets.push({ items: chosen, cost, score });
+    }
+    return subsets;
+  };
+
+  const midpoint = Math.ceil(maxOptional.length / 2);
+  const leftSubsets = enumerateSubsets(maxOptional.slice(0, midpoint));
+  const rightSubsets = enumerateSubsets(maxOptional.slice(midpoint))
+    .sort((a, b) => a.cost - b.cost);
+  const bestRightAtOrBelow: number[] = [];
+  let bestRightIndex = 0;
+  for (let index = 0; index < rightSubsets.length; index += 1) {
+    const candidate = rightSubsets[index];
+    const currentBest = rightSubsets[bestRightIndex];
+    if (
+      candidate.score > currentBest.score ||
+      (candidate.score === currentBest.score && candidate.cost < currentBest.cost)
+    ) {
+      bestRightIndex = index;
+    }
+    bestRightAtOrBelow[index] = bestRightIndex;
+  }
+
+  for (const left of leftSubsets) {
+    if (left.cost > remainingBudget) continue;
+    const available = remainingBudget - left.cost;
+    let low = 0;
+    let high = rightSubsets.length - 1;
+    let affordableIndex = -1;
+    while (low <= high) {
+      const mid = Math.floor((low + high) / 2);
+      if (rightSubsets[mid].cost <= available) {
+        affordableIndex = mid;
+        low = mid + 1;
+      } else {
+        high = mid - 1;
+      }
+    }
+    if (affordableIndex < 0) continue;
+
+    const right = rightSubsets[bestRightAtOrBelow[affordableIndex]];
+    const combinedCost = mandatoryCost + left.cost + right.cost;
+    const combinedScore = mandatoryScore + left.score + right.score;
+    if (
+      combinedScore > bestScore ||
+      (combinedScore === bestScore && combinedCost < bestCost)
+    ) {
+      bestItems = [...mandatory, ...left.items, ...right.items];
       bestCost = combinedCost;
       bestScore = combinedScore;
     }
-    if (index >= maxOptional.length) return;
-    const item = maxOptional[index];
-    const itemCost = costOf(item);
-    if (cost + itemCost <= remainingBudget) {
-      chosen.push(item);
-      visit(index + 1, chosen, cost + itemCost, score + item.priority_score);
-      chosen.pop();
-    }
-    visit(index + 1, chosen, cost, score);
-  };
-  visit(0, [], 0, 0);
+  }
 
   const selectedIds = new Set(bestItems.map((item) => item.road_section_id));
   return {
