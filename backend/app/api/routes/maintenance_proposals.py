@@ -106,6 +106,16 @@ def update_proposal(
     if not updates:
         raise HTTPException(status_code=400, detail="No fields to update.")
     status = updates.get("status")
+    allowed_transitions = {
+        "draft": {"submitted"},
+        "revision_required": {"submitted"},
+        "submitted": {"under_review", "approved", "rejected", "revision_required"},
+        "under_review": {"under_review", "approved", "rejected", "revision_required"},
+        "approved": set(),
+        "rejected": set(),
+    }
+    if status is not None and status not in allowed_transitions[current["status"]]:
+        raise HTTPException(status_code=409, detail="Invalid proposal status transition.")
     if current["status"] in ("approved", "rejected") and any(k in updates for k in ("title", "work_scope", "road_section_id", "boq_items", "evidence_notes")):
         raise HTTPException(status_code=409, detail="Finalized proposals cannot be edited. Create a revision instead.")
     if status == "submitted":
