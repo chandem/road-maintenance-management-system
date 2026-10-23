@@ -1065,3 +1065,72 @@ button:focus-visible, a:focus-visible {
     scrollbar-width: thin;
   }
 }
+
+
+/* Maintenance proposal BOQ and review workflow */
+.proposal-boq-row {
+  display: grid;
+  grid-template-columns: minmax(180px, 2fr) minmax(75px, 0.7fr) minmax(95px, 0.8fr) minmax(125px, 1fr);
+  gap: 0.7rem;
+  align-items: end;
+  padding: 0.8rem;
+  border: 1px solid #dbe3ed;
+  border-radius: 10px;
+  background: #fff;
+}
+.proposal-boq-row label,
+.module-form > label,
+.proposal-actions label {
+  display: grid;
+  gap: 0.35rem;
+  color: #475569;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+.proposal-boq-row input,
+.module-form input,
+.module-form select,
+.module-form textarea,
+.proposal-actions textarea,
+.section-heading select {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 0.65rem 0.75rem;
+  color: #0f172a;
+  background: #fff;
+  font: inherit;
+}
+.proposal-boq-row > strong { font-size: 0.9rem; }
+.proposal-card { margin: 0.8rem 0; display: grid; gap: 0.6rem; }
+.proposal-actions { display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: end; }
+.proposal-actions label { flex: 1 1 100%; }
+.proposal-actions button, .module-form > button, .secondary-button {
+  width: fit-content;
+  max-width: 100%;
+}
+.secondary-button { color: #334155; background: #e2e8f0; }
+.status-pill {
+  display: inline-block;
+  flex: 0 0 auto;
+  padding: 0.3rem 0.55rem;
+  border-radius: 999px;
+  background: #eff6ff;
+  color: #1e40af;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: capitalize;
+}
+.success-message { color: #166534; background: #f0fdf4; border: 1px solid #bbf7d0; padding: 0.7rem; border-radius: 8px; }
+@media (max-width: 760px) {
+  .proposal-boq-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .proposal-boq-row label:first-child { grid-column: 1 / -1; }
+  .proposal-boq-row > strong { grid-column: 1 / -1; }
+}
+@media (max-width: 440px) {
+  .proposal-boq-row { grid-template-columns: 1fr; }
+  .proposal-boq-row label:first-child, .proposal-boq-row > strong { grid-column: auto; }
+  .proposal-actions button, .module-form > button { width: 100%; }
+}
