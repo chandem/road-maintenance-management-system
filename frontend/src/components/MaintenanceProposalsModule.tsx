@@ -44,6 +44,7 @@ export default function MaintenanceProposalsModule() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [filter, setFilter] = useState("all");
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [reviewNotes, setReviewNotes] = useState<Record<string, string>>({});
 
   const load = useCallback(async () => {
@@ -66,13 +67,18 @@ export default function MaintenanceProposalsModule() {
   async function createProposal(event: FormEvent) {
     event.preventDefault(); setSaving(true); setError(""); setNotice("");
     try {
-      const created = await request("/maintenance-proposals", "POST", {
-        maintenance_plan_id: planId, road_section_id: sectionId || null, title, work_scope: scope,
+      const payload = {
+        ...(editingId ? {} : { maintenance_plan_id: planId }),
+        road_section_id: sectionId || null, title, work_scope: scope,
         evidence_notes: evidence || null,
         boq_items: items.map((item) => ({ description: item.description, unit: item.unit, quantity: Number(item.quantity), unit_rate: Number(item.unit_rate) })),
-      });
-      setProposals((current) => [created, ...current]); setTitle(""); setScope(""); setEvidence(""); setItems([emptyItem()]); setSectionId("");
-      setNotice("Proposal saved as a draft. Review quantities, rates, and supporting evidence before submission.");
+      };
+      const saved = editingId
+        ? await request("/maintenance-proposals/" + editingId, "PATCH", payload)
+        : await request("/maintenance-proposals", "POST", payload);
+      setProposals((current) => editingId ? current.map((p) => p.id === saved.id ? saved : p) : [saved, ...current]);
+      setTitle(""); setScope(""); setEvidence(""); setItems([emptyItem()]); setSectionId(""); setEditingId(null);
+      setNotice(editingId ? "Proposal changes saved." : "Proposal saved as a draft. Review quantities, rates, and supporting evidence before submission.");
     } catch (e) { setError(e instanceof Error ? e.message : "Unable to save proposal."); }
     finally { setSaving(false); }
   }
@@ -94,7 +100,7 @@ export default function MaintenanceProposalsModule() {
     <p>Prepare a formal scope and measured BOQ against a saved maintenance plan, attach supporting evidence notes, and track engineering review separately from the plan. Approval here does not authorize expenditure.</p>
     {error && <div className="error-message" role="alert">{error}</div>}
     {notice && <p className="success-message" role="status">{notice}</p>}
-    <div className="section-heading"><h3>Create proposal</h3><span className="panel-help">Draft → Submitted → Engineering review</span></div>
+    <div className="section-heading"><h3>{editingId ? "Edit proposal" : "Create proposal"}</h3><span className="panel-help">Draft → Submitted → Engineering review</span></div>
     {plans.length === 0 && !loading && <p className="empty-state">Create a maintenance plan first. Proposals must link to a saved plan.</p>}
     <form className="module-form" onSubmit={createProposal}>
       <label>Maintenance plan<select required value={planId} onChange={(e) => setPlanId(e.target.value)}><option value="">Select a saved plan</option>{plans.map((p) => <option key={p.id} value={p.id}>{p.name}{p.fiscal_year ? " · " + p.fiscal_year : ""}</option>)}</select></label>
@@ -112,7 +118,7 @@ export default function MaintenanceProposalsModule() {
       </div>)}
       <button type="button" className="secondary-button" onClick={() => setItems((old) => [...old, emptyItem()])} disabled={items.length >= 200}>Add BOQ line</button>
       <label>Supporting evidence and engineering notes<textarea maxLength={8000} rows={3} value={evidence} onChange={(e) => setEvidence(e.target.value)} placeholder="Inspection reference, photos/document references, chainage measurements, traffic/safety risks, estimate source, assumptions." /></label>
-      <button type="submit" disabled={saving || loading || !planId}>{saving ? "Saving…" : "Save proposal draft"}</button>
+      <button type="submit" disabled={saving || loading || !planId}>{saving ? "Saving…" : editingId ? "Save proposal changes" : "Save proposal draft"}</button>
     </form>
     <div className="section-heading"><h3>Proposal register</h3><select aria-label="Filter proposals by status" value={filter} onChange={(e) => setFilter(e.target.value)}><option value="all">All statuses</option>{statuses.map((s) => <option key={s} value={s}>{s.replaceAll("_", " ")}</option>)}</select></div>
     {loading && <p className="empty-state">Loading plans and proposals…</p>}
@@ -126,7 +132,15 @@ export default function MaintenanceProposalsModule() {
         {p.evidence_notes && <p><strong>Evidence:</strong> {p.evidence_notes}</p>}
         {p.review_notes && <p><strong>Review notes:</strong> {p.review_notes}</p>}
         <div className="proposal-actions">
-          {p.status === "draft" || p.status === "revision_required" ? <button type="button" onClick={() => void changeStatus(p, "submitted")}>Submit for review</button> : null}
+          {p.status === "draft" || p.status === "revision_required" ? <>
+            <button type="button" className="secondary-button" onClick={() => {
+              setEditingId(p.id); setPlanId(p.maintenance_plan_id); setSectionId(p.road_section_id ?? "");
+              setTitle(p.title); setScope(p.work_scope); setEvidence(p.evidence_notes ?? "");
+              setItems(p.boq_items.map((line) => ({ description: line.description, unit: line.unit, quantity: String(line.quantity), unit_rate: String(line.unit_rate) })));
+              document.getElementById("module-maintenance-proposals")?.scrollIntoView({ behavior: "smooth" });
+            }}>Edit proposal</button>
+            <button type="button" onClick={() => void changeStatus(p, "submitted")}>Submit for review</button>
+          </> : null}
           {p.status === "submitted" || p.status === "under_review" ? <>
             <label>Reviewer notes<textarea rows={2} value={reviewNotes[p.id] ?? ""} onChange={(e) => setReviewNotes((old) => ({ ...old, [p.id]: e.target.value }))} placeholder="Record engineering findings or required changes." /></label>
             <button type="button" onClick={() => void changeStatus(p, "under_review")}>Mark under review</button>
