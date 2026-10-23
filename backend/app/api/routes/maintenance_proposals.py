@@ -118,6 +118,8 @@ def update_proposal(
         raise HTTPException(status_code=409, detail="Invalid proposal status transition.")
     if current["status"] in ("approved", "rejected") and any(k in updates for k in ("title", "work_scope", "road_section_id", "boq_items", "evidence_notes")):
         raise HTTPException(status_code=409, detail="Finalized proposals cannot be edited. Create a revision instead.")
+    if current["status"] in ("submitted", "under_review") and any(k in updates for k in ("title", "work_scope", "road_section_id", "boq_items", "evidence_notes")):
+        raise HTTPException(status_code=409, detail="Submitted proposals cannot be edited during review. Request a revision first.")
     if status == "submitted":
         if current["status"] not in ("draft", "revision_required"):
             raise HTTPException(status_code=409, detail="Only drafts or proposals requiring revision can be submitted.")
