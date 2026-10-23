@@ -14,6 +14,7 @@ import MachineryRegisterModule from "./MachineryRegisterModule";
 import MachinerySchedulesModule from "./MachinerySchedulesModule";
 import MachineryWorkOrdersModule from "./MachineryWorkOrdersModule";
 import MaintenancePlansModule from "./MaintenancePlansModule";
+import MaintenanceProposalsModule from "./MaintenanceProposalsModule";
 import OrganizationStaffingModule from "./OrganizationStaffingModule";
 import PaymentRequestsModule from "./PaymentRequestsModule";
 import RoadAiPriorityModule from "./RoadAiPriorityModule";
@@ -43,6 +44,7 @@ const CONFIG: Record<string, DepartmentConfig> = {
       { title: "Sections and chainage", description: "Section breakdowns and condition ratings.", status: "live" },
       { title: "Inspections", description: "Condition surveys, defects and recommended actions.", status: "live" },
       { title: "Maintenance planning", description: "Plans linked to sections and priorities.", status: "live" },
+      { title: "Maintenance proposals", description: "Prepare measured BOQs, attach evidence, and track engineering review.", status: "live" },
       { title: "Work orders", description: "Execution of road maintenance activities.", status: "live" },
       { title: "AI priority support", description: "Ranking and evidence-backed prioritization.", status: "live" },
     ],
@@ -189,6 +191,7 @@ export default function DepartmentWorkspace({ departmentCode }: { departmentCode
               "sections-and-chainage": "#module-sections-and-chainage",
               inspections: "#inspections",
               "maintenance-planning": "#module-maintenance-planning",
+              "maintenance-proposals": "#module-maintenance-proposals",
               "work-orders": "#module-work-orders",
               "ai-priority-support": "#module-ai-priority-support",
             };
@@ -196,7 +199,7 @@ export default function DepartmentWorkspace({ departmentCode }: { departmentCode
               ? roadAssetTargets[slug] ?? ("#module-" + slug)
               : "#module-" + slug;
             const icon = departmentCode === "road_asset"
-              ? ({ "road-inventory": "▤", "road-asset-register": "◈", "sections-and-chainage": "⇄", inspections: "✓", "maintenance-planning": "▦", "work-orders": "⚙", "ai-priority-support": "✦" } as Record<string, string>)[slug]
+              ? ({ "road-inventory": "▤", "road-asset-register": "◈", "sections-and-chainage": "⇄", inspections: "✓", "maintenance-planning": "▦", "maintenance-proposals": "▧", "work-orders": "⚙", "ai-priority-support": "✦" } as Record<string, string>)[slug]
               : undefined;
             return (
               <a key={m.title} href={href}>
@@ -261,6 +264,7 @@ export default function DepartmentWorkspace({ departmentCode }: { departmentCode
             <RoadSectionsModule />
             <RoadInspectionsModule />
             <MaintenancePlansModule />
+            <MaintenanceProposalsModule />
             <RoadWorkOrdersModule />
             <RoadAiPriorityModule />
           </>
