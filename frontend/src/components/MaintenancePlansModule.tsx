@@ -270,7 +270,7 @@ export default function MaintenancePlansModule() {
     const roadLabel = [item.road_code, item.road_name].filter(Boolean).join(" — ");
     const sectionLabel = item.section_code || item.road_section_id.slice(0, 8);
     setSelectedRecommendation(item);
-    setName(`Maintenance proposal: ${roadLabel ? `${roadLabel} · ` : ""}${sectionLabel}`);
+    setName(`Maintenance plan draft: ${roadLabel ? `${roadLabel} · ` : ""}${sectionLabel}`);
     setPlanType(suggestedPlanType(item));
     setStatus("draft");
     document.getElementById("maintenance-plan-create-form")?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -531,7 +531,7 @@ export default function MaintenancePlansModule() {
                 <span>{safetyCriticalIds.includes(item.road_section_id) ? "Safety-critical: escalate; do not treat as an ordinary deferral." : "Review for later funding or revised scope."}</span>
               </div>
             ))}
-            <p className="panel-help">This is a planning preview only. It does not save road-section selections as plan activities or approve expenditure. The current workflow saves a plan header; persistence of selected sections depends on the plan-activity API and database migration being active.</p>
+            <p className="panel-help">This is a planning preview, not a detailed maintenance proposal or approval to spend. After saving the plan as a draft, use “Save selected sections as plan activities” to persist the selected sections. Each saved amount is a section-level budget allowance, not a measured BOQ. Engineering review must confirm scope, quantities, rates, safety needs, and available resources.</p>
             <button type="button" onClick={() => { setCreatedPlanId(null); setCreatedPlanName(""); setActivitySaveMessage(""); setName(`Annual maintenance scenario · ${fiscalYear}`); setBudget(String(Number(annualBudget))); setPlanType("routine"); setStatus("draft"); document.getElementById("maintenance-plan-create-form")?.scrollIntoView({ behavior: "smooth", block: "start" }); }}>
               Use budget and start a draft plan
             </button>
@@ -601,7 +601,7 @@ export default function MaintenancePlansModule() {
             <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
           </label>
         </div>
-        <p className="panel-help">This creates a maintenance-plan record. The current plan schema does not persist a road-section relationship or activity-level estimate; those require a separately reviewed schema/API change.</p>
+        <p className="panel-help">This form creates or saves the maintenance-plan header. To attach the budget optimizer selections, first save the plan as a Draft, then use “Save selected sections as plan activities” in the budget scenario above. Those entries are section-level allowances, not a detailed bill of quantities (BOQ). A separate Maintenance Proposal workflow is needed for detailed scope, measured quantities, rates, supporting evidence, and formal review. Keep this plan in Draft until an authorized engineer and manager review it.</p>
         <button type="submit" disabled={saving}>
           {saving ? "Saving…" : "Create plan"}
         </button>
