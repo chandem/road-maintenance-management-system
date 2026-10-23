@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { FormEvent } from "react";
 import { supabase } from "../lib/supabase";
 
@@ -19,6 +19,8 @@ export default function GeneralAssetsModule() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [filter, setFilter] = useState("");
+  const [search, setSearch] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [assetCode, setAssetCode] = useState("");
   const [name, setName] = useState("");
@@ -57,6 +59,21 @@ export default function GeneralAssetsModule() {
   }, [filter]);
 
   useEffect(() => { void load(); }, [load]);
+
+  const categories = useMemo(
+    () => [...new Set(items.map((item) => item.category?.trim()).filter((value): value is string => Boolean(value)))].sort((a, b) => a.localeCompare(b)),
+    [items],
+  );
+  const filteredItems = useMemo(() => {
+    const query = search.trim().toLocaleLowerCase();
+    return items.filter((item) => {
+      const matchesSearch = !query || [
+        item.asset_code, item.name, item.category ?? "", item.location ?? "", item.assigned_to ?? "",
+      ].some((value) => value.toLocaleLowerCase().includes(query));
+      const matchesCategory = !categoryFilter || item.category === categoryFilter;
+      return matchesSearch && matchesCategory;
+    });
+  }, [items, search, categoryFilter]);
 
   function resetForm() {
     setEditingId(null); setAssetCode(""); setName(""); setCategory("Office equipment");
@@ -135,13 +152,20 @@ export default function GeneralAssetsModule() {
         </div>
         <div className="section-heading"><button type="submit" disabled={saving}>{saving ? "Saving…" : editingId ? "Save changes" : "Register asset"}</button>{editingId && <button type="button" onClick={resetForm} disabled={saving}>Cancel edit</button>}</div>
       </form>
-      <div className="section-heading"><div><h3>Inventory</h3><p className="panel-help">Filter assets by status. Asset records are restricted by your organization and department role.</p></div>
+      <div className="section-heading"><div><h3>Inventory</h3><p className="panel-help">Search by asset code, name, category, location or custodian. Filters apply only to records your account can access.</p></div>
         <label>Filter status<select value={filter} onChange={e => setFilter(e.target.value)}><option value="">All statuses</option>{STATUSES.map(s => <option key={s} value={s}>{s.replaceAll("_", " ")}</option>)}</select></label>
+      </div>
+      <div className="form-grid asset-inventory-filters">
+        <label>Search inventory<input type="search" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search code, name, location…" aria-label="Search general asset inventory" /></label>
+        <label>Filter category<select value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)}><option value="">All categories</option>{categories.map(value => <option key={value} value={value}>{value}</option>)}</select></label>
+        <div className="asset-filter-summary" aria-live="polite"><strong>{filteredItems.length}</strong> of {items.length} loaded assets</div>
+        {(search || categoryFilter || filter) && <button type="button" onClick={() => { setSearch(""); setCategoryFilter(""); setFilter(""); }}>Clear filters</button>}
       </div>
       {loading && <p className="empty-state">Loading asset inventory…</p>}
       {!loading && items.length === 0 && <p className="empty-state">No general assets found. Register the first asset above.</p>}
-      {items.length > 0 && <div className="table-wrap"><table><thead><tr><th>Code</th><th>Asset</th><th>Category</th><th>Location</th><th>Status</th><th>Current value (ETB)</th><th>Actions</th></tr></thead>
-        <tbody>{items.map(item => <tr key={item.id}><td>{item.asset_code}</td><td>{item.name}</td><td>{item.category || "—"}</td><td>{item.location || "—"}</td><td><span className="badge">{item.status.replaceAll("_", " ")}</span></td><td>{item.current_value == null ? "—" : Number(item.current_value).toLocaleString()}</td><td><button type="button" onClick={() => edit(item)}>Edit</button></td></tr>)}</tbody>
+      {!loading && items.length > 0 && filteredItems.length === 0 && <p className="empty-state">No assets match these filters. Clear or adjust the filters to see more records.</p>}
+      {filteredItems.length > 0 && <div className="table-wrap"><table><thead><tr><th>Code</th><th>Asset</th><th>Category</th><th>Location</th><th>Status</th><th>Current value (ETB)</th><th>Actions</th></tr></thead>
+        <tbody>{filteredItems.map(item => <tr key={item.id}><td>{item.asset_code}</td><td>{item.name}</td><td>{item.category || "—"}</td><td>{item.location || "—"}</td><td><span className="badge">{item.status.replaceAll("_", " ")}</span></td><td>{item.current_value == null ? "—" : Number(item.current_value).toLocaleString()}</td><td><button type="button" onClick={() => edit(item)}>Edit</button></td></tr>)}</tbody>
       </table></div>}
     </section>
   );
