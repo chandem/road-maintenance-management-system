@@ -55,6 +55,7 @@ export default function FinanceModule() {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [expenseSearch, setExpenseSearch] = useState("");
   const [expenseStatus, setExpenseStatus] = useState("");
+  const [expenseCategory, setExpenseCategory] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -123,9 +124,10 @@ export default function FinanceModule() {
       const matchesSearch = !query || [
         expense.description, expense.category ?? "", expense.reference_no ?? "",
       ].some((value) => value.toLocaleLowerCase().includes(query));
-      return matchesSearch && (!expenseStatus || expense.status === expenseStatus);
+      const matchesCategory = !expenseCategory || (expense.category?.trim() || "Uncategorized") === expenseCategory;
+      return matchesSearch && matchesCategory && (!expenseStatus || expense.status === expenseStatus);
     });
-  }, [expenses, expenseSearch, expenseStatus]);
+  }, [expenses, expenseSearch, expenseStatus, expenseCategory]);
 
   async function createBudget(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -332,7 +334,8 @@ export default function FinanceModule() {
         <div className="form-grid finance-expense-filters">
           <label>Search expenses<input type="search" value={expenseSearch} onChange={(event) => setExpenseSearch(event.target.value)} placeholder="Description, category or reference…" /></label>
           <label>Filter by status<select value={expenseStatus} onChange={(event) => setExpenseStatus(event.target.value)}><option value="">All statuses</option>{[...new Set(expenses.map((expense) => expense.status))].sort().map((status) => <option key={status} value={status}>{status.replaceAll("_", " ")}</option>)}</select></label>
-          {(expenseSearch || expenseStatus) && <button type="button" onClick={() => { setExpenseSearch(""); setExpenseStatus(""); }}>Clear filters</button>}
+          <label>Filter by category<select value={expenseCategory} onChange={(event) => setExpenseCategory(event.target.value)}><option value="">All categories</option>{[...new Set(expenses.map((expense) => expense.category?.trim() || "Uncategorized"))].sort((a, b) => a.localeCompare(b)).map((category) => <option key={category} value={category}>{category}</option>)}</select></label>
+          {(expenseSearch || expenseStatus || expenseCategory) && <button type="button" onClick={() => { setExpenseSearch(""); setExpenseStatus(""); setExpenseCategory(""); }}>Clear filters</button>}
         </div>
         {!loading && expenses.length === 0 && <p className="empty-state">No expense records are available yet.</p>}
         {!loading && expenses.length > 0 && filteredExpenses.length === 0 && <p className="empty-state">No expenses match these filters. Clear or adjust the filters to see more records.</p>}
