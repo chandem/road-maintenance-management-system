@@ -38,6 +38,7 @@ export default function MachinerySchedulesModule() {
   const [error, setError] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [search, setSearch] = useState("");
+  const [dueFilter, setDueFilter] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
 
   const [machineryId, setMachineryId] = useState("");
@@ -179,11 +180,23 @@ export default function MachinerySchedulesModule() {
     }
   };
 
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+  const dueSoonDate = new Date(today);
+  dueSoonDate.setDate(dueSoonDate.getDate() + 30);
+  const dueSoonKey = `${dueSoonDate.getFullYear()}-${String(dueSoonDate.getMonth() + 1).padStart(2, "0")}-${String(dueSoonDate.getDate()).padStart(2, "0")}`;
+
   const filteredItems = items.filter((item) => {
     const query = search.trim().toLowerCase();
-    if (!query) return true;
-    return [item.schedule_code, item.title, item.service_type ?? "", item.notes ?? "", machineLabel(item.machinery_id)]
+    const matchesSearch = !query || [item.schedule_code, item.title, item.service_type ?? "", item.notes ?? "", machineLabel(item.machinery_id)]
       .some((value) => value.toLowerCase().includes(query));
+    const dueDate = item.next_due_date?.slice(0, 10) ?? "";
+    const matchesDue = !dueFilter
+      || (dueFilter === "overdue" && Boolean(dueDate) && dueDate < todayKey && item.status === "active")
+      || (dueFilter === "due_soon" && Boolean(dueDate) && dueDate >= todayKey && dueDate <= dueSoonKey && item.status === "active")
+      || (dueFilter === "no_date" && !dueDate && item.status === "active");
+    return matchesSearch && matchesDue;
   });
 
   return (
@@ -341,8 +354,17 @@ export default function MachinerySchedulesModule() {
           Search schedules
           <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Schedule code, title, service type, equipment…" />
         </label>
+        <label>
+          Due date
+          <select value={dueFilter} onChange={(e) => setDueFilter(e.target.value)}>
+            <option value="">All due dates</option>
+            <option value="overdue">Overdue (active)</option>
+            <option value="due_soon">Due within 30 days</option>
+            <option value="no_date">Active without a due date</option>
+          </select>
+        </label>
         <div style={{ display: "flex", alignItems: "end" }}>
-          <button type="button" onClick={() => { setSearch(""); setStatusFilter(""); }}>Clear filters</button>
+          <button type="button" onClick={() => { setSearch(""); setStatusFilter(""); setDueFilter(""); }}>Clear filters</button>
         </div>
       </div>
 
@@ -371,7 +393,12 @@ export default function MachinerySchedulesModule() {
               {item.interval_days != null ? `${item.interval_days} d` : ""}
               {item.interval_hours == null && item.interval_days == null ? "—" : ""}
             </span>
-            <span>{item.next_due_date ? item.next_due_date.slice(0, 10) : "—"}</span>
+            <span>
+              {item.next_due_date ? item.next_due_date.slice(0, 10) : "—"}
+              {item.status === "active" && item.next_due_date && item.next_due_date.slice(0, 10) < todayKey && <small className="badge high">Overdue</small>}
+              {item.status === "active" && item.next_due_date && item.next_due_date.slice(0, 10) >= todayKey && item.next_due_date.slice(0, 10) <= dueSoonKey && <small className="badge medium">Due soon</small>}
+              {item.status === "active" && !item.next_due_date && <small className="badge">No due date</small>}
+            </span>
             <span>{item.status}</span>
             <span>
               <button type="button" onClick={() => startEdit(item)}>
