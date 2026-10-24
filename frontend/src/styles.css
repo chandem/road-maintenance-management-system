@@ -1051,10 +1051,18 @@ button:focus-visible, a:focus-visible {
 }
 .department-sidebar .department-nav-road-asset .department-nav-overview {
   margin-bottom: .25rem;
+}
+.department-sidebar .department-nav a.is-active,
+.department-sidebar .department-nav-road-asset a.is-active,
+.department-sidebar .department-nav-road-asset .department-nav-overview.is-active {
   border-color: #dbe7f8;
-  background: linear-gradient(110deg, #f0f6ff, #ffffff);
+  background: linear-gradient(110deg, #e8f1ff, #ffffff);
   color: #1e40af;
   font-weight: 750;
+}
+.department-sidebar .department-nav a.is-active .department-nav-icon {
+  background: #dbeafe;
+  color: #1d4ed8;
 }
 @media (min-width: 901px) {
   .department-sidebar {
