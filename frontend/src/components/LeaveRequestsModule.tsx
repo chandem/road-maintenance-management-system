@@ -34,6 +34,7 @@ export default function LeaveRequestsModule() {
   const [summary, setSummary] = useState<Summary | null>(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [leaveTypeFilter, setLeaveTypeFilter] = useState("");
@@ -139,6 +140,8 @@ export default function LeaveRequestsModule() {
   };
 
   const setStatus = async (id: string, status: string) => {
+    if (updatingId) return;
+    setUpdatingId(id);
     setError("");
     try {
       const { data } = await supabase.auth.getSession();
@@ -159,6 +162,8 @@ export default function LeaveRequestsModule() {
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Unable to update leave request.");
+    } finally {
+      setUpdatingId(null);
     }
   };
 
@@ -369,17 +374,17 @@ export default function LeaveRequestsModule() {
             <span style={{ display: "flex", flexWrap: "wrap", gap: "0.35rem" }}>
               {item.status === "pending" && (
                 <>
-                  <button type="button" onClick={() => void setStatus(item.id, "approved")}>
-                    Approve
+                  <button type="button" onClick={() => void setStatus(item.id, "approved")} disabled={updatingId !== null}>
+                    {updatingId === item.id ? "Updating…" : "Approve"}
                   </button>
-                  <button type="button" onClick={() => void setStatus(item.id, "rejected")}>
-                    Reject
+                  <button type="button" onClick={() => void setStatus(item.id, "rejected")} disabled={updatingId !== null}>
+                    {updatingId === item.id ? "Updating…" : "Reject"}
                   </button>
                 </>
               )}
               {item.status === "approved" && (
-                <button type="button" onClick={() => void setStatus(item.id, "cancelled")}>
-                  Cancel
+                <button type="button" onClick={() => void setStatus(item.id, "cancelled")} disabled={updatingId !== null}>
+                  {updatingId === item.id ? "Updating…" : "Cancel"}
                 </button>
               )}
             </span>
