@@ -60,6 +60,7 @@ export default function MachineryWorkOrdersModule() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [search, setSearch] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
 
   const [machineryId, setMachineryId] = useState("");
@@ -202,6 +203,13 @@ export default function MachineryWorkOrdersModule() {
       setSaving(false);
     }
   };
+
+  const filteredItems = items.filter((item) => {
+    const query = search.trim().toLowerCase();
+    if (!query) return true;
+    return [item.work_order_no, item.title, item.fault_type ?? "", item.description ?? "", machineLabel(item.machinery_id)]
+      .some((value) => value.toLowerCase().includes(query));
+  });
 
   return (
     <section id="module-breakdowns-and-work-orders" className="module-panel">
@@ -357,7 +365,10 @@ export default function MachineryWorkOrdersModule() {
       </form>
 
       <div className="section-heading" style={{ marginTop: "1.25rem" }}>
-        <h3>Repair queue</h3>
+        <div>
+          <h3>Repair queue</h3>
+          <p className="panel-help">{filteredItems.length} matching work order(s)</p>
+        </div>
         <label>
           Filter status{" "}
           <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
@@ -371,6 +382,16 @@ export default function MachineryWorkOrdersModule() {
         </label>
       </div>
 
+      <div className="form-grid" style={{ marginBottom: "0.75rem" }}>
+        <label>
+          Search work orders
+          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Work order, title, fault, description, equipment…" />
+        </label>
+        <div style={{ display: "flex", alignItems: "end" }}>
+          <button type="button" onClick={() => { setSearch(""); setStatusFilter(""); }}>Clear filters</button>
+        </div>
+      </div>
+
       <div className="table module-table">
         <div className="table-row table-head">
           <span>WO / Title</span>
@@ -380,10 +401,10 @@ export default function MachineryWorkOrdersModule() {
           <span>Actions</span>
         </div>
         {loading && <div className="empty-state">Loading work orders…</div>}
-        {!loading && items.length === 0 && (
+        {!loading && filteredItems.length === 0 && (
           <div className="empty-state">No machinery work orders yet.</div>
         )}
-        {items.map((item) => (
+        {filteredItems.map((item) => (
           <div className="table-row" key={item.id}>
             <span>
               <strong>{item.work_order_no}</strong>

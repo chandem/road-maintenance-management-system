@@ -37,6 +37,7 @@ export default function MachinerySchedulesModule() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [search, setSearch] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
 
   const [machineryId, setMachineryId] = useState("");
@@ -178,6 +179,13 @@ export default function MachinerySchedulesModule() {
     }
   };
 
+  const filteredItems = items.filter((item) => {
+    const query = search.trim().toLowerCase();
+    if (!query) return true;
+    return [item.schedule_code, item.title, item.service_type ?? "", item.notes ?? "", machineLabel(item.machinery_id)]
+      .some((value) => value.toLowerCase().includes(query));
+  });
+
   return (
     <section id="module-maintenance-planning" className="module-panel">
       <div className="section-heading">
@@ -311,7 +319,10 @@ export default function MachinerySchedulesModule() {
       </form>
 
       <div className="section-heading" style={{ marginTop: "1.25rem" }}>
-        <h3>Schedules</h3>
+        <div>
+          <h3>Schedules</h3>
+          <p className="panel-help">{filteredItems.length} matching schedule(s)</p>
+        </div>
         <label>
           Filter{" "}
           <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
@@ -325,6 +336,16 @@ export default function MachinerySchedulesModule() {
         </label>
       </div>
 
+      <div className="form-grid" style={{ marginBottom: "0.75rem" }}>
+        <label>
+          Search schedules
+          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Schedule code, title, service type, equipment…" />
+        </label>
+        <div style={{ display: "flex", alignItems: "end" }}>
+          <button type="button" onClick={() => { setSearch(""); setStatusFilter(""); }}>Clear filters</button>
+        </div>
+      </div>
+
       <div className="table module-table">
         <div className="table-row table-head">
           <span>Code / Title</span>
@@ -335,8 +356,8 @@ export default function MachinerySchedulesModule() {
           <span>Actions</span>
         </div>
         {loading && <div className="empty-state">Loading schedules…</div>}
-        {!loading && items.length === 0 && <div className="empty-state">No schedules yet.</div>}
-        {items.map((item) => (
+        {!loading && filteredItems.length === 0 && <div className="empty-state">No schedules match these filters.</div>}
+        {filteredItems.map((item) => (
           <div className="table-row" key={item.id}>
             <span>
               <strong>{item.schedule_code}</strong>
