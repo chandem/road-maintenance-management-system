@@ -136,6 +136,37 @@ export default function GeneralAssetsModule() {
         <div className="metric-card"><span className="metric-label">Active assets</span><strong className="metric-value">{summary.active_count}</strong></div>
         <div className="metric-card"><span className="metric-label">Current portfolio value</span><strong className="metric-value">{Number(summary.total_current_value || 0).toLocaleString()}</strong></div>
       </div>}
+      {summary && (Object.keys(summary.by_status ?? {}).length > 0 || Object.keys(summary.by_category ?? {}).length > 0) && (
+        <div className="asset-summary-breakdown" aria-label="Asset portfolio breakdown">
+          {Object.keys(summary.by_status ?? {}).length > 0 && (
+            <div className="module-form">
+              <h3>Assets by status</h3>
+              <div className="metric-grid">
+                {Object.entries(summary.by_status).sort(([a], [b]) => a.localeCompare(b)).map(([key, count]) => (
+                  <div className="metric-card" key={key}>
+                    <span className="metric-label">{key.replaceAll("_", " ")}</span>
+                    <strong className="metric-value">{count}</strong>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          {Object.keys(summary.by_category ?? {}).length > 0 && (
+            <div className="module-form">
+              <h3>Assets by category</h3>
+              <div className="metric-grid">
+                {Object.entries(summary.by_category).sort(([, a], [, b]) => Number(b) - Number(a)).map(([key, count]) => (
+                  <div className="metric-card" key={key}>
+                    <span className="metric-label">{key}</span>
+                    <strong className="metric-value">{count}</strong>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       <form id="general-asset-form" className="module-form" onSubmit={save}>
         <h3>{editingId ? "Update asset" : "Register an asset"}</h3>
         <p className="panel-help">Managers and officers can register or update assets. Read-only users can view the register.</p>
