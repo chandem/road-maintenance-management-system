@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "../lib/supabase";
 
 type RankingItem = {
@@ -78,6 +78,8 @@ export default function RoadAiPriorityModule() {
   const [costBases, setCostBases] = useState<Record<string, string>>({});
   const [plan, setPlan] = useState<BudgetPlanResponse | null>(null);
   const [planLoading, setPlanLoading] = useState(false);
+  const [search, setSearch] = useState("");
+  const [levelFilter, setLevelFilter] = useState("all");
 
   const loadRanking = useCallback(async () => {
     setLoading(true);
@@ -105,6 +107,15 @@ export default function RoadAiPriorityModule() {
   useEffect(() => {
     void loadRanking();
   }, [loadRanking]);
+
+  const visibleRankings = useMemo(() => (report?.rankings ?? []).filter((item) => {
+    const query = search.trim().toLowerCase();
+    const matchesSearch = !query || [item.section_code, item.road_code, item.road_name].some((value) => value?.toLowerCase().includes(query));
+    return matchesSearch && (levelFilter === "all" || item.priority_level.toLowerCase() === levelFilter);
+  }), [report, search, levelFilter]);
+
+  const confidencePercent = (value: number) => Math.max(0, Math.min(100, Math.round(Number(value) * 100)));
+  const confidenceLabel = (value: number) => value >= 0.8 ? "Higher confidence" : value >= 0.6 ? "Moderate confidence" : "Limited confidence";
 
   const analyzeSection = async (sectionId: string) => {
     setDetailLoading(true);
@@ -175,6 +186,12 @@ export default function RoadAiPriorityModule() {
         </div>
       )}
 
+      <div className="ai-priority-controls" aria-label="Filter road priority ranking">
+        <label>Search roads or sections<input type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Section code, road code or name" /></label>
+        <label>Priority level<select value={levelFilter} onChange={(event) => setLevelFilter(event.target.value)}><option value="all">All levels</option><option value="critical">Critical</option><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select></label>
+        <p>{visibleRankings.length} of {report?.rankings.length ?? 0} ranked sections shown</p>
+      </div>
+
       <div className="table module-table" style={{ marginTop: "1rem" }}>
         <div className="table-row table-head">
           <span>Rank</span>
@@ -188,7 +205,7 @@ export default function RoadAiPriorityModule() {
         {!loading && report && report.rankings.length === 0 && (
           <div className="empty-state">No sections available. Register roads and sections first.</div>
         )}
-        {report?.rankings.map((item) => (
+        {visibleRankings.map((item) => (
           <div className="table-row" key={item.road_section_id}>
             <span>#{item.rank}</span>
             <span>
@@ -199,7 +216,7 @@ export default function RoadAiPriorityModule() {
             <span>
               {Number(item.priority_score)}
               <br />
-              <span className="panel-help">conf {Number(item.confidence).toFixed(2)}</span>
+              <span className={"ai-confidence-chip " + (item.confidence >= 0.8 ? "is-high" : item.confidence >= 0.6 ? "is-medium" : "is-low")} title="Confidence reflects the completeness and strength of recorded signals; it does not change the priority score.">{confidencePercent(item.confidence)}% confidence</span>
             </span>
             <span>{item.priority_level}</span>
             <span>
@@ -349,19 +366,19 @@ export default function RoadAiPriorityModule() {
       {detailLoading && <p className="empty-state">Loading section evidence…</p>}
 
       {detail && (
-        <div className="dashboard-panel" style={{ marginTop: "1.25rem" }}>
+        <div className="dashboard-panel ai-explanation-panel" style={{ marginTop: "1.25rem" }}>
           <p className="eyebrow">SECTION DETAIL</p>
           <h3>
             {detail.section_code || detail.road_section_id.slice(0, 8)} — {detail.priority_level} (
             {Number(detail.priority_score)}/100)
           </h3>
-          <p>{detail.explanation}</p>
-          <p>
-            <strong>Recommended action:</strong> {detail.recommended_action}
-          </p>
+          <div className="ai-explanation-summary"><div><span className="metric-label">Priority score</span><strong className="metric-value">{Number(detail.priority_score).toFixed(1)}<small> / 100</small></strong></div><div><span className="metric-label">Evidence confidence</span><strong className="metric-value">{confidencePercent(detail.confidence)}%</strong><span className={"ai-confidence-chip " + (detail.confidence >= 0.8 ? "is-high" : detail.confidence >= 0.6 ? "is-medium" : "is-low")}>{confidenceLabel(detail.confidence)}</span></div></div>
+          <p className="ai-explanation-text">{detail.explanation}</p>
+          {detail.confidence < 0.6 && <p className="ai-confidence-warning"><strong>Review needed:</strong> recorded evidence may be incomplete. Verify the latest field inspection and condition rating before using this ranking for a maintenance decision.</p>}
+          <div className="ai-recommended-action"><span aria-hidden="true">→</span><p><strong>Recommended action</strong><br />{detail.recommended_action}</p></div>
           {detail.reasons?.length > 0 && (
             <>
-              <h4>Reasons</h4>
+              <h4>Why this section was prioritized</h4>
               <ul>
                 {detail.reasons.map((r) => (
                   <li key={r}>{r}</li>
@@ -371,7 +388,7 @@ export default function RoadAiPriorityModule() {
           )}
           {detail.evidence?.length > 0 && (
             <>
-              <h4>Evidence</h4>
+              <h4>Recorded operational evidence</h4>
               <ul>
                 {detail.evidence.map((r) => (
                   <li key={r}>{r}</li>
@@ -381,7 +398,7 @@ export default function RoadAiPriorityModule() {
           )}
           {detail.document_evidence?.length > 0 && (
             <>
-              <h4>Document evidence</h4>
+              <h4>Supporting document evidence</h4>
               <ul>
                 {detail.document_evidence.map((r) => (
                   <li key={r}>{r}</li>
