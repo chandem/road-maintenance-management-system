@@ -536,8 +536,13 @@ def office_assistant(
     """Cross-module assistant: RAMS + MMMS + Finance + HR + Assets + Documents."""
     supabase = current_user["client"]
     question = (request.question or request.query or "").strip()
+    organization_id = _best_effort_organization_id(supabase, current_user["id"])
+    if not organization_id:
+        raise HTTPException(status_code=403, detail="Active organization membership is required.")
 
-    ctx = collect_cross_module_context(supabase)
+    ctx = collect_cross_module_context(
+        supabase, organization_id=str(organization_id)
+    )
     evidence = list(ctx.evidence)
     modules = list(ctx.modules_consulted)
     document_evidence: list[str] = []

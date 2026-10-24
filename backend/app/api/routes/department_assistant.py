@@ -84,7 +84,11 @@ def department_assistant(
         )
 
     question = (request.question or request.query or "").strip()
-    context = collect_cross_module_context(client, allowed_modules=allowed_modules)
+    context = collect_cross_module_context(
+        client,
+        organization_id=str(organization_id),
+        allowed_modules=allowed_modules,
+    )
     evidence = list(context.evidence)
     modules = [
         DEPARTMENTS[code] for code in DEPARTMENTS if code in allowed_modules

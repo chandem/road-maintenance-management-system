@@ -24,11 +24,14 @@ MODULE_TABLES = {
 
 
 def collect_cross_module_context(
-    client: Any, allowed_modules: set[str] | None = None
+    client: Any,
+    organization_id: str,
+    allowed_modules: set[str] | None = None,
 ) -> CrossModuleContext:
-    """Load only authorized module data when a module scope is supplied.
+    """Load organization-scoped data, optionally restricted to authorized modules.
 
     None means all modules and is reserved for organization-admin features.
+    Every query explicitly filters by organization_id in addition to database RLS.
     """
     ctx = CrossModuleContext()
 
@@ -37,7 +40,7 @@ def collect_cross_module_context(
             table in MODULE_TABLES.get(module, set()) for module in allowed_modules
         ):
             return []
-        return _select(client, table, columns, limit)
+        return _select(client, table, columns, limit, organization_id)
 
     roads = select("roads", "id,road_code,name,total_length_km,status", 100)
     sections = select("road_sections", "id,road_id,section_code,condition_rating,status", 500)
@@ -137,8 +140,18 @@ def collect_cross_module_context(
     return ctx
 
 
-def _select(client: Any, table: str, columns: str, limit: int) -> list[dict]:
+def _select(
+    client: Any, table: str, columns: str, limit: int, organization_id: str
+) -> list[dict]:
     try:
-        return client.table(table).select(columns).limit(limit).execute().data or []
+        return (
+            client.table(table)
+            .select(columns)
+            .eq("organization_id", str(organization_id))
+            .limit(limit)
+            .execute()
+            .data
+            or []
+        )
     except Exception:
         return []
