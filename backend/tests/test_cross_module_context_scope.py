@@ -5,8 +5,14 @@ class FakeQuery:
     def __init__(self, client, table):
         self.client = client
         self.table_name = table
+        self.filters = {}
 
     def select(self, *_args, **_kwargs):
+        return self
+
+    def eq(self, key, value):
+        self.filters[key] = value
+        self.client.query_filters.append((self.table_name, key, value))
         return self
 
     def limit(self, *_args, **_kwargs):
@@ -20,6 +26,7 @@ class FakeQuery:
 class FakeClient:
     def __init__(self):
         self.queried_tables = []
+        self.query_filters = []
 
     def table(self, table_name):
         return FakeQuery(self, table_name)
@@ -28,7 +35,7 @@ class FakeClient:
 def test_road_asset_context_never_queries_other_departments():
     client = FakeClient()
 
-    ctx = collect_cross_module_context(client, allowed_modules={"road_asset"})
+    ctx = collect_cross_module_context(client, organization_id="org-1", allowed_modules={"road_asset"})
 
     assert set(client.queried_tables) == {
         "roads", "road_sections", "maintenance_plans", "work_orders", "materials"
@@ -43,7 +50,7 @@ def test_road_asset_context_never_queries_other_departments():
 def test_finance_context_only_queries_finance_tables():
     client = FakeClient()
 
-    ctx = collect_cross_module_context(client, allowed_modules={"finance"})
+    ctx = collect_cross_module_context(client, organization_id="org-1", allowed_modules={"finance"})
 
     assert set(client.queried_tables) == {"budgets", "expenses"}
     assert ctx.modules_consulted == ["Financial Management"]
@@ -54,9 +61,24 @@ def test_finance_context_only_queries_finance_tables():
 def test_unrestricted_context_still_collects_all_modules_for_admin():
     client = FakeClient()
 
-    collect_cross_module_context(client)
+    collect_cross_module_context(client, organization_id="org-1")
 
     assert set(client.queried_tables) == {
         "roads", "road_sections", "maintenance_plans", "work_orders", "machinery",
         "employees", "budgets", "expenses", "assets", "materials",
     }
+
+
+
+def test_every_context_query_is_explicitly_scoped_to_the_active_organization():
+    client = FakeClient()
+
+    collect_cross_module_context(
+        client,
+        organization_id="org-42",
+        allowed_modules={"road_asset", "finance"},
+    )
+
+    assert client.query_filters
+    assert all(key == "organization_id" for _, key, _ in client.query_filters)
+    assert all(value == "org-42" for _, _, value in client.query_filters)
