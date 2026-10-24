@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections import Counter
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.api.dependencies import get_current_user, require_department_access, require_org_admin
 from app.schemas.dashboards import (
@@ -74,7 +74,6 @@ def executive_dashboard(current_user=Depends(require_org_admin())):
     """Organization-wide KPI snapshot for executives."""
     organization_id = resolve_organization_id(current_user["client"], current_user["id"])
     if not organization_id:
-        from fastapi import HTTPException, status
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Active organization membership is required.")
     ctx = collect_cross_module_context(current_user["client"], organization_id)
     s = ctx.summary
