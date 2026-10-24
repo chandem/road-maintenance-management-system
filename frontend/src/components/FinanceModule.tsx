@@ -1,4 +1,4 @@
-import { FormEvent, useCallback, useEffect, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "../lib/supabase";
 
 type Budget = {
@@ -53,6 +53,8 @@ export default function FinanceModule() {
   const [summary, setSummary] = useState<FinanceSummary | null>(null);
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [expenseSearch, setExpenseSearch] = useState("");
+  const [expenseStatus, setExpenseStatus] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -86,7 +88,7 @@ export default function FinanceModule() {
       const [summaryResponse, budgetResponse, expenseResponse] = await Promise.all([
         fetch(`${API_BASE_URL}/finance/summary?fiscal_year=${encodeURIComponent(fiscalYear)}`, { headers }),
         fetch(`${API_BASE_URL}/finance/budgets?limit=100&fiscal_year=${encodeURIComponent(fiscalYear)}`, { headers }),
-        fetch(`${API_BASE_URL}/finance/expenses?limit=8`, { headers }),
+        fetch(`${API_BASE_URL}/finance/expenses?limit=100`, { headers }),
       ]);
 
       const failedResponse = [summaryResponse, budgetResponse, expenseResponse].find((response) => !response.ok);
@@ -114,6 +116,16 @@ export default function FinanceModule() {
   }, [fiscalYear]);
 
   useEffect(() => { void loadFinanceData(); }, [loadFinanceData]);
+
+  const filteredExpenses = useMemo(() => {
+    const query = expenseSearch.trim().toLocaleLowerCase();
+    return expenses.filter((expense) => {
+      const matchesSearch = !query || [
+        expense.description, expense.category ?? "", expense.reference_no ?? "",
+      ].some((value) => value.toLocaleLowerCase().includes(query));
+      return matchesSearch && (!expenseStatus || expense.status === expenseStatus);
+    });
+  }, [expenses, expenseSearch, expenseStatus]);
 
   async function createBudget(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -316,11 +328,17 @@ export default function FinanceModule() {
       </section>
 
       <section aria-labelledby="recent-expenses-title">
-        <div className="section-heading"><div><p className="eyebrow">RECENT ACTIVITY</p><h3 id="recent-expenses-title">Recent expenses</h3></div><span className="badge">{expenses.length} shown</span></div>
+        <div className="section-heading"><div><p className="eyebrow">RECENT ACTIVITY</p><h3 id="recent-expenses-title">Expense register</h3><p className="panel-help">Search and filter the latest expense records returned by the finance API.</p></div><span className="badge">{filteredExpenses.length} of {expenses.length}</span></div>
+        <div className="form-grid finance-expense-filters">
+          <label>Search expenses<input type="search" value={expenseSearch} onChange={(event) => setExpenseSearch(event.target.value)} placeholder="Description, category or reference…" /></label>
+          <label>Filter by status<select value={expenseStatus} onChange={(event) => setExpenseStatus(event.target.value)}><option value="">All statuses</option>{[...new Set(expenses.map((expense) => expense.status))].sort().map((status) => <option key={status} value={status}>{status.replaceAll("_", " ")}</option>)}</select></label>
+          {(expenseSearch || expenseStatus) && <button type="button" onClick={() => { setExpenseSearch(""); setExpenseStatus(""); }}>Clear filters</button>}
+        </div>
         {!loading && expenses.length === 0 && <p className="empty-state">No expense records are available yet.</p>}
-        {expenses.length > 0 && <div className="module-table"><div className="table finance-expense-table">
+        {!loading && expenses.length > 0 && filteredExpenses.length === 0 && <p className="empty-state">No expenses match these filters. Clear or adjust the filters to see more records.</p>}
+        {filteredExpenses.length > 0 && <div className="module-table"><div className="table finance-expense-table">
           <div className="table-row table-head" role="row"><span>Date</span><span>Description</span><span>Category</span><span>Amount</span><span>Reference / status</span></div>
-          {expenses.map((expense) => <div className="table-row" role="row" key={expense.id}>
+          {filteredExpenses.map((expense) => <div className="table-row" role="row" key={expense.id}>
             <span>{expense.expense_date}</span><span>{expense.description}</span><span>{expense.category || "—"}</span><span>{amount(expense.amount)}</span><span>{expense.reference_no || "—"}<small>{expense.status}</small></span>
           </div>)}
         </div></div>}
