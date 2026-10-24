@@ -15,6 +15,7 @@ from app.schemas.dashboards import (
     ModuleDashboard,
 )
 from app.services.cross_module_context import collect_cross_module_context
+from app.services.ai_audit import resolve_organization_id
 
 router = APIRouter(prefix="/dashboards", tags=["dashboards"])
 
@@ -71,7 +72,11 @@ def _alerts_from_summary(summary: dict) -> list[AlertItem]:
 @router.get("/executive", response_model=ExecutiveDashboard)
 def executive_dashboard(current_user=Depends(require_org_admin())):
     """Organization-wide KPI snapshot for executives."""
-    ctx = collect_cross_module_context(current_user["client"])
+    organization_id = resolve_organization_id(current_user["client"], current_user["id"])
+    if not organization_id:
+        from fastapi import HTTPException, status
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Active organization membership is required.")
+    ctx = collect_cross_module_context(current_user["client"], organization_id)
     s = ctx.summary
     metrics = [
         MetricCount(label="Roads", value=s.get("roads", 0)),
@@ -264,7 +269,11 @@ def hr_dashboard(current_user=Depends(require_department_access("human_resources
 @router.get("/report/operational")
 def operational_report(current_user=Depends(require_org_admin())) -> dict:
     """Structured operational report combining all module KPIs and alerts."""
-    ctx = collect_cross_module_context(current_user["client"])
+    organization_id = resolve_organization_id(current_user["client"], current_user["id"])
+    if not organization_id:
+        from fastapi import HTTPException, status
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Active organization membership is required.")
+    ctx = collect_cross_module_context(current_user["client"], organization_id)
     alerts = _alerts_from_summary(ctx.summary)
     generated_at = datetime.now(timezone.utc).isoformat()
     return {
