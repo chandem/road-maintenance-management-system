@@ -36,6 +36,8 @@ export default function LeaveRequestsModule() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [leaveTypeFilter, setLeaveTypeFilter] = useState("");
+  const [search, setSearch] = useState("");
 
   const [employeeId, setEmployeeId] = useState("");
   const [leaveType, setLeaveType] = useState("annual");
@@ -160,6 +162,22 @@ export default function LeaveRequestsModule() {
     }
   };
 
+  const filteredItems = items.filter((item) => {
+    if (leaveTypeFilter && item.leave_type !== leaveTypeFilter) return false;
+    const query = search.trim().toLowerCase();
+    if (!query) return true;
+    const searchable = [
+      employeeLabel(item.employee_id),
+      item.leave_type,
+      item.start_date,
+      item.end_date,
+      item.status,
+      item.reason ?? "",
+      item.decision_notes ?? "",
+    ].join(" ").toLowerCase();
+    return searchable.includes(query);
+  });
+
   return (
     <section id="module-attendance-and-leave" className="module-panel">
       <div className="section-heading">
@@ -273,18 +291,56 @@ export default function LeaveRequestsModule() {
       </form>
 
       <div className="section-heading" style={{ marginTop: "1.25rem" }}>
-        <h3>Requests</h3>
-        <label>
-          Filter{" "}
-          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-            <option value="">All</option>
-            {STATUSES.map((s) => (
-              <option key={s} value={s}>
-                {s}
-              </option>
-            ))}
-          </select>
-        </label>
+        <div>
+          <h3>Requests</h3>
+          <p className="panel-help" aria-live="polite">
+            Showing {filteredItems.length} of {items.length} loaded request(s)
+          </p>
+        </div>
+        <div className="form-grid">
+          <label>
+            Search requests
+            <input
+              type="search"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Employee, reason, dates, status…"
+            />
+          </label>
+          <label>
+            Status
+            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+              <option value="">All statuses</option>
+              {STATUSES.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Leave type
+            <select value={leaveTypeFilter} onChange={(e) => setLeaveTypeFilter(e.target.value)}>
+              <option value="">All types</option>
+              {LEAVE_TYPES.map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button
+            type="button"
+            onClick={() => {
+              setSearch("");
+              setStatusFilter("");
+              setLeaveTypeFilter("");
+            }}
+            disabled={!search && !statusFilter && !leaveTypeFilter}
+          >
+            Clear filters
+          </button>
+        </div>
       </div>
 
       <div className="table module-table">
@@ -297,7 +353,10 @@ export default function LeaveRequestsModule() {
         </div>
         {loading && <div className="empty-state">Loading leave requests…</div>}
         {!loading && items.length === 0 && <div className="empty-state">No leave requests yet.</div>}
-        {items.map((item) => (
+        {!loading && items.length > 0 && filteredItems.length === 0 && (
+          <div className="empty-state">No leave requests match these filters.</div>
+        )}
+        {filteredItems.map((item) => (
           <div className="table-row" key={item.id}>
             <span>{employeeLabel(item.employee_id)}</span>
             <span>
