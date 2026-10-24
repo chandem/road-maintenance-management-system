@@ -373,7 +373,7 @@ export default function MachineryWorkOrdersModule() {
         </div>
         <label>
           Filter status{" "}
-          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}
+          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
             <option value="">All</option>
             {STATUS_OPTIONS.map((s) => (
               <option key={s} value={s}>
