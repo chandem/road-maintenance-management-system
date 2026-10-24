@@ -97,13 +97,13 @@ def calculate_priority(
     )
 
     status = str(data.get("status") or "").lower()
+    data_points = sum(
+        1 for value in (rating, data.get("status")) if value is not None
+    ) + (1 if work_orders else 0)
+
     if rating is None:
-        data_points = 2
         data_quality = Decimal("0")
     else:
-        data_points = sum(
-            1 for value in (rating, data.get("status")) if value is not None
-        ) + (1 if work_orders else 0)
         data_quality = (
             Decimal("100")
             if data_points == 3

@@ -33,8 +33,9 @@ def test_calculate_priority_without_condition_data():
 
     assert score == Decimal("29.41")
     assert level == "low"
-    assert confidence == Decimal("0.70")
+    assert confidence == Decimal("0.45")
     assert any("neutral score" in item for item in reasons)
+    assert any("data_quality=0" in item for item in evidence)
 
 
 
