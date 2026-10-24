@@ -56,6 +56,8 @@ export default function FinanceModule() {
   const [expenseSearch, setExpenseSearch] = useState("");
   const [expenseStatus, setExpenseStatus] = useState("");
   const [expenseCategory, setExpenseCategory] = useState("");
+  const [budgetSearch, setBudgetSearch] = useState("");
+  const [budgetStatus, setBudgetStatus] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -117,6 +119,15 @@ export default function FinanceModule() {
   }, [fiscalYear]);
 
   useEffect(() => { void loadFinanceData(); }, [loadFinanceData]);
+
+  const filteredBudgets = useMemo(() => {
+    const query = budgetSearch.trim().toLocaleLowerCase();
+    return budgets.filter((budget) => {
+      const matchesSearch = !query || [budget.budget_code ?? "", budget.category ?? "", budget.fiscal_year]
+        .some((value) => value.toLocaleLowerCase().includes(query));
+      return matchesSearch && (!budgetStatus || budget.status === budgetStatus);
+    });
+  }, [budgets, budgetSearch, budgetStatus]);
 
   const filteredExpenses = useMemo(() => {
     const query = expenseSearch.trim().toLocaleLowerCase();
@@ -277,12 +288,19 @@ export default function FinanceModule() {
           </form>
         )}
 
+        <div className="form-grid finance-budget-filters">
+          <label>Search budgets<input type="search" value={budgetSearch} onChange={(event) => setBudgetSearch(event.target.value)} placeholder="Budget code, category or fiscal year…" /></label>
+          <label>Filter by status<select value={budgetStatus} onChange={(event) => setBudgetStatus(event.target.value)}><option value="">All statuses</option>{[...new Set(budgets.map((budget) => budget.status))].sort().map((status) => <option key={status} value={status}>{status.replaceAll("_", " ")}</option>)}</select></label>
+          <span className="asset-filter-summary" aria-live="polite">{filteredBudgets.length} of {budgets.length} budgets</span>
+          {(budgetSearch || budgetStatus) && <button type="button" onClick={() => { setBudgetSearch(""); setBudgetStatus(""); }}>Clear filters</button>}
+        </div>
         {!loading && budgets.length === 0 && <p className="empty-state">No budgets were found for this fiscal year. If you have permission, create the first budget above.</p>}
-        {budgets.length > 0 && (
+        {!loading && budgets.length > 0 && filteredBudgets.length === 0 && <p className="empty-state">No budgets match these filters. Clear or adjust the filters to see more records.</p>}
+        {filteredBudgets.length > 0 && (
           <div className="module-table">
             <div className="table finance-table">
               <div className="table-row table-head" role="row"><span>Code / category</span><span>Allocated</span><span>Spent</span><span>Committed</span><span>Balance</span><span>Status</span></div>
-              {budgets.map((budget) => {
+              {filteredBudgets.map((budget) => {
                 const balance = numberValue(budget.allocated_amount) - numberValue(budget.spent_amount) - numberValue(budget.committed_amount);
                 return <div className="table-row" role="row" key={budget.id}>
                   <span><strong>{budget.budget_code || "No code"}</strong><small>{budget.category || "Uncategorized"} · {budget.fiscal_year}</small></span>
