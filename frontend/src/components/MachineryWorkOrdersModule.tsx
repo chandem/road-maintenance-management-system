@@ -60,6 +60,7 @@ export default function MachineryWorkOrdersModule() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [priorityFilter, setPriorityFilter] = useState("");
   const [search, setSearch] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
 
@@ -205,6 +206,7 @@ export default function MachineryWorkOrdersModule() {
   };
 
   const filteredItems = items.filter((item) => {
+    if (priorityFilter && item.priority.toLowerCase() !== priorityFilter) return false;
     const query = search.trim().toLowerCase();
     if (!query) return true;
     return [item.work_order_no, item.title, item.fault_type ?? "", item.description ?? "", machineLabel(item.machinery_id)]
@@ -371,7 +373,7 @@ export default function MachineryWorkOrdersModule() {
         </div>
         <label>
           Filter status{" "}
-          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}
             <option value="">All</option>
             {STATUS_OPTIONS.map((s) => (
               <option key={s} value={s}>
@@ -384,11 +386,20 @@ export default function MachineryWorkOrdersModule() {
 
       <div className="form-grid" style={{ marginBottom: "0.75rem" }}>
         <label>
+          Filter priority
+          <select value={priorityFilter} onChange={(e) => setPriorityFilter(e.target.value)}>
+            <option value="">All priorities</option>
+            {PRIORITY_OPTIONS.map((p) => (
+              <option key={p} value={p}>{p}</option>
+            ))}
+          </select>
+        </label>
+        <label>
           Search work orders
           <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Work order, title, fault, description, equipment…" />
         </label>
         <div style={{ display: "flex", alignItems: "end" }}>
-          <button type="button" onClick={() => { setSearch(""); setStatusFilter(""); }}>Clear filters</button>
+          <button type="button" onClick={() => { setSearch(""); setStatusFilter(""); setPriorityFilter(""); }}>Clear filters</button>
         </div>
       </div>
 
