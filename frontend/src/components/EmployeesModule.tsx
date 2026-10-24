@@ -32,6 +32,8 @@ export default function EmployeesModule() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [search, setSearch] = useState("");
+  const [typeFilter, setTypeFilter] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
 
   const [code, setCode] = useState("");
@@ -151,6 +153,14 @@ export default function EmployeesModule() {
       setSaving(false);
     }
   };
+
+  const filteredItems = items.filter((item) => {
+    const query = search.trim().toLowerCase();
+    const matchesSearch = !query || [item.employee_code, item.full_name, item.job_title ?? "", item.phone ?? ""]
+      .some((value) => value.toLowerCase().includes(query));
+    const matchesType = !typeFilter || item.employment_type === typeFilter;
+    return matchesSearch && matchesType;
+  });
 
   return (
     <section id="module-employee-records" className="module-panel">
@@ -273,6 +283,24 @@ export default function EmployeesModule() {
         </label>
       </div>
 
+      <div className="form-grid" style={{ marginBottom: "0.75rem" }}>
+        <label>
+          Search employees
+          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Employee code, name, job title, phone…" />
+        </label>
+        <label>
+          Employment type
+          <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}>
+            <option value="">All types</option>
+            {TYPE_OPTIONS.map((type) => <option key={type} value={type}>{type}</option>)}
+          </select>
+        </label>
+        <div style={{ display: "flex", alignItems: "end" }}>
+          <button type="button" onClick={() => { setSearch(""); setTypeFilter(""); setStatusFilter(""); }}>Clear filters</button>
+        </div>
+      </div>
+      <p className="panel-help">{filteredItems.length} matching employee record(s)</p>
+
       <div className="table module-table">
         <div className="table-row table-head">
           <span>Code / Name</span>
@@ -282,10 +310,10 @@ export default function EmployeesModule() {
           <span>Actions</span>
         </div>
         {loading && <div className="empty-state">Loading employees…</div>}
-        {!loading && items.length === 0 && (
+        {!loading && filteredItems.length === 0 && (
           <div className="empty-state">No employees recorded yet.</div>
         )}
-        {items.map((item) => (
+        {filteredItems.map((item) => (
           <div className="table-row" key={item.id}>
             <span>
               <strong>{item.employee_code}</strong>
