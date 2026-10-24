@@ -236,16 +236,9 @@ def analyze_road_priority(
         or []
     )
 
-    plans = (
-        supabase.table("maintenance_plans")
-        .select("id,name,status,fiscal_year")
-        .limit(50)
-        .execute()
-        .data
-        or []
-    )
-
-    priority = score_road_section(data, work_orders, related_plans=plans)
+    # Do not use organization-wide plans as if they were linked to this section.
+    # A plan-to-section relationship must be verified before it can affect priority.
+    priority = score_road_section(data, work_orders)
     action = baseline_action(priority.level)
 
     road_meta = {"road_code": None, "road_name": None}
@@ -412,15 +405,6 @@ def rank_road_sections(
         )
         roads_by_id = {str(r["id"]): r for r in roads}
 
-    plans = (
-        supabase.table("maintenance_plans")
-        .select("id,name,status,fiscal_year")
-        .limit(100)
-        .execute()
-        .data
-        or []
-    )
-
     rows = []
 
     for section in sections:
@@ -432,7 +416,7 @@ def rank_road_sections(
             if inspection.get("condition_rating") is not None:
                 section["condition_rating"] = inspection["condition_rating"]
         orders = orders_by_section.get(section_id, [])
-        priority = score_road_section(section, orders, related_plans=plans)
+        priority = score_road_section(section, orders)
         road = roads_by_id.get(str(section.get("road_id") or ""), {})
 
         rows.append(
