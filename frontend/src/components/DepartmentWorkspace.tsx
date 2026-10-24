@@ -114,6 +114,17 @@ export default function DepartmentWorkspace({ departmentCode }: { departmentCode
   const [metrics, setMetrics] = useState<Metric[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [activeSection, setActiveSection] = useState(
+    () => window.location.hash || "#department-overview",
+  );
+
+  useEffect(() => {
+    const syncActiveSection = () => {
+      setActiveSection(window.location.hash || "#department-overview");
+    };
+    window.addEventListener("hashchange", syncActiveSection);
+    return () => window.removeEventListener("hashchange", syncActiveSection);
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -180,7 +191,7 @@ export default function DepartmentWorkspace({ departmentCode }: { departmentCode
         <h2>{config.name}</h2>
         <p className="panel-help">Department modules</p>
         <nav aria-label={config.name + " navigation"} className={departmentCode === "road_asset" ? "department-nav department-nav-road-asset" : "department-nav"}>
-          <a className="department-nav-overview" href="#department-overview">
+          <a className={"department-nav-overview" + (activeSection === "#department-overview" ? " is-active" : "")} href="#department-overview" aria-current={activeSection === "#department-overview" ? "page" : undefined}>
             <span className="department-nav-icon" aria-hidden="true">⌂</span><span>Overview</span>
           </a>
           {config.modules.map((m) => {
@@ -231,13 +242,13 @@ export default function DepartmentWorkspace({ departmentCode }: { departmentCode
               "disposal-and-reports": "▥"
             } as Record<string, string>)[slug] ?? "•";
             return (
-              <a key={m.title} href={href}>
+              <a key={m.title} href={href} className={activeSection === href ? "is-active" : undefined} aria-current={activeSection === href ? "page" : undefined}>
                 <span className="department-nav-icon" aria-hidden="true">{icon}</span>
                 <span>{m.title}</span>
               </a>
             );
           })}
-          <a href="#department-reports"><span className="department-nav-icon" aria-hidden="true">▥</span><span>Reports and analytics</span></a>
+          <a href="#department-reports" className={activeSection === "#department-reports" ? "is-active" : undefined} aria-current={activeSection === "#department-reports" ? "page" : undefined}><span className="department-nav-icon" aria-hidden="true">▥</span><span>Reports and analytics</span></a>
         </nav>
       </aside>
       <div className="department-main">
