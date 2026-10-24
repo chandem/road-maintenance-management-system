@@ -299,12 +299,26 @@ export default function FinanceModule() {
         {filteredBudgets.length > 0 && (
           <div className="module-table">
             <div className="table finance-table">
-              <div className="table-row table-head" role="row"><span>Code / category</span><span>Allocated</span><span>Spent</span><span>Committed</span><span>Balance</span><span>Status</span></div>
+              <div className="table-row table-head" role="row"><span>Code / category</span><span>Allocated</span><span>Spent</span><span>Committed</span><span>Balance</span><span>Utilization</span><span>Status</span></div>
               {filteredBudgets.map((budget) => {
-                const balance = numberValue(budget.allocated_amount) - numberValue(budget.spent_amount) - numberValue(budget.committed_amount);
+                const allocated = numberValue(budget.allocated_amount);
+                const spent = numberValue(budget.spent_amount);
+                const committed = numberValue(budget.committed_amount);
+                const balance = allocated - spent - committed;
+                const used = spent + committed;
+                const utilization = allocated > 0 ? (used / allocated) * 100 : null;
+                const utilizationWidth = utilization === null ? 0 : Math.min(100, Math.max(0, utilization));
                 return <div className="table-row" role="row" key={budget.id}>
                   <span><strong>{budget.budget_code || "No code"}</strong><small>{budget.category || "Uncategorized"} · {budget.fiscal_year}</small></span>
-                  <span>{amount(budget.allocated_amount)}</span><span>{amount(budget.spent_amount)}</span><span>{amount(budget.committed_amount)}</span><span>{amount(balance)}</span><span><span className={`badge ${budget.status.toLowerCase() === "active" ? "low" : ""}`}>{budget.status.replaceAll("_", " ")}</span></span>
+                  <span>{amount(allocated)}</span><span>{amount(spent)}</span><span>{amount(committed)}</span><span>{amount(balance)}</span>
+                  <span className="finance-budget-utilization">
+                    <strong>{utilization === null ? "—" : `${utilization.toFixed(1)}%`}</strong>
+                    <div className="finance-progress" role="progressbar" aria-label={`Budget utilization for ${budget.budget_code || budget.category || budget.fiscal_year}`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={utilizationWidth}>
+                      <span style={{ width: `${utilizationWidth}%` }} />
+                    </div>
+                    {utilization !== null && utilization > 100 && <small>Over budget</small>}
+                  </span>
+                  <span><span className={`badge ${budget.status.toLowerCase() === "active" ? "low" : ""}`}>{budget.status.replaceAll("_", " ")}</span></span>
                 </div>;
               })}
             </div>
