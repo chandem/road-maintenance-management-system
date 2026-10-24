@@ -860,6 +860,21 @@ function App() {
                 </p>
               </div>
               <div className="assistant-chat">
+                {selectedDepartment === "road_asset" && (
+                  <div className="assistant-quick-actions">
+                    <button
+                      type="button"
+                      className="secondary-button"
+                      onClick={() =>
+                        setAssistantQuestion(
+                          "Prepare an evidence-based annual road maintenance priority plan within the available fixed budget. Use authorized road asset and road-section records, condition ratings, inspections, defects, safety risks, active work orders, maintenance proposals, BOQ quantities, and unit rates where available. Rank sections and explain each priority. For every proposed treatment, show the supporting evidence, estimated cost and calculation, confidence, and missing inputs. Summarize total proposed expenditure, remaining budget, and deferred work with reasons. Do not invent condition scores, quantities, rates, budget values, or records. If essential budget or cost inputs are missing, list them and ask for them. This is an advisory proposal requiring engineering review, not approval to spend."
+                        )
+                      }
+                    >
+                      Prepare annual budget & priority plan
+                    </button>
+                  </div>
+                )}
                 <form onSubmit={handleAskAssistant}>
                   <textarea
                     value={assistantQuestion}
