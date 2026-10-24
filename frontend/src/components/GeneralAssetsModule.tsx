@@ -81,6 +81,35 @@ export default function GeneralAssetsModule() {
     setCurrentValue(""); setAssignedTo("");
   }
 
+  function exportAssetsCsv() {
+    const columns: Array<{ label: string; value: (item: Asset) => string | number }> = [
+      { label: "Asset code", value: (item) => item.asset_code },
+      { label: "Asset name", value: (item) => item.name },
+      { label: "Category", value: (item) => item.category ?? "" },
+      { label: "Location", value: (item) => item.location ?? "" },
+      { label: "Status", value: (item) => item.status },
+      { label: "Acquisition date", value: (item) => item.acquisition_date?.slice(0, 10) ?? "" },
+      { label: "Acquisition cost", value: (item) => item.acquisition_cost ?? "" },
+      { label: "Current value", value: (item) => item.current_value ?? "" },
+      { label: "Assigned to", value: (item) => item.assigned_to ?? "" },
+    ];
+    const escapeCsv = (value: string | number) => {
+      const text = String(value);
+      return /[",\\r\\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+    };
+    const csv = [
+      columns.map((column) => escapeCsv(column.label)).join(","),
+      ...filteredItems.map((item) => columns.map((column) => escapeCsv(column.value(item))).join(",")),
+    ].join("\\r\\n");
+    const blob = new Blob(["\\uFEFF", csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "general-assets.csv";
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+
   function edit(item: Asset) {
     setEditingId(item.id); setAssetCode(item.asset_code); setName(item.name);
     setCategory(item.category ?? ""); setLocation(item.location ?? ""); setStatus(item.status || "active");
@@ -127,7 +156,10 @@ export default function GeneralAssetsModule() {
       <div className="section-heading">
         <div><p className="eyebrow">GENERAL ASSETS · INVENTORY</p><h2>General asset register</h2>
           <p className="panel-help">Register and track office equipment, furniture, IT devices and other organizational assets. Separate from roads and heavy machinery.</p></div>
-        <button type="button" onClick={() => void load()} disabled={loading}>{loading ? "Loading…" : "Refresh"}</button>
+        <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+          <button type="button" onClick={exportAssetsCsv} disabled={filteredItems.length === 0}>Export CSV ({filteredItems.length})</button>
+          <button type="button" onClick={() => void load()} disabled={loading}>{loading ? "Loading…" : "Refresh"}</button>
+        </div>
       </div>
       {error && <div className="error-message" role="alert">{error}</div>}
       {notice && <div className="success-message" role="status">{notice}</div>}
