@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routes.ai import router as ai_router
+from app.api.routes.budget_planning import router as budget_planning_router
 from app.api.routes.assets import router as assets_router
 from app.api.routes.asset_transfers import router as asset_transfers_router
 from app.api.routes.asset_maintenance import router as asset_maintenance_router
@@ -51,6 +52,7 @@ app.add_middleware(
 
 app.include_router(health_router, prefix="/api/v1")
 app.include_router(ai_router, prefix="/api/v1")
+app.include_router(budget_planning_router, prefix="/api/v1")
 app.include_router(department_assistant_router, prefix="/api/v1")
 app.include_router(documents_router, prefix="/api/v1")
 app.include_router(departments_router, prefix="/api/v1")
