@@ -12,6 +12,7 @@ type Props = {
 const shortcuts: { id: string; title: string; description: string; icon: string; tag: string }[] = [
   { id: "module-road-inventory", title: "Road inventory", description: "Register corridors, road class, surface and length.", icon: "↗", tag: "NETWORK" },
   { id: "module-sections-and-chainage", title: "Sections & chainage", description: "Manage section limits, chainage and condition ratings.", icon: "◎", tag: "SEGMENTATION" },
+  { id: "module-gis-asset-map", title: "GIS asset map", description: "Explore GPS-located assets, condition and criticality on an interactive map.", icon: "⌖", tag: "SPATIAL INTELLIGENCE" },
   { id: "inspections", title: "Field inspections", description: "Record surveys, defects and recommended actions.", icon: "✓", tag: "FIELD DATA" },
   { id: "module-maintenance-planning", title: "Maintenance plans", description: "Organize routine, periodic and emergency works.", icon: "▤", tag: "PLANNING" },
   { id: "module-work-orders", title: "Work orders", description: "Track assigned maintenance and delivery progress.", icon: "⚙", tag: "EXECUTION" },
