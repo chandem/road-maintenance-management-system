@@ -24,6 +24,7 @@ import RoadWorkOrdersModule from "./RoadWorkOrdersModule";
 import RoadsModule from "./RoadsModule";
 import RoadAssetDashboard from "./RoadAssetDashboard";
 import RoadAssetRegisterModule from "./RoadAssetRegisterModule";
+import RoadGISModule from "./RoadGISModule";
 import SparePartsModule from "./SparePartsModule";
 import TrainingLicensesModule from "./TrainingLicensesModule";
 
@@ -41,6 +42,7 @@ const CONFIG: Record<string, DepartmentConfig> = {
     modules: [
       { title: "Road inventory", description: "Road corridors, codes, class, surface and operational status.", status: "live" },
       { title: "Road asset register", description: "Bridges, culverts, drainage, signs and infrastructure condition.", status: "live" },
+      { title: "GIS asset map", description: "Explore registered GPS-located road assets and criticality.", status: "live" },
       { title: "Sections and chainage", description: "Section breakdowns and condition ratings.", status: "live" },
       { title: "Inspections", description: "Condition surveys, defects and recommended actions.", status: "live" },
       { title: "Maintenance planning", description: "Plans linked to sections and priorities.", status: "live" },
@@ -199,6 +201,7 @@ export default function DepartmentWorkspace({ departmentCode }: { departmentCode
             const roadAssetTargets: Record<string, string> = {
               "road-inventory": "#module-road-inventory",
               "road-asset-register": "#module-road-asset-register",
+              "gis-asset-map": "#module-gis-asset-map",
               "sections-and-chainage": "#module-sections-and-chainage",
               inspections: "#inspections",
               "maintenance-planning": "#module-maintenance-planning",
@@ -212,6 +215,7 @@ export default function DepartmentWorkspace({ departmentCode }: { departmentCode
             const icon = ({
               "road-inventory": "▤",
               "road-asset-register": "◈",
+              "gis-asset-map": "⌖",
               "sections-and-chainage": "⇄",
               inspections: "✓",
               "maintenance-planning": "▦",
@@ -301,6 +305,7 @@ export default function DepartmentWorkspace({ departmentCode }: { departmentCode
           <>
             <RoadsModule />
             <RoadAssetRegisterModule />
+            <RoadGISModule />
             <RoadSectionsModule />
             <RoadInspectionsModule />
             <MaintenancePlansModule />
