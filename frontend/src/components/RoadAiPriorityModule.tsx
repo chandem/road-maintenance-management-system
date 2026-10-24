@@ -25,6 +25,30 @@ type RankingResponse = {
   ai_generated?: boolean;
 };
 
+type BudgetPlanItem = {
+  road_section_id: string;
+  section_code: string | null;
+  road_code: string | null;
+  road_name: string | null;
+  priority_score: number;
+  priority_level: string;
+  confidence: number;
+  estimated_cost: number;
+  cost_basis: string;
+  reason: string;
+};
+
+type BudgetPlanResponse = {
+  budget: number;
+  selected: BudgetPlanItem[];
+  deferred: BudgetPlanItem[];
+  selected_total: number;
+  remaining_budget: number;
+  method: string;
+  advisory_only: boolean;
+  limitations: string[];
+};
+
 type PriorityDetail = {
   road_section_id: string;
   section_code: string | null;
@@ -48,6 +72,12 @@ export default function RoadAiPriorityModule() {
   const [loading, setLoading] = useState(false);
   const [detailLoading, setDetailLoading] = useState(false);
   const [error, setError] = useState("");
+  const [selectedSections, setSelectedSections] = useState<string[]>([]);
+  const [budget, setBudget] = useState("");
+  const [costs, setCosts] = useState<Record<string, string>>({});
+  const [costBases, setCostBases] = useState<Record<string, string>>({});
+  const [plan, setPlan] = useState<BudgetPlanResponse | null>(null);
+  const [planLoading, setPlanLoading] = useState(false);
 
   const loadRanking = useCallback(async () => {
     setLoading(true);
@@ -184,6 +214,131 @@ export default function RoadAiPriorityModule() {
           </div>
         ))}
       </div>
+
+      {report && report.rankings.length > 0 && (
+        <div className="dashboard-panel" style={{ marginTop: "1.25rem" }}>
+          <p className="eyebrow">BUDGET PLANNING</p>
+          <h3>Build a budget-constrained maintenance plan</h3>
+          <p className="panel-help">
+            Select road sections, enter estimated treatment costs and identify the BOQ or estimate basis.
+            The planner ranks recorded priorities and never authorizes spending.
+          </p>
+          <label htmlFor="maintenance-budget">Available planning budget (ETB)</label>
+          <input
+            id="maintenance-budget"
+            type="number"
+            min="0"
+            step="0.01"
+            value={budget}
+            onChange={(event) => setBudget(event.target.value)}
+            placeholder="Enter available budget"
+          />
+          <div className="table module-table" style={{ marginTop: "0.75rem" }}>
+            <div className="table-row table-head">
+              <span>Include</span><span>Road section</span><span>Priority</span><span>Estimated cost (ETB)</span><span>Cost basis</span>
+            </div>
+            {report.rankings.map((item) => (
+              <div className="table-row" key={item.road_section_id}>
+                <span>
+                  <input
+                    aria-label={`Include section ${item.section_code || item.road_section_id}`}
+                    type="checkbox"
+                    checked={selectedSections.includes(item.road_section_id)}
+                    onChange={(event) => {
+                      setSelectedSections((current) =>
+                        event.target.checked
+                          ? [...current, item.road_section_id]
+                          : current.filter((id) => id !== item.road_section_id)
+                      );
+                      setPlan(null);
+                    }}
+                  />
+                </span>
+                <span><strong>{item.section_code || item.road_section_id.slice(0, 8)}</strong><br />{[item.road_code, item.road_name].filter(Boolean).join(" — ") || "—"}</span>
+                <span>{Number(item.priority_score).toFixed(1)}/100<br /><span className="panel-help">{item.priority_level}</span></span>
+                <span>
+                  <input
+                    aria-label={`Estimated cost for ${item.section_code || item.road_section_id}`}
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={costs[item.road_section_id] ?? ""}
+                    onChange={(event) => {
+                      setCosts((current) => ({ ...current, [item.road_section_id]: event.target.value }));
+                      setPlan(null);
+                    }}
+                    placeholder="ETB"
+                  />
+                </span>
+                <span>
+                  <input
+                    aria-label={`Cost basis for ${item.section_code || item.road_section_id}`}
+                    value={costBases[item.road_section_id] ?? ""}
+                    onChange={(event) => {
+                      setCostBases((current) => ({ ...current, [item.road_section_id]: event.target.value }));
+                      setPlan(null);
+                    }}
+                    placeholder="BOQ / estimate reference"
+                  />
+                </span>
+              </div>
+            ))}
+          </div>
+          <button
+            type="button"
+            disabled={planLoading || !budget.trim() || !Number.isFinite(Number(budget)) || Number(budget) < 0 || selectedSections.length === 0 || selectedSections.some((id) => !costs[id]?.trim() || !Number.isFinite(Number(costs[id])) || Number(costs[id]) < 0 || !costBases[id]?.trim())}
+            onClick={async () => {
+              setPlanLoading(true);
+              setError("");
+              setPlan(null);
+              try {
+                const { data } = await supabase.auth.getSession();
+                const token = data.session?.access_token;
+                if (!token) throw new Error("Please sign in to create a maintenance plan.");
+                const response = await fetch(`${API}/ai/budget-plan`, {
+                  method: "POST",
+                  headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    budget: Number(budget),
+                    candidates: selectedSections.map((road_section_id) => ({
+                      road_section_id,
+                      estimated_cost: Number(costs[road_section_id]),
+                      cost_basis: costBases[road_section_id].trim(),
+                    })),
+                  }),
+                });
+                if (!response.ok) {
+                  const message = (await response.text()).slice(0, 300);
+                  throw new Error(`Budget plan failed (${response.status}): ${message}`);
+                }
+                setPlan(await response.json());
+              } catch (e) {
+                setError(e instanceof Error ? e.message : "Unable to create budget plan.");
+              } finally {
+                setPlanLoading(false);
+              }
+            }}
+          >
+            {planLoading ? "Building plan…" : "Generate budget plan"}
+          </button>
+          {plan && (
+            <div style={{ marginTop: "1rem" }}>
+              <h4>Advisory plan — not spending authorization</h4>
+              <div className="metric-grid">
+                <div className="metric-card"><span className="metric-label">Budget (ETB)</span><strong className="metric-value">{Number(plan.budget).toLocaleString()}</strong></div>
+                <div className="metric-card"><span className="metric-label">Selected total (ETB)</span><strong className="metric-value">{Number(plan.selected_total).toLocaleString()}</strong></div>
+                <div className="metric-card"><span className="metric-label">Remaining (ETB)</span><strong className="metric-value">{Number(plan.remaining_budget).toLocaleString()}</strong></div>
+              </div>
+              <h4>Selected sections ({plan.selected.length})</h4>
+              {plan.selected.length ? <ul>{plan.selected.map((item) => <li key={item.road_section_id}>{item.section_code || item.road_section_id}: ETB {Number(item.estimated_cost).toLocaleString()} — {item.reason}</li>)}</ul> : <p>No sections fit within the supplied budget.</p>}
+              <h4>Deferred sections ({plan.deferred.length})</h4>
+              {plan.deferred.length ? <ul>{plan.deferred.map((item) => <li key={item.road_section_id}>{item.section_code || item.road_section_id}: ETB {Number(item.estimated_cost).toLocaleString()} — {item.reason}</li>)}</ul> : <p>No sections deferred.</p>}
+              <p className="panel-help">{plan.method}. Costs are estimates; verify each cost basis before operational use.</p>
+              <ul>{plan.limitations.map((limitation) => <li key={limitation}>{limitation}</li>)}</ul>
+            </div>
+          )}
+        </div>
+      )}
 
       {report?.methodology && (
         <p className="panel-help" style={{ marginTop: "1rem" }}>
