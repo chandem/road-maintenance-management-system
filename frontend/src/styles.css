@@ -1214,7 +1214,7 @@ section, .dashboard-panel, .metric-card, .proposal-card {
 }
 .department-nav a:hover { background: #f3f7ff; color: #1d4ed8; border-color: #e0eaff; }
 .department-nav a:active { transform: translateY(1px); }
-.department-nav .department-nav-overview { background: #eaf1ff; color: #1e4fc5; font-weight: 750; }
+.department-nav .department-nav-overview { background: transparent; color: #42516a; font-weight: 580; }
 .department-nav-icon {
   display: inline-grid;
   flex: 0 0 28px;
@@ -1228,8 +1228,7 @@ section, .dashboard-panel, .metric-card, .proposal-card {
   font-weight: 800;
   line-height: 1;
 }
-.department-nav a:hover .department-nav-icon,
-.department-nav .department-nav-overview .department-nav-icon { background: #dce8ff; color: #1d4ed8; }
+.department-nav a:hover .department-nav-icon { background: #dce8ff; color: #1d4ed8; }
 .department-main { min-width: 0; display: grid; gap: 1.1rem; }
 .department-main > section { min-width: 0; }
 .department-main h2, .department-main h3 { letter-spacing: -.025em; }
