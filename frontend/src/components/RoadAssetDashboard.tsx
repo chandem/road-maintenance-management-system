@@ -73,7 +73,12 @@ export default function RoadAssetDashboard({ metrics, loading, error, onRefresh 
       </div>
 
       {loading && <div className="rams-dashboard-state" role="status"><span className="rams-loading-spinner" /> Loading authorized road asset metrics…</div>}
-      {error && <div className="error-message" role="alert">{error}</div>}
+      {error && (
+        <div className="error-message" role="alert">
+          <p>{error}</p>
+          <button className="rams-refresh-button" type="button" onClick={onRefresh} disabled={loading}>Try again</button>
+        </div>
+      )}
       {!loading && !error && metrics.length > 0 && (
         <div className="rams-metric-grid">
           {metrics.slice(0, 8).map((metric, index) => (
