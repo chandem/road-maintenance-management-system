@@ -1307,3 +1307,13 @@ section, .dashboard-panel, .metric-card, .proposal-card {
 @media (prefers-reduced-motion: reduce) {
   .gis-leaflet-map { scroll-behavior: auto; }
 }
+
+/* Consistent vector navigation icons across all department workspaces */
+.department-nav-icon { color: #42618f; }
+.department-nav-svg { display: block; flex: 0 0 auto; }
+.department-nav a.is-active .department-nav-icon,
+.department-nav a:hover .department-nav-icon { color: #1d4ed8; }
+@media (max-width: 720px) {
+  .department-nav-icon { flex-basis: 24px; width: 24px; height: 24px; }
+  .department-nav-svg { width: 16px; height: 16px; }
+}
