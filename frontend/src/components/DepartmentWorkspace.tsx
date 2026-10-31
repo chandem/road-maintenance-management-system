@@ -116,6 +116,7 @@ export default function DepartmentWorkspace({ departmentCode }: { departmentCode
   const [metrics, setMetrics] = useState<Metric[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [refreshKey, setRefreshKey] = useState(0);
   const [activeSection, setActiveSection] = useState(
     () => window.location.hash || "#department-overview",
   );
@@ -175,7 +176,7 @@ export default function DepartmentWorkspace({ departmentCode }: { departmentCode
     return () => {
       active = false;
     };
-  }, [departmentCode, config]);
+  }, [departmentCode, config, refreshKey]);
 
   if (!config) {
     return (
@@ -261,7 +262,7 @@ export default function DepartmentWorkspace({ departmentCode }: { departmentCode
             metrics={metrics}
             loading={loading}
             error={error}
-            onRefresh={() => window.location.reload()}
+            onRefresh={() => setRefreshKey((current) => current + 1)}
           />
         ) : (
         <section id="department-overview" className="dashboard-panel">
@@ -270,8 +271,8 @@ export default function DepartmentWorkspace({ departmentCode }: { departmentCode
           <p>{config.description}</p>
           <div className="section-heading">
             <h3>Live operational metrics</h3>
-            <button type="button" onClick={() => window.location.reload()}>
-              Refresh
+            <button type="button" onClick={() => setRefreshKey((current) => current + 1)}>
+              Refresh metrics
             </button>
           </div>
           {loading && <p className="empty-state">Loading department metrics…</p>}
