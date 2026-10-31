@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { supabase } from "../lib/supabase";
 import AssetMaintenanceModule from "./AssetMaintenanceModule";
 import AssetTransfersModule from "./AssetTransfersModule";
@@ -111,6 +111,41 @@ function statusLabel(status?: ModuleInfo["status"]): string {
   return "Planned";
 }
 
+type DepartmentNavIconName =
+  | "overview" | "inventory" | "map" | "route" | "inspection" | "calendar"
+  | "clipboard" | "sparkles" | "machinery" | "parts" | "fuel" | "chart"
+  | "wallet" | "receipt" | "payment" | "users" | "organization" | "clock"
+  | "award" | "assets" | "transfer" | "wrench" | "archive";
+
+function DepartmentNavIcon({ name }: { name: DepartmentNavIconName }) {
+  const paths: Record<DepartmentNavIconName, ReactNode> = {
+    overview: <><path d="m3 10 9-7 9 7" /><path d="M5 9v11h14V9M9 20v-6h6v6" /></>,
+    inventory: <><rect x="4" y="4" width="16" height="16" rx="2" /><path d="M8 8h8M8 12h8M8 16h5" /></>,
+    map: <><path d="m3 6 6-3 6 3 6-3v15l-6 3-6-3-6 3z" /><path d="M9 3v15m6-12v15" /></>,
+    route: <><circle cx="6" cy="18" r="2" /><circle cx="18" cy="6" r="2" /><path d="M8 18h3a3 3 0 0 0 3-3V9a3 3 0 0 1 3-3" /></>,
+    inspection: <><path d="m5 12 4 4L19 6" /><path d="M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h9" /></>,
+    calendar: <><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M7 3v4m10-4v4M3 10h18" /></>,
+    clipboard: <><rect x="5" y="4" width="14" height="17" rx="2" /><path d="M9 4V3h6v1M8 10h8m-8 4h8m-8 4h5" /></>,
+    sparkles: <><path d="m12 3 1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z" /><path d="m19 14 .9 2.1L22 17l-2.1.9L19 20l-.9-2.1L16 17l2.1-.9z" /></>,
+    machinery: <><circle cx="12" cy="12" r="3" /><path d="m19.4 15 .1.1 1.4 1.1-1.5 2.6-1.7-.7a8 8 0 0 1-1.7 1l-.3 1.8h-3l-.3-1.8a8 8 0 0 1-1.7-1l-1.7.7-1.5-2.6 1.4-1.1a7 7 0 0 1 0-2l-1.4-1.1 1.5-2.6 1.7.7a8 8 0 0 1 1.7-1L12 7h3l.3 1.8a8 8 0 0 1 1.7 1l1.7-.7 1.5 2.6-1.4 1.1a7 7 0 0 1 0 2Z" transform="translate(-1 -1) scale(1.08)" /></>,
+    parts: <><path d="m12 3 8 4.5v9L12 21l-8-4.5v-9z" /><path d="m4 7.5 8 4.5 8-4.5M12 12v9" /></>,
+    fuel: <><path d="M5 21V4a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v17M3 21h15" /><path d="M8 6h5v5H8zM16 8h2l2 2v7a2 2 0 0 1-4 0v-3" /></>,
+    chart: <><path d="M4 19V5m0 14h17" /><path d="m7 15 4-4 3 2 6-7" /></>,
+    wallet: <><rect x="3" y="5" width="18" height="15" rx="2" /><path d="M3 9h18m-5 5h2" /></>,
+    receipt: <><path d="M5 3h14v18l-3-2-4 2-4-2-3 2z" /><path d="M8 8h8m-8 4h8m-8 4h4" /></>,
+    payment: <><path d="M3 7h18v12H3zM3 10h18" /><path d="M7 15h4" /></>,
+    users: <><circle cx="9" cy="8" r="3" /><path d="M3 20v-1a6 6 0 0 1 12 0v1z" /><path d="M16 5a3 3 0 0 1 0 6m2 3a5 5 0 0 1 3 5v1h-4" /></>,
+    organization: <><rect x="8" y="3" width="8" height="5" rx="1" /><rect x="2" y="16" width="8" height="5" rx="1" /><rect x="14" y="16" width="8" height="5" rx="1" /><path d="M12 8v4M6 16v-2h12v2m0 0v-2" /></>,
+    clock: <><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></>,
+    award: <><circle cx="12" cy="8" r="5" /><path d="m8 12-1 9 5-3 5 3-1-9" /></>,
+    assets: <><path d="m12 3 9 5-9 5-9-5z" /><path d="m3 12 9 5 9-5M3 16l9 5 9-5" /></>,
+    transfer: <><path d="M4 7h15l-3-3m3 3-3 3M20 17H5l3 3m-3-3 3-3" /></>,
+    wrench: <><path d="M14 6a5 5 0 0 0-6 6L3 17l4 4 5-5a5 5 0 0 0 6-6l-3 3-4-4z" /></>,
+    archive: <><path d="M3 4h18v4H3zM5 8v12h14V8m-9 4h4" /></>,
+  };
+  return <svg className="department-nav-svg" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{paths[name]}</svg>;
+}
+
 export default function DepartmentWorkspace({ departmentCode }: { departmentCode: string }) {
   const config = CONFIG[departmentCode];
   const [metrics, setMetrics] = useState<Metric[]>([]);
@@ -195,7 +230,7 @@ export default function DepartmentWorkspace({ departmentCode }: { departmentCode
         <p className="panel-help">Department modules</p>
         <nav aria-label={config.name + " navigation"} className={departmentCode === "road_asset" ? "department-nav department-nav-road-asset" : "department-nav"}>
           <a className={"department-nav-overview" + (activeSection === "#department-overview" ? " is-active" : "")} href="#department-overview" aria-current={activeSection === "#department-overview" ? "page" : undefined}>
-            <span className="department-nav-icon" aria-hidden="true">⌂</span><span>Overview</span>
+            <span className="department-nav-icon"><DepartmentNavIcon name="overview" /></span><span>Overview</span>
           </a>
           {config.modules.map((m) => {
             const slug = m.title.toLowerCase().replaceAll(" ", "-");
@@ -214,46 +249,46 @@ export default function DepartmentWorkspace({ departmentCode }: { departmentCode
               ? roadAssetTargets[slug] ?? ("#module-" + slug)
               : "#module-" + slug;
             const icon = ({
-              "road-inventory": "▤",
-              "road-asset-register": "◈",
-              "gis-asset-map": "⌖",
-              "sections-and-chainage": "⇄",
-              inspections: "✓",
-              "maintenance-planning": "▦",
-              "maintenance-proposals": "▧",
-              "work-orders": "⚙",
-              "ai-priority-support": "✦",
-              "equipment-register": "▣",
-              "breakdowns-and-work-orders": "⚒",
-              "spare-parts": "◈",
-              "fuel-and-operating-hours": "⛽",
-              "fleet-reports": "▥",
-              "budget-management": "◉",
-              expenses: "↗",
-              "payment-requests": "⇄",
-              "project-cost-control": "▤",
-              "suppliers-and-contracts": "♧",
-              "financial-reports": "▥",
-              employees: "♙",
-              "organization-staffing": "♧",
-              "leave-requests": "◷",
-              "training-and-licenses": "✦",
-              "hr-reports": "▥",
-              "asset-register": "▣",
-              "asset-transfers": "⇄",
-              "asset-maintenance": "⚙",
-              "asset-categories": "◈",
-              "repairs-and-warranties": "⚒",
-              "disposal-and-reports": "▥"
-            } as Record<string, string>)[slug] ?? "•";
+              "road-inventory": "inventory",
+              "road-asset-register": "assets",
+              "gis-asset-map": "map",
+              "sections-and-chainage": "route",
+              inspections: "inspection",
+              "maintenance-planning": "calendar",
+              "maintenance-proposals": "clipboard",
+              "work-orders": "wrench",
+              "ai-priority-support": "sparkles",
+              "equipment-register": "machinery",
+              "breakdowns-and-work-orders": "wrench",
+              "spare-parts": "parts",
+              "fuel-and-operating-hours": "fuel",
+              "fleet-reports": "chart",
+              "budget-management": "wallet",
+              expenses: "receipt",
+              "payment-requests": "payment",
+              "project-cost-control": "chart",
+              "suppliers-and-contracts": "organization",
+              "financial-reports": "chart",
+              employees: "users",
+              "organization-staffing": "organization",
+              "leave-requests": "clock",
+              "training-and-licenses": "award",
+              "hr-reports": "chart",
+              "asset-register": "assets",
+              "asset-transfers": "transfer",
+              "asset-maintenance": "wrench",
+              "asset-categories": "inventory",
+              "repairs-and-warranties": "wrench",
+              "disposal-and-reports": "archive",
+            } as Record<string, DepartmentNavIconName>)[slug] ?? "clipboard";
             return (
               <a key={m.title} href={href} className={activeSection === href ? "is-active" : undefined} aria-current={activeSection === href ? "page" : undefined}>
-                <span className="department-nav-icon" aria-hidden="true">{icon}</span>
+                <span className="department-nav-icon"><DepartmentNavIcon name={icon} /></span>
                 <span>{m.title}</span>
               </a>
             );
           })}
-          <a href="#department-reports" className={activeSection === "#department-reports" ? "is-active" : undefined} aria-current={activeSection === "#department-reports" ? "page" : undefined}><span className="department-nav-icon" aria-hidden="true">▥</span><span>Reports and analytics</span></a>
+          <a href="#department-reports" className={activeSection === "#department-reports" ? "is-active" : undefined} aria-current={activeSection === "#department-reports" ? "page" : undefined}><span className="department-nav-icon"><DepartmentNavIcon name="chart" /></span><span>Reports and analytics</span></a>
         </nav>
       </aside>
       <div className="department-main">
