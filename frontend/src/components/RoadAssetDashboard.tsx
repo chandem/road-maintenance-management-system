@@ -1,9 +1,11 @@
 import "./RoadAssetDashboard.css";
 
 export type RoadAssetMetric = { label: string; value: string | number; unit?: string };
+export type RoadAssetAlert = { severity: string; module: string; message: string };
 
 type Props = {
   metrics: RoadAssetMetric[];
+  alerts: RoadAssetAlert[];
   loading: boolean;
   error: string;
   onRefresh: () => void;
@@ -32,7 +34,7 @@ function metricIcon(label: string): string {
   return "▦";
 }
 
-export default function RoadAssetDashboard({ metrics, loading, error, onRefresh }: Props) {
+export default function RoadAssetDashboard({ metrics, alerts, loading, error, onRefresh }: Props) {
   return (
     <section id="department-overview" className="rams-dashboard">
       <header className="rams-dashboard-hero">
@@ -78,6 +80,20 @@ export default function RoadAssetDashboard({ metrics, loading, error, onRefresh 
           <p>{error}</p>
           <button className="rams-refresh-button" type="button" onClick={onRefresh} disabled={loading}>Try again</button>
         </div>
+      )}
+      {!loading && !error && alerts.length > 0 && (
+        <section className="department-alerts" aria-label="Operational alerts">
+          <h3>Operational alerts</h3>
+          <div className="department-alert-list">
+            {alerts.map((alert, index) => {
+              const severity = ["high", "medium", "low"].includes(alert.severity.toLowerCase()) ? alert.severity.toLowerCase() : "info";
+              return <article className={`department-alert is-${severity}`} key={`${alert.module}-${index}`}>
+                <span className="department-alert-severity">{severity}</span>
+                <div><strong>{alert.module}</strong><p>{alert.message}</p></div>
+              </article>;
+            })}
+          </div>
+        </section>
       )}
       {!loading && !error && metrics.length > 0 && (
         <div className="rams-metric-grid">
