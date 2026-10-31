@@ -313,7 +313,10 @@ export default function DepartmentWorkspace({ departmentCode }: { departmentCode
           {loading && <p className="empty-state">Loading department metrics…</p>}
           {error && (
             <div className="error-message" role="alert">
-              {error}
+              <p>{error}</p>
+              <button type="button" onClick={() => setRefreshKey((current) => current + 1)} disabled={loading}>
+                Try again
+              </button>
             </div>
           )}
           {!loading && !error && metrics.length > 0 && (
