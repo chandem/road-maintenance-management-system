@@ -29,6 +29,7 @@ import SparePartsModule from "./SparePartsModule";
 import TrainingLicensesModule from "./TrainingLicensesModule";
 
 type Metric = { label: string; value: string | number; unit?: string };
+type DashboardAlert = { severity: string; module: string; message: string };
 type ModuleInfo = { title: string; description: string; status?: "planned" | "partial" | "live" };
 type DepartmentConfig = { name: string; description: string; endpoint: string; modules: ModuleInfo[] };
 
@@ -149,6 +150,7 @@ function DepartmentNavIcon({ name }: { name: DepartmentNavIconName }) {
 export default function DepartmentWorkspace({ departmentCode }: { departmentCode: string }) {
   const config = CONFIG[departmentCode];
   const [metrics, setMetrics] = useState<Metric[]>([]);
+  const [alerts, setAlerts] = useState<DashboardAlert[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [refreshKey, setRefreshKey] = useState(0);
@@ -169,6 +171,7 @@ export default function DepartmentWorkspace({ departmentCode }: { departmentCode
     (async () => {
       setLoading(true);
       setError("");
+      setAlerts([]);
       try {
         if (!config) throw new Error("This department workspace is not configured.");
         const { data, error: sessionError } = await supabase.auth.getSession();
@@ -201,7 +204,14 @@ export default function DepartmentWorkspace({ departmentCode }: { departmentCode
               value: value as string | number,
             }));
         }
-        if (active) setMetrics(next);
+        if (active) {
+          setMetrics(next);
+          setAlerts(Array.isArray(payload.alerts) ? payload.alerts.filter((item): item is DashboardAlert => {
+            if (!item || typeof item !== "object") return false;
+            const alert = item as Record<string, unknown>;
+            return typeof alert.message === "string" && typeof alert.module === "string" && typeof alert.severity === "string";
+          }) : []);
+        }
       } catch (e) {
         if (active) setError(e instanceof Error ? e.message : "Unable to load department data.");
       } finally {
@@ -295,6 +305,7 @@ export default function DepartmentWorkspace({ departmentCode }: { departmentCode
         {departmentCode === "road_asset" ? (
           <RoadAssetDashboard
             metrics={metrics}
+            alerts={alerts}
             loading={loading}
             error={error}
             onRefresh={() => setRefreshKey((current) => current + 1)}
@@ -311,6 +322,20 @@ export default function DepartmentWorkspace({ departmentCode }: { departmentCode
             </button>
           </div>
           {loading && <p className="empty-state">Loading department metrics…</p>}
+          {!loading && !error && alerts.length > 0 && (
+            <section className="department-alerts" aria-label="Operational alerts">
+              <h3>Operational alerts</h3>
+              <div className="department-alert-list">
+                {alerts.map((alert, index) => {
+                  const severity = ["high", "medium", "low"].includes(alert.severity.toLowerCase()) ? alert.severity.toLowerCase() : "info";
+                  return <article className={`department-alert is-${severity}`} key={`${alert.module}-${index}`}>
+                    <span className="department-alert-severity">{severity}</span>
+                    <div><strong>{alert.module}</strong><p>{alert.message}</p></div>
+                  </article>;
+                })}
+              </div>
+            </section>
+          )}
           {error && (
             <div className="error-message" role="alert">
               <p>{error}</p>
