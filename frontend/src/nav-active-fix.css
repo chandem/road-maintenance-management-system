@@ -1,0 +1,37 @@
+/* Department nav: only the active item is highlighted.
+   Loaded after styles.css so these rules win on equal specificity. */
+
+/* Overview is neutral unless selected */
+.department-nav .department-nav-overview {
+  background: transparent;
+  color: #42516a;
+  font-weight: 580;
+}
+
+.department-nav .department-nav-overview.is-active {
+  background: #eaf1ff;
+  color: #1e4fc5;
+  font-weight: 750;
+}
+
+.department-nav .department-nav-overview:not(.is-active) .department-nav-icon {
+  background: #f0f4fa;
+  color: #526887;
+}
+
+.department-nav .department-nav-overview.is-active .department-nav-icon {
+  background: #dce8ff;
+  color: #1d4ed8;
+}
+
+/* Road Asset: icons stay neutral until hover/active (no permanent blue) */
+.department-sidebar .department-nav-road-asset a .department-nav-icon {
+  background: #f0f5fc;
+  color: #526887;
+}
+
+.department-sidebar .department-nav-road-asset a:hover .department-nav-icon,
+.department-sidebar .department-nav-road-asset a.is-active .department-nav-icon {
+  background: #edf4ff;
+  color: #2457c5;
+}
