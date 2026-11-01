@@ -1334,3 +1334,6 @@ section, .dashboard-panel, .metric-card, .proposal-card {
 .department-alert.is-medium .department-alert-severity { color: #92400e; background: #fef3c7; }
 .department-alert.is-low { border-left-color: #0f766e; }
 .department-alert.is-low .department-alert-severity { color: #115e59; background: #ccfbf1; }
+
+/* Timestamp for department dashboard data freshness */
+.dashboard-updated-at { margin: .25rem 0 0; color: #64748b; font-size: .76rem; line-height: 1.4; }
