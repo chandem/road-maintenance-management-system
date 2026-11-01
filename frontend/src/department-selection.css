@@ -1,0 +1,20 @@
+/* Softer department selection colors on the sign-in / entry screen. */
+.entry-panel .department-card {
+  background: #f8fafc;
+  border-color: #d7dee8;
+  transition: background-color .16s ease, border-color .16s ease, box-shadow .16s ease;
+}
+.entry-panel .department-card:hover {
+  background: #f1f5f9;
+  border-color: #94a3b8;
+}
+.entry-panel .department-card.selected,
+.entry-panel .department-card[aria-pressed="true"] {
+  background: #edf2f7;
+  border: 2px solid #64748b;
+  box-shadow: 0 0 0 2px rgba(100, 116, 139, .10);
+}
+.entry-panel .department-card:focus-visible {
+  outline: 3px solid rgba(100, 116, 139, .35);
+  outline-offset: 2px;
+}
