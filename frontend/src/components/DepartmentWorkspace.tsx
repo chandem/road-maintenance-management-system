@@ -154,6 +154,7 @@ export default function DepartmentWorkspace({ departmentCode }: { departmentCode
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [refreshKey, setRefreshKey] = useState(0);
+  const [lastUpdated, setLastUpdated] = useState<number | null>(null);
   const [activeSection, setActiveSection] = useState(
     () => window.location.hash || "#department-overview",
   );
@@ -206,6 +207,7 @@ export default function DepartmentWorkspace({ departmentCode }: { departmentCode
         }
         if (active) {
           setMetrics(next);
+          setLastUpdated(Date.now());
           setAlerts(Array.isArray(payload.alerts) ? payload.alerts.filter((item): item is DashboardAlert => {
             if (!item || typeof item !== "object") return false;
             const alert = item as Record<string, unknown>;
@@ -316,7 +318,10 @@ export default function DepartmentWorkspace({ departmentCode }: { departmentCode
           <h2>{config.name}</h2>
           <p>{config.description}</p>
           <div className="section-heading">
-            <h3>Live operational metrics</h3>
+            <div>
+              <h3>Live operational metrics</h3>
+              <p className="dashboard-updated-at" aria-live="polite">{lastUpdated === null ? "Not yet refreshed" : `Last updated: ${new Date(lastUpdated).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`}</p>
+            </div>
             <button type="button" onClick={() => setRefreshKey((current) => current + 1)}>
               Refresh metrics
             </button>
