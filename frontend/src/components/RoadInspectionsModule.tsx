@@ -3,7 +3,7 @@ import type { FormEvent } from "react";
 import { supabase } from "../lib/supabase";
 
 type Section = { id: string; section_code: string | null; start_chainage_km: number; end_chainage_km: number; condition_rating: number | null };
-type Inspection = { id: string; road_section_id: string; inspection_date: string; inspector_name: string | null; condition_rating: number | null; surface_condition: string | null; defects_summary: string | null; recommended_action: string | null; status: string };
+type Inspection = { id: string; road_section_id: string; inspection_date: string; inspector_name: string | null; condition_rating: number | null; surface_condition: string | null; defects_summary: string | null; recommended_action: string | null; weather_notes: string | null; status: string };
 type PriorityRecommendation = {
   road_section_id: string;
   section_code: string | null;
@@ -33,6 +33,7 @@ export default function RoadInspectionsModule() {
   const [surface, setSurface] = useState("fair");
   const [defects, setDefects] = useState("");
   const [action, setAction] = useState("");
+  const [weatherNotes, setWeatherNotes] = useState("");
   const [status, setStatus] = useState("recorded");
   const [priorityLoading, setPriorityLoading] = useState(false);
   const [priorityError, setPriorityError] = useState("");
@@ -72,11 +73,11 @@ export default function RoadInspectionsModule() {
           road_section_id: sectionId, inspection_date: date, inspector_name: inspector.trim() || null,
           condition_rating: Number(rating), surface_condition: surface,
           defects_summary: defects.trim() || null, recommended_action: action.trim() || null,
-          status, update_section_condition: true,
+          weather_notes: weatherNotes.trim() || null, status, update_section_condition: true,
         }),
       });
       if (!response.ok) throw new Error(`Could not save inspection (${response.status}): ${(await response.text()).slice(0,220)}`);
-      setDefects(""); setAction(""); await load();
+      setDefects(""); setAction(""); setWeatherNotes(""); await load();
     } catch (e) { setError(e instanceof Error ? e.message : "Unable to save road inspection."); }
     finally { setSaving(false); }
   };
@@ -120,12 +121,13 @@ export default function RoadInspectionsModule() {
       <div className="form-grid">
         <label>Road section<select value={sectionId} onChange={e=>setSectionId(e.target.value)} required disabled={!sections.length}><option value="">Select a road section</option>{sections.map(s=><option key={s.id} value={s.id}>{sectionLabel(s.id)}</option>)}</select></label>
         <label>Inspection date<input type="date" value={date} onChange={e=>setDate(e.target.value)} required/></label>
-        <input value={inspector} onChange={e=>setInspector(e.target.value)} placeholder="Inspector name (optional)" maxLength={255}/>
+        <label>Inspector name (optional)<input value={inspector} onChange={e=>setInspector(e.target.value)} placeholder="Enter inspector name" maxLength={255}/></label>
         <label>Condition rating (0–5)<select value={rating} onChange={e=>setRating(e.target.value)}><option value="0">0 — Failed</option><option value="1">1 — Very poor</option><option value="2">2 — Poor</option><option value="3">3 — Fair</option><option value="4">4 — Good</option><option value="5">5 — Very good</option></select></label>
         <label>Surface condition<select value={surface} onChange={e=>setSurface(e.target.value)}><option value="good">Good</option><option value="fair">Fair</option><option value="poor">Poor</option><option value="very poor">Very poor</option><option value="failed">Failed</option></select></label>
         <label>Status<select value={status} onChange={e=>setStatus(e.target.value)}><option value="recorded">Recorded</option><option value="reviewed">Reviewed</option><option value="requires_action">Requires action</option></select></label>
         <label className="span-two">Defects observed<textarea value={defects} onChange={e=>setDefects(e.target.value)} rows={3} placeholder="Potholes, erosion, drainage problems…" maxLength={5000}/></label>
         <label className="span-two">Recommended action<textarea value={action} onChange={e=>setAction(e.target.value)} rows={2} placeholder="Recommended maintenance action" maxLength={2000}/></label>
+        <label className="span-two">Weather / site conditions<textarea value={weatherNotes} onChange={e=>setWeatherNotes(e.target.value)} rows={2} placeholder="Rain, standing water, visibility, access conditions…" maxLength={500}/></label>
       </div>
       <button type="submit" disabled={saving || !sectionId}>{saving ? "Saving…" : "Save inspection"}</button>
     </form>
