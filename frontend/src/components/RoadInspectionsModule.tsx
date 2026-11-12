@@ -38,6 +38,11 @@ export default function RoadInspectionsModule() {
   const [priorityLoading, setPriorityLoading] = useState(false);
   const [priorityError, setPriorityError] = useState("");
   const [recommendation, setRecommendation] = useState<PriorityRecommendation | null>(null);
+  const [historySearch, setHistorySearch] = useState("");
+  const [historyFrom, setHistoryFrom] = useState("");
+  const [historyTo, setHistoryTo] = useState("");
+  const [historyRating, setHistoryRating] = useState("all");
+  const [historyStatus, setHistoryStatus] = useState("all");
 
   const load = useCallback(async () => {
     setLoading(true); setError("");
@@ -113,6 +118,16 @@ export default function RoadInspectionsModule() {
     return s ? `${s.section_code || s.id.slice(0,8)} (${Number(s.start_chainage_km).toFixed(2)}–${Number(s.end_chainage_km).toFixed(2)} km)` : id.slice(0,8);
   };
 
+  const filteredItems = items.filter(item => {
+    const query = historySearch.trim().toLowerCase();
+    const matchesSearch = !query || `${item.inspector_name || ""} ${sectionLabel(item.road_section_id)}`.toLowerCase().includes(query);
+    const matchesFrom = !historyFrom || item.inspection_date >= historyFrom;
+    const matchesTo = !historyTo || item.inspection_date <= historyTo;
+    const matchesRating = historyRating === "all" || String(item.condition_rating ?? "") === historyRating;
+    const matchesStatus = historyStatus === "all" || item.status === historyStatus;
+    return matchesSearch && matchesFrom && matchesTo && matchesRating && matchesStatus;
+  });
+
   return <section id="inspections" className="module-panel">
     <div className="section-heading"><div><p className="eyebrow">ROAD CONDITION MONITORING</p><h2>Road Inspections</h2></div><button type="button" onClick={() => void load()} disabled={loading}>{loading ? "Loading…" : "Refresh inspections"}</button></div>
     {error && <div className="error-message">{error}</div>}
@@ -158,10 +173,21 @@ export default function RoadInspectionsModule() {
       )}
     </section>
     <h3>Inspection history</h3>
+    <div className="module-form" aria-label="Filter inspection history">
+      <div className="form-grid">
+        <label>Search inspector or road section<input value={historySearch} onChange={e=>setHistorySearch(e.target.value)} placeholder="Name or section code"/></label>
+        <label>Condition rating<select value={historyRating} onChange={e=>setHistoryRating(e.target.value)}><option value="all">All ratings</option><option value="0">0 — Failed</option><option value="1">1 — Very poor</option><option value="2">2 — Poor</option><option value="3">3 — Fair</option><option value="4">4 — Good</option><option value="5">5 — Very good</option></select></label>
+        <label>Status<select value={historyStatus} onChange={e=>setHistoryStatus(e.target.value)}><option value="all">All statuses</option><option value="recorded">Recorded</option><option value="reviewed">Reviewed</option><option value="requires_action">Requires action</option></select></label>
+        <label>From date<input type="date" value={historyFrom} onChange={e=>setHistoryFrom(e.target.value)}/></label>
+        <label>To date<input type="date" value={historyTo} onChange={e=>setHistoryTo(e.target.value)} min={historyFrom || undefined}/></label>
+      </div>
+      <div className="section-heading"><p className="panel-help" aria-live="polite">Showing {filteredItems.length} of {items.length} inspection(s)</p><button type="button" onClick={()=>{setHistorySearch("");setHistoryFrom("");setHistoryTo("");setHistoryRating("all");setHistoryStatus("all");}}>Clear filters</button></div>
+    </div>
     <div className="table module-table"><div className="table-row table-head"><span>Date / Section</span><span>Inspector</span><span>Rating</span><span>Surface</span><span>Status</span></div>
       {loading && <div className="empty-state">Loading inspections…</div>}
       {!loading && items.length===0 && <div className="empty-state">No road inspections recorded yet.</div>}
-      {items.map(item=><div className="table-row" key={item.id}><span>{item.inspection_date}<br/><strong>{sectionLabel(item.road_section_id)}</strong></span><span>{item.inspector_name || "—"}</span><span>{item.condition_rating == null ? "—" : Number(item.condition_rating)}</span><span>{item.surface_condition || "—"}</span><span>{item.status}</span></div>)}
+      {!loading && items.length>0 && filteredItems.length===0 && <div className="empty-state">No inspections match these filters. Try changing or clearing your filters.</div>}
+      {filteredItems.map(item=><div className="table-row" key={item.id}><span>{item.inspection_date}<br/><strong>{sectionLabel(item.road_section_id)}</strong></span><span>{item.inspector_name || "—"}</span><span>{item.condition_rating == null ? "—" : Number(item.condition_rating)}</span><span>{item.surface_condition || "—"}</span><span>{item.status}</span></div>)}
     </div>
   </section>;
 }
