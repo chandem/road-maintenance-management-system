@@ -43,6 +43,7 @@ export default function RoadInspectionsModule() {
   const [historyTo, setHistoryTo] = useState("");
   const [historyRating, setHistoryRating] = useState("all");
   const [historyStatus, setHistoryStatus] = useState("all");
+  const [expandedInspectionId, setExpandedInspectionId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true); setError("");
@@ -187,7 +188,32 @@ export default function RoadInspectionsModule() {
       {loading && <div className="empty-state">Loading inspections…</div>}
       {!loading && items.length===0 && <div className="empty-state">No road inspections recorded yet.</div>}
       {!loading && items.length>0 && filteredItems.length===0 && <div className="empty-state">No inspections match these filters. Try changing or clearing your filters.</div>}
-      {filteredItems.map(item=><div className="table-row" key={item.id}><span>{item.inspection_date}<br/><strong>{sectionLabel(item.road_section_id)}</strong></span><span>{item.inspector_name || "—"}</span><span>{item.condition_rating == null ? "—" : Number(item.condition_rating)}</span><span>{item.surface_condition || "—"}</span><span>{item.status}</span></div>)}
+      {filteredItems.map(item=>{
+        const expanded = expandedInspectionId === item.id;
+        return <div className="inspection-history-item" key={item.id}>
+          <div className="table-row">
+            <span>{item.inspection_date}<br/><strong>{sectionLabel(item.road_section_id)}</strong></span>
+            <span>{item.inspector_name || "—"}</span>
+            <span>{item.condition_rating == null ? "—" : Number(item.condition_rating)}</span>
+            <span>{item.surface_condition || "—"}</span>
+            <span>{item.status}</span>
+            <span><button type="button" aria-expanded={expanded} aria-controls={`inspection-details-${item.id}`} onClick={()=>setExpandedInspectionId(expanded ? null : item.id)}>{expanded ? "Hide details" : "View details"}</button></span>
+          </div>
+          {expanded && <div className="assistant-answer" id={`inspection-details-${item.id}`} aria-label={`Inspection details for ${item.inspection_date}`}>
+            <div className="form-grid">
+              <div><strong>Inspection date</strong><p>{item.inspection_date}</p></div>
+              <div><strong>Inspector</strong><p>{item.inspector_name || "Not recorded"}</p></div>
+              <div><strong>Condition rating</strong><p>{item.condition_rating == null ? "Not recorded" : `${item.condition_rating} / 5`}</p></div>
+              <div><strong>Surface condition</strong><p>{item.surface_condition || "Not recorded"}</p></div>
+              <div><strong>Status</strong><p>{item.status}</p></div>
+              <div><strong>Road section</strong><p>{sectionLabel(item.road_section_id)}</p></div>
+            </div>
+            <p><strong>Defects observed</strong><br/>{item.defects_summary || "No defects recorded."}</p>
+            <p><strong>Recommended maintenance action</strong><br/>{item.recommended_action || "No action recorded."}</p>
+            <p><strong>Weather / site conditions</strong><br/>{item.weather_notes || "No weather or site notes recorded."}</p>
+          </div>}
+        </div>;
+      })}
     </div>
   </section>;
 }
